@@ -1,5 +1,5 @@
 import type { AcquisitionScenario, FinancialPeriod, ProFormaPeriod } from "../../types";
-import { formatNum, formatMultiple, toNum } from "./helpers";
+import { formatNum, toNum } from "./helpers";
 
 interface KeyMetricsCardsProps {
   scenario: AcquisitionScenario;
@@ -8,63 +8,71 @@ interface KeyMetricsCardsProps {
   pfPeriods: ProFormaPeriod[];
 }
 
+/** Find a period matching a given period_label (year string like "2029") */
+function findByLabel(periods: FinancialPeriod[], label: string) {
+  return periods.find((p) => p.period_label === label);
+}
+function findPfByLabel(periods: ProFormaPeriod[], label: string) {
+  return periods.find((p) => p.period_label === label);
+}
+
+/** Get current year as string, e.g. "2026" */
+function currentYearLabel(): string {
+  return String(new Date().getFullYear());
+}
+
 export default function KeyMetricsCards({
   scenario,
   acquirerPeriods,
   targetPeriods,
   pfPeriods,
 }: KeyMetricsCardsProps) {
+  // Reference year = last year with acquirer data
+  const refLabel =
+    acquirerPeriods.length > 0
+      ? acquirerPeriods[acquirerPeriods.length - 1].period_label
+      : "";
+  const curLabel = currentYearLabel();
+
+  // Find periods for current year and reference year
+  const acqCur = findByLabel(acquirerPeriods, curLabel);
+  const acqRef = findByLabel(acquirerPeriods, refLabel);
+  const tgtCur = findByLabel(targetPeriods, curLabel);
+  const tgtRef = findByLabel(targetPeriods, refLabel);
+  const pfCur = findPfByLabel(pfPeriods, curLabel);
+  const pfRef = findPfByLabel(pfPeriods, refLabel);
+
   const cards = [
     {
-      label: `${scenario.acquirer_company_name} EBITDA`,
-      value:
-        acquirerPeriods.length > 0
-          ? formatNum(acquirerPeriods[acquirerPeriods.length - 1].ebitda_total)
-          : "-",
-      sub:
-        acquirerPeriods.length > 0
-          ? acquirerPeriods[acquirerPeriods.length - 1].period_label
-          : "",
+      label: `${scenario.acquirer_company_name || "Oppkjøper"} EBITDA`,
+      cur: acqCur ? formatNum(acqCur.ebitda_total) : "-",
+      ref: acqRef ? formatNum(acqRef.ebitda_total) : "-",
     },
     {
-      label: `${scenario.target_company_name} EBITDA`,
-      value:
-        targetPeriods.length > 0
-          ? formatNum(targetPeriods[targetPeriods.length - 1].ebitda_total)
-          : "-",
-      sub:
-        targetPeriods.length > 0
-          ? targetPeriods[targetPeriods.length - 1].period_label
-          : "",
+      label: `${scenario.target_company_name || "Target"} EBITDA`,
+      cur: tgtCur ? formatNum(tgtCur.ebitda_total) : "-",
+      ref: tgtRef ? formatNum(tgtRef.ebitda_total) : "-",
     },
     {
       label: "Kombinert PF EBITDA",
-      value:
-        pfPeriods.length > 0
-          ? formatNum(pfPeriods[pfPeriods.length - 1].total_ebitda_incl_synergies)
-          : "-",
-      sub: pfPeriods.length > 0 ? pfPeriods[pfPeriods.length - 1].period_label : "Generer først",
-    },
-    {
-      label: "EV / EBITDA",
-      value:
-        scenario.enterprise_value && targetPeriods.length > 0
-          ? formatMultiple(
-              toNum(scenario.enterprise_value) /
-              (toNum(targetPeriods[targetPeriods.length - 1].ebitda_total) || 1)
-            )
-          : "-",
-      sub: "Implisitt multippel",
+      cur: pfCur ? formatNum(toNum(pfCur.total_ebitda_incl_synergies)) : "-",
+      ref: pfRef ? formatNum(toNum(pfRef.total_ebitda_incl_synergies)) : "-",
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+    <div className="grid grid-cols-3 gap-4 mb-8">
       {cards.map((card, i) => (
         <div key={i} className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs text-gray-500 font-medium">{card.label}</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{card.value}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{card.sub}</p>
+          <p className="text-xs text-gray-500 font-medium mb-2">{card.label}</p>
+          <div className="flex items-baseline justify-between">
+            <span className="text-xs text-gray-400">{curLabel}</span>
+            <span className="text-lg font-bold text-gray-900">{card.cur}</span>
+          </div>
+          <div className="flex items-baseline justify-between mt-1">
+            <span className="text-xs text-gray-400">{refLabel}</span>
+            <span className="text-lg font-bold text-gray-900">{card.ref}</span>
+          </div>
         </div>
       ))}
     </div>

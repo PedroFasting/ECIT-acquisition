@@ -2,30 +2,41 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import api from "../services/api";
 import type { Company, AcquisitionScenario } from "../types";
-import { Building2, FileSpreadsheet, GitMerge, ArrowRight } from "lucide-react";
+import { Building2, FileSpreadsheet, GitMerge, ArrowRight, Trash2 } from "lucide-react";
 
 export default function DashboardPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [scenarios, setScenarios] = useState<AcquisitionScenario[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const loadData = async () => {
+    try {
+      const [comps, scens] = await Promise.all([
+        api.getCompanies(),
+        api.getScenarios(),
+      ]);
+      setCompanies(comps);
+      setScenarios(scens);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const load = async () => {
-      try {
-        const [comps, scens] = await Promise.all([
-          api.getCompanies(),
-          api.getScenarios(),
-        ]);
-        setCompanies(comps);
-        setScenarios(scens);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    loadData();
   }, []);
+
+  const handleDeleteScenario = async (id: number, name: string) => {
+    if (!confirm(`Slett scenario "${name}"? Dette kan ikke angres.`)) return;
+    try {
+      await api.deleteScenario(id);
+      setScenarios((prev) => prev.filter((s) => s.id !== id));
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   if (loading) {
     return (
@@ -168,30 +179,41 @@ export default function DashboardPage() {
           </div>
           <div className="space-y-3">
             {scenarios.slice(0, 5).map((s) => (
-              <Link
+              <div
                 key={s.id}
-                to={`/scenarios/${s.id}`}
                 className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
               >
-                <GitMerge size={16} className="text-[#002C55]" />
-                <div className="flex-1">
-                  <p className="font-medium text-gray-900 text-sm">
-                    {s.name}
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    {s.acquirer_company_name} + {s.target_company_name}
-                  </p>
-                </div>
-                <span
-                  className={`px-2 py-0.5 rounded text-xs ${
-                    s.status === "active"
-                      ? "bg-green-100 text-green-700"
-                      : "bg-amber-100 text-amber-700"
-                  }`}
+                <Link
+                  to={`/scenarios/${s.id}`}
+                  className="flex items-center gap-3 flex-1 min-w-0"
                 >
-                  {s.status === "active" ? "Aktiv" : s.status === "draft" ? "Utkast" : "Arkivert"}
-                </span>
-              </Link>
+                  <GitMerge size={16} className="text-[#002C55] shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-900 text-sm truncate">
+                      {s.name}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {s.acquirer_company_name} + {s.target_company_name}
+                    </p>
+                  </div>
+                  <span
+                    className={`px-2 py-0.5 rounded text-xs shrink-0 ${
+                      s.status === "active"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-amber-100 text-amber-700"
+                    }`}
+                  >
+                    {s.status === "active" ? "Aktiv" : s.status === "draft" ? "Utkast" : "Arkivert"}
+                  </span>
+                </Link>
+                <button
+                  onClick={() => handleDeleteScenario(s.id, s.name)}
+                  className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                  title="Slett scenario"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
             ))}
           </div>
         </div>
