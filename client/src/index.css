@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+/* ECIT Acquisition custom theme */
+:root {
+  --color-ecit-dark: #03223F;
+  --color-ecit-navy: #002C55;
+  --color-ecit-accent: #57A5E4;
+  --color-ecit-cream: #F4EDDC;
+  --color-ecit-light: #FBF7EF;
+  --color-ecit-positive: #22c55e;
+  --color-ecit-negative: #ef4444;
+  --color-ecit-neutral: #6b7280;
+
+  font-family: system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+/* Consistent table styling */
+.ecit-table {
+  width: 100%;
+  font-size: 0.875rem;
+  border-collapse: collapse;
+}
+
+.ecit-table thead tr {
+  background-color: #002C55;
+  color: white;
+}
+
+.ecit-table thead th {
+  padding: 0.5rem 0.75rem;
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.ecit-table tbody tr {
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.ecit-table tbody tr:nth-child(even) {
+  background-color: #FBF7EF;
+}
+
+.ecit-table tbody tr:nth-child(odd) {
+  background-color: white;
+}
+
+.ecit-table tbody td {
+  padding: 0.5rem 0.75rem;
+}
+
+.ecit-table td.num,
+.ecit-table th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+@media print {
+  aside {
+    display: none !important;
+  }
+  main {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+  .flex.h-screen {
+    display: block !important;
+  }
+}
