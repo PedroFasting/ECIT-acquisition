@@ -180,9 +180,14 @@ export default function AccretionAnalysis({
                       ))}
                     </tr>
                     <tr className="!bg-[#F4EDDC]">
-                      <td className="font-semibold text-gray-900 text-xs">delta (verdiøkning)</td>
+                      <td className="font-semibold text-gray-900 text-xs">delta</td>
                       {accretionData.map((d) => {
-                        const delta = d.targetOrgGrowth - d.acquirerOrgGrowth;
+                        // Revenue-weighted combined organic growth vs acquirer standalone
+                        const totalRev = d.acqRev + d.tgtRev;
+                        const weightedGrowth = totalRev > 0
+                          ? (d.acquirerOrgGrowth * d.acqRev + d.targetOrgGrowth * d.tgtRev) / totalRev
+                          : 0;
+                        const delta = weightedGrowth - d.acquirerOrgGrowth;
                         return (
                           <td
                             key={d.label}
@@ -222,9 +227,10 @@ export default function AccretionAnalysis({
                       ))}
                     </tr>
                     <tr className="!bg-[#F4EDDC]">
-                      <td className="font-semibold text-gray-900 text-xs">delta (verdiøkning)</td>
+                      <td className="font-semibold text-gray-900 text-xs">delta</td>
                       {accretionData.map((d) => {
-                        const delta = d.targetMargin - d.acquirerMargin;
+                        // Pro forma weighted margin vs acquirer standalone
+                        const delta = d.pfMargin - d.acquirerMargin;
                         return (
                           <td
                             key={d.label}
