@@ -32,11 +32,12 @@ services:
     ports:
       - "5173:5173"
     environment:
-      VITE_API_URL: http://localhost:3001
+      VITE_API_URL: http://server:3001
     depends_on:
       - server
     volumes:
       - ./client/src:/app/src
+      - ./client/vite.config.ts:/app/vite.config.ts
 
 volumes:
   pgdata:
