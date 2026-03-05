@@ -1,7 +1,7 @@
 import { Router, Response } from "express";
 import pool from "../models/db.js";
 import { AuthRequest, authMiddleware } from "../middleware/auth.js";
-import { calculateDealReturns, type DealParameters, type CaseReturn } from "../services/dealReturns.js";
+import { calculateDealReturns, type DealParameters, type PeriodData, type CaseReturn } from "../services/dealReturns.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -193,6 +193,8 @@ router.get(
 
       // Auto-calculate returns if deal_parameters are set on the scenario
       let calculatedReturns: CaseReturn[] | null = null;
+      let returnsLevel: 1 | 2 = 1;
+      let returnsLevelLabel = "";
       const dp: DealParameters | null = scenario?.deal_parameters &&
         Object.keys(scenario.deal_parameters).length > 0 &&
         scenario.deal_parameters.price_paid > 0
@@ -200,20 +202,54 @@ router.get(
         : null;
 
       if (dp) {
-        const acqData = acquirerPeriods.rows.map((p: any) => ({
+        // Merge capital structure from scenario into deal_parameters
+        const mergedParams: DealParameters = {
+          ...dp,
+          ordinary_equity: dp.ordinary_equity ?? (parseFloat(scenario.ordinary_equity) || undefined),
+          preferred_equity: dp.preferred_equity ?? (parseFloat(scenario.preferred_equity) || undefined),
+          preferred_equity_rate: dp.preferred_equity_rate ?? (parseFloat(scenario.preferred_equity_rate) || undefined),
+          net_debt: dp.net_debt ?? (parseFloat(scenario.net_debt) || undefined),
+          rollover_equity: dp.rollover_equity ?? (parseFloat(scenario.rollover_shareholders) || undefined),
+        };
+
+        // Build period data with actual capex/NWC
+        const acqData: PeriodData[] = acquirerPeriods.rows.map((p: any) => ({
           ebitda: parseFloat(p.ebitda_total) || 0,
           revenue: parseFloat(p.revenue_total) || 0,
+          capex: p.capex != null ? parseFloat(p.capex) : undefined,
+          change_nwc: p.change_nwc != null ? parseFloat(p.change_nwc) : undefined,
         }));
-        const tgtData = targetPeriods.map((p: any) => ({
+        const tgtData: PeriodData[] = targetPeriods.map((p: any) => ({
           ebitda: parseFloat(p.ebitda_total) || 0,
           revenue: parseFloat(p.revenue_total) || 0,
+          capex: p.capex != null ? parseFloat(p.capex) : undefined,
+          change_nwc: p.change_nwc != null ? parseFloat(p.change_nwc) : undefined,
         }));
-        const pfData = proFormaPeriods.map((p: any) => ({
-          ebitda: p.total_ebitda_excl_synergies || 0,
-          revenue: p.total_revenue || 0,
-        }));
-        const result = calculateDealReturns(acqData, tgtData, pfData, dp);
+
+        // Pro forma: include synergies from cost_synergies_timeline
+        const synergiesTimeline = scenario.cost_synergies_timeline || {};
+        const pfData: PeriodData[] = proFormaPeriods.map((p: any) => {
+          const year = new Date(p.period_date).getFullYear().toString();
+          const synergy = synergiesTimeline[year] || 0;
+          return {
+            ebitda: (p.total_ebitda_excl_synergies || 0) + synergy,
+            revenue: p.total_revenue || 0,
+            capex: p.total_capex != null ? p.total_capex : undefined,
+            change_nwc: p.total_change_nwc != null ? p.total_change_nwc : undefined,
+          };
+        });
+
+        // Pass synergies array for Level 2 if needed
+        const synergiesArray = proFormaPeriods.map((p: any) => {
+          const year = new Date(p.period_date).getFullYear().toString();
+          return synergiesTimeline[year] || 0;
+        });
+        mergedParams.cost_synergies = synergiesArray;
+
+        const result = calculateDealReturns(acqData, tgtData, pfData, mergedParams);
         calculatedReturns = result.cases;
+        returnsLevel = result.level;
+        returnsLevelLabel = result.level_label;
       }
 
       res.json({
@@ -225,6 +261,8 @@ router.get(
         scenario: scenario,
         deal_returns: dealReturns,
         calculated_returns: calculatedReturns,
+        returns_level: returnsLevel,
+        returns_level_label: returnsLevelLabel,
       });
     } catch (err) {
       console.error("Error comparing models:", err);
@@ -464,31 +502,65 @@ router.post(
         targetByDate.set(t.period_date.toISOString().split("T")[0], t);
       }
 
-      const pfData: { ebitda: number; revenue: number }[] = [];
+      // Get synergies timeline from scenario
+      const synergiesTimeline = scenario.cost_synergies_timeline || {};
+
+      const pfData: PeriodData[] = [];
       for (const ap of acquirerPeriods.rows) {
         const dateKey = ap.period_date.toISOString().split("T")[0];
         const tp = targetByDate.get(dateKey);
+        const year = ap.period_date.getFullYear().toString();
+        const synergy = synergiesTimeline[year] || 0;
+
+        const acqEbitda = parseFloat(ap.ebitda_total) || 0;
+        const tgtEbitda = tp ? parseFloat(tp.ebitda_total) || 0 : 0;
+
         pfData.push({
-          ebitda: (parseFloat(ap.ebitda_total) || 0) + (tp ? parseFloat(tp.ebitda_total) || 0 : 0),
+          ebitda: acqEbitda + tgtEbitda + synergy,
           revenue: (parseFloat(ap.revenue_total) || 0) + (tp ? parseFloat(tp.revenue_total) || 0 : 0),
+          capex: (ap.capex != null ? parseFloat(ap.capex) : 0) + (tp?.capex != null ? parseFloat(tp.capex) : 0) || undefined,
+          change_nwc: (ap.change_nwc != null ? parseFloat(ap.change_nwc) : 0) + (tp?.change_nwc != null ? parseFloat(tp.change_nwc) : 0) || undefined,
         });
       }
 
-      const acqData = acquirerPeriods.rows.map((p: any) => ({
+      const acqData: PeriodData[] = acquirerPeriods.rows.map((p: any) => ({
         ebitda: parseFloat(p.ebitda_total) || 0,
         revenue: parseFloat(p.revenue_total) || 0,
+        capex: p.capex != null ? parseFloat(p.capex) : undefined,
+        change_nwc: p.change_nwc != null ? parseFloat(p.change_nwc) : undefined,
       }));
-      const tgtData = targetPeriods.map((p: any) => ({
+      const tgtData: PeriodData[] = targetPeriods.map((p: any) => ({
         ebitda: parseFloat(p.ebitda_total) || 0,
         revenue: parseFloat(p.revenue_total) || 0,
+        capex: p.capex != null ? parseFloat(p.capex) : undefined,
+        change_nwc: p.change_nwc != null ? parseFloat(p.change_nwc) : undefined,
       }));
 
-      const result = calculateDealReturns(acqData, tgtData, pfData, dp);
+      // Merge capital structure from scenario into deal_parameters
+      const mergedDp: DealParameters = {
+        ...dp,
+        ordinary_equity: dp.ordinary_equity ?? (parseFloat(scenario.ordinary_equity) || undefined),
+        preferred_equity: dp.preferred_equity ?? (parseFloat(scenario.preferred_equity) || undefined),
+        preferred_equity_rate: dp.preferred_equity_rate ?? (parseFloat(scenario.preferred_equity_rate) || undefined),
+        net_debt: dp.net_debt ?? (parseFloat(scenario.net_debt) || undefined),
+        rollover_equity: dp.rollover_equity ?? (parseFloat(scenario.rollover_shareholders) || undefined),
+      };
+
+      // Pass synergies array
+      const synergiesArray = acquirerPeriods.rows.map((ap: any) => {
+        const year = ap.period_date.getFullYear().toString();
+        return synergiesTimeline[year] || 0;
+      });
+      mergedDp.cost_synergies = synergiesArray;
+
+      const result = calculateDealReturns(acqData, tgtData, pfData, mergedDp);
 
       res.json({
         calculated_returns: result.cases,
         standalone_by_multiple: result.standalone_by_multiple,
-        deal_parameters: dp,
+        deal_parameters: mergedDp,
+        level: result.level,
+        level_label: result.level_label,
       });
     } catch (err) {
       console.error("Error calculating returns:", err);

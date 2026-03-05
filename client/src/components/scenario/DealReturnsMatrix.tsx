@@ -1,16 +1,16 @@
 import { useState, useEffect, useCallback } from "react";
-import { Save, Calculator, Settings2 } from "lucide-react";
+import { Calculator, Settings2, Info, ChevronDown, ChevronUp } from "lucide-react";
 import type {
   AcquisitionScenario,
   DealParameters,
   CalculatedReturn,
   FinancialPeriod,
 } from "../../types";
-import { toNum, formatPct, formatMultiple } from "./helpers";
+import { toNum } from "./helpers";
 import SectionHeader from "./SectionHeader";
 import api from "../../services/api";
 
-// ── Norwegian number helpers (inline for IRR display) ──────────────
+// ── Norwegian number helpers ──────────────────────────────────────
 
 const nbFmt1 = new Intl.NumberFormat("nb-NO", {
   minimumFractionDigits: 1,
@@ -75,14 +75,12 @@ interface DealReturnsMatrixProps {
 }
 
 const DEFAULT_PARAMS: DealParameters = {
-  nwc_investment: 20,
-  nibd_target: 0,
-  wacc: 0.10,
-  terminal_growth: 0.01,
   price_paid: 0,
   tax_rate: 0.22,
   exit_multiples: [10, 11, 12, 13, 14],
   acquirer_entry_ev: 0,
+  nwc_investment: 20,
+  da_pct_revenue: 0.05,
 };
 
 // ── Component ──────────────────────────────────────────────────────
@@ -99,8 +97,11 @@ export default function DealReturnsMatrix({
   onCalculated,
 }: DealReturnsMatrixProps) {
   const [showParams, setShowParams] = useState(false);
+  const [showEquityParams, setShowEquityParams] = useState(false);
   const [calculating, setCalculating] = useState(false);
   const [error, setError] = useState("");
+  const [level, setLevel] = useState<1 | 2>(1);
+  const [levelLabel, setLevelLabel] = useState("");
 
   // Initialize params from scenario or defaults
   const savedParams = scenario.deal_parameters;
@@ -123,6 +124,17 @@ export default function DealReturnsMatrix({
         exit_multiples: sp.exit_multiples?.length ? sp.exit_multiples : prev.exit_multiples,
       }));
     }
+    // Also pull capital structure from scenario fields
+    if (scenario.ordinary_equity || scenario.preferred_equity || scenario.net_debt) {
+      setParams((prev) => ({
+        ...prev,
+        ordinary_equity: prev.ordinary_equity || toNum(scenario.ordinary_equity) || undefined,
+        preferred_equity: prev.preferred_equity || toNum(scenario.preferred_equity) || undefined,
+        preferred_equity_rate: prev.preferred_equity_rate || toNum(scenario.preferred_equity_rate) || undefined,
+        net_debt: prev.net_debt || toNum(scenario.net_debt) || undefined,
+        rollover_equity: prev.rollover_equity || toNum(scenario.rollover_shareholders) || undefined,
+      }));
+    }
   }, [scenario.id]);
 
   // Auto-derive acquirer_entry_ev from first-period EBITDA if not set
@@ -130,12 +142,14 @@ export default function DealReturnsMatrix({
     if (!params.acquirer_entry_ev && acquirerPeriods.length > 0) {
       const firstEbitda = toNum(acquirerPeriods[0]?.ebitda_total);
       if (firstEbitda > 0) {
-        // Use median exit multiple as proxy
         const medMult = params.exit_multiples[Math.floor(params.exit_multiples.length / 2)];
         setParams((p) => ({ ...p, acquirer_entry_ev: Math.round(firstEbitda * medMult) }));
       }
     }
   }, [acquirerPeriods]);
+
+  // Detect level based on current params
+  const currentLevel: 1 | 2 = (params.ordinary_equity ?? 0) > 0 && (params.net_debt ?? 0) > 0 ? 2 : 1;
 
   const handleCalculate = useCallback(async () => {
     if (!scenario.id || scenario.id === 0) return;
@@ -143,6 +157,8 @@ export default function DealReturnsMatrix({
     setError("");
     try {
       const result = await api.calculateReturns(scenario.id, params);
+      setLevel(result.level);
+      setLevelLabel(result.level_label);
       onCalculated(result.calculated_returns, result.deal_parameters);
     } catch (err: any) {
       setError(err.message);
@@ -155,7 +171,6 @@ export default function DealReturnsMatrix({
 
   const exitMultiples = params.exit_multiples;
 
-  // Group by case
   const caseNames: string[] = [];
   const matrixByCaseAndMult: Record<
     string,
@@ -196,7 +211,18 @@ export default function DealReturnsMatrix({
         expanded={expanded}
         onToggle={onToggle}
         actions={
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            {/* Level indicator badge */}
+            {calculatedReturns && (
+              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold ${
+                level === 2
+                  ? "bg-blue-100 text-blue-800"
+                  : "bg-amber-100 text-amber-800"
+              }`}>
+                <Info size={10} />
+                {level === 2 ? "Level 2: Equity IRR" : "Level 1: Forenklet"}
+              </span>
+            )}
             <button
               onClick={() => setShowParams(!showParams)}
               className="flex items-center gap-1 px-3 py-1 text-xs bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium"
@@ -226,9 +252,24 @@ export default function DealReturnsMatrix({
           {/* ── Deal Parameters Panel ─────────────────────── */}
           {showParams && (
             <div className="bg-gray-50 rounded-xl border border-gray-200 p-5 mb-6">
-              <h4 className="text-sm font-semibold text-gray-900 mb-4">
-                Deal-parametere
-              </h4>
+              {/* Level indicator */}
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-sm font-semibold text-gray-900">
+                  Deal-parametere
+                </h4>
+                <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium ${
+                  currentLevel === 2
+                    ? "bg-blue-50 text-blue-700 border border-blue-200"
+                    : "bg-amber-50 text-amber-700 border border-amber-200"
+                }`}>
+                  <Info size={12} />
+                  {currentLevel === 2
+                    ? "Level 2: Full Equity IRR (leveraged) aktivert"
+                    : "Level 1: Forenklet (EV-basert, unlevered)"}
+                </div>
+              </div>
+
+              {/* Core parameters (always shown) */}
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 <div>
                   <label className={labelCls}>Price paid (target EV, NOKm)</label>
@@ -258,7 +299,7 @@ export default function DealReturnsMatrix({
                 </div>
                 <div>
                   <label className={labelCls}>
-                    Investment / NWC per ar (NOKm)
+                    Fallback capex/NWC (NOKm/ar)
                   </label>
                   <input
                     type="number"
@@ -269,53 +310,7 @@ export default function DealReturnsMatrix({
                     className={inputCls}
                     placeholder="f.eks. 20"
                   />
-                </div>
-                <div>
-                  <label className={labelCls}>NIBD i target (NOKm)</label>
-                  <input
-                    type="number"
-                    value={params.nibd_target || ""}
-                    onChange={(e) =>
-                      updateParam("nibd_target", Number(e.target.value))
-                    }
-                    className={inputCls}
-                    placeholder="f.eks. 30"
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>WACC (%)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={
-                      params.wacc ? (params.wacc * 100).toFixed(1) : ""
-                    }
-                    onChange={(e) =>
-                      updateParam("wacc", Number(e.target.value) / 100)
-                    }
-                    className={inputCls}
-                    placeholder="f.eks. 10"
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>Terminal Growth (%)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={
-                      params.terminal_growth
-                        ? (params.terminal_growth * 100).toFixed(1)
-                        : ""
-                    }
-                    onChange={(e) =>
-                      updateParam(
-                        "terminal_growth",
-                        Number(e.target.value) / 100
-                      )
-                    }
-                    className={inputCls}
-                    placeholder="f.eks. 1"
-                  />
+                  <span className="text-[10px] text-gray-400">Brukes kun nar periodedata mangler</span>
                 </div>
                 <div>
                   <label className={labelCls}>Skattesats (%)</label>
@@ -335,6 +330,24 @@ export default function DealReturnsMatrix({
                   />
                 </div>
                 <div>
+                  <label className={labelCls}>D&A (% av revenue)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={
+                      params.da_pct_revenue
+                        ? (params.da_pct_revenue * 100).toFixed(1)
+                        : ""
+                    }
+                    onChange={(e) =>
+                      updateParam("da_pct_revenue", Number(e.target.value) / 100)
+                    }
+                    className={inputCls}
+                    placeholder="f.eks. 5"
+                  />
+                  <span className="text-[10px] text-gray-400">Proxy for EBT-beregning</span>
+                </div>
+                <div>
                   <label className={labelCls}>Exit-multipler (kommasep.)</label>
                   <input
                     type="text"
@@ -352,6 +365,126 @@ export default function DealReturnsMatrix({
                   />
                 </div>
               </div>
+
+              {/* ── Level 2: Capital Structure (collapsible) ── */}
+              <div className="mt-6 border-t border-gray-200 pt-4">
+                <button
+                  onClick={() => setShowEquityParams(!showEquityParams)}
+                  className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900 mb-3"
+                >
+                  {showEquityParams ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  Kapitalstruktur (aktiverer Level 2: Full Equity IRR)
+                  {currentLevel === 2 && (
+                    <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                      Aktiv
+                    </span>
+                  )}
+                </button>
+                <p className="text-xs text-gray-400 mb-3">
+                  Fyll inn ordinaer egenkapital og netto gjeld for a aktivere leveraged equity IRR.
+                  Lar felter sta tomme for forenklet EV-basert beregning.
+                </p>
+
+                {showEquityParams && (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <div>
+                      <label className={labelCls}>Ordinaer egenkapital (NOKm)</label>
+                      <input
+                        type="number"
+                        value={params.ordinary_equity || ""}
+                        onChange={(e) =>
+                          updateParam("ordinary_equity", Number(e.target.value) || undefined)
+                        }
+                        className={inputCls}
+                        placeholder="f.eks. 3000"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Preferred equity (NOKm)</label>
+                      <input
+                        type="number"
+                        value={params.preferred_equity || ""}
+                        onChange={(e) =>
+                          updateParam("preferred_equity", Number(e.target.value) || undefined)
+                        }
+                        className={inputCls}
+                        placeholder="f.eks. 500"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Pref. equity PIK-rente (%)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={
+                          params.preferred_equity_rate
+                            ? (params.preferred_equity_rate * 100).toFixed(1)
+                            : ""
+                        }
+                        onChange={(e) =>
+                          updateParam("preferred_equity_rate", Number(e.target.value) / 100 || undefined)
+                        }
+                        className={inputCls}
+                        placeholder="f.eks. 8"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Netto gjeld (NOKm)</label>
+                      <input
+                        type="number"
+                        value={params.net_debt || ""}
+                        onChange={(e) =>
+                          updateParam("net_debt", Number(e.target.value) || undefined)
+                        }
+                        className={inputCls}
+                        placeholder="f.eks. 2000"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Gjeldsrente (%)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={
+                          params.interest_rate
+                            ? (params.interest_rate * 100).toFixed(1)
+                            : ""
+                        }
+                        onChange={(e) =>
+                          updateParam("interest_rate", Number(e.target.value) / 100 || undefined)
+                        }
+                        className={inputCls}
+                        placeholder="f.eks. 5"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Arlig gjeldsavdrag (NOKm)</label>
+                      <input
+                        type="number"
+                        value={params.debt_amortisation || ""}
+                        onChange={(e) =>
+                          updateParam("debt_amortisation", Number(e.target.value) || undefined)
+                        }
+                        className={inputCls}
+                        placeholder="f.eks. 100"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Rollover egenkapital (NOKm)</label>
+                      <input
+                        type="number"
+                        value={params.rollover_equity || ""}
+                        onChange={(e) =>
+                          updateParam("rollover_equity", Number(e.target.value) || undefined)
+                        }
+                        className={inputCls}
+                        placeholder="f.eks. 200"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="mt-4 flex justify-end">
                 <button
                   onClick={handleCalculate}
@@ -361,7 +494,7 @@ export default function DealReturnsMatrix({
                   <Calculator size={14} />
                   {calculating
                     ? "Beregner..."
-                    : "Beregn IRR / MoM"}
+                    : `Beregn IRR / MoM (Level ${currentLevel})`}
                 </button>
               </div>
             </div>
@@ -377,6 +510,10 @@ export default function DealReturnsMatrix({
                 <strong>Acquirer entry EV</strong>) og trykk{" "}
                 <strong>Beregn</strong>.
               </p>
+              <p className="text-xs text-gray-300 mb-4">
+                Level 1 (forenklet): Tilgjengelig med EBITDA og pris.
+                Level 2 (full equity IRR): Fyll inn kapitalstruktur.
+              </p>
               <button
                 onClick={() => setShowParams(true)}
                 className="text-[#002C55] hover:underline text-sm font-medium"
@@ -386,13 +523,30 @@ export default function DealReturnsMatrix({
             </div>
           )}
 
-          {/* ── Results Matrix (Towerbrook-style) ─────────── */}
+          {/* ── Results Matrix ────────────────────────────── */}
           {calculatedReturns && calculatedReturns.length > 0 && (
             <div className="space-y-6">
+              {/* Level banner */}
+              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs ${
+                level === 2
+                  ? "bg-blue-50 text-blue-700 border border-blue-200"
+                  : "bg-amber-50 text-amber-700 border border-amber-200"
+              }`}>
+                <Info size={14} />
+                <span className="font-semibold">
+                  {level === 2 ? "Level 2: Full Equity IRR" : "Level 1: Forenklet (EV-basert)"}
+                </span>
+                <span className="text-gray-500">
+                  {level === 2
+                    ? "— Leveraged equity-basert IRR med gjeldsplan og preferred equity PIK"
+                    : "— Unlevered EV-basert avkastning. Fyll inn kapitalstruktur for Level 2."}
+                </span>
+              </div>
+
               {/* Main IRR/MoM table */}
               <div>
                 <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                  Deal returns (IRR / MoM)
+                  Deal returns ({level === 2 ? "Equity IRR" : "IRR"} / MoM)
                 </h4>
                 <div className="overflow-x-auto">
                   <table className="ecit-table w-full">
@@ -429,6 +583,12 @@ export default function DealReturnsMatrix({
                           >
                             <td className="font-semibold text-gray-900">
                               <div>{label}</div>
+                              {caseName === "Standalone" && level === 2 && (
+                                <div className="text-[10px] text-gray-400 font-normal">EV-basert (Level 1)</div>
+                              )}
+                              {caseName === "Kombinert" && level === 2 && (
+                                <div className="text-[10px] text-blue-500 font-normal">Equity IRR (Level 2)</div>
+                              )}
                             </td>
                             {exitMultiples.map((mult) => {
                               const cell = data[mult];
@@ -463,6 +623,9 @@ export default function DealReturnsMatrix({
                   <p className="text-xs text-gray-500 mb-3">
                     Viser hvor mye IRR/MoM forbedres ved a kjope {targetName}{" "}
                     vs. {acquirerName} standalone
+                    {level === 2 && (
+                      <span className="text-gray-400"> (NB: standalone er Level 1, kombinert er Level 2)</span>
+                    )}
                   </p>
                   <div className="overflow-x-auto">
                     <table className="ecit-table w-full">
@@ -553,7 +716,6 @@ export default function DealReturnsMatrix({
 
                   {/* Worked example callout */}
                   {(() => {
-                    // Find the accretive case at reference multiple (13x or middle)
                     const refMult = exitMultiples.includes(13) ? 13 : exitMultiples[Math.floor(exitMultiples.length / 2)];
                     const sRef = matrixByCaseAndMult[standaloneCase]?.[refMult];
                     const cRef = matrixByCaseAndMult[combinedCase]?.[refMult];
@@ -584,13 +746,33 @@ export default function DealReturnsMatrix({
                   {nbFmt1.format(params.acquirer_entry_ev || 0)} NOKm
                 </div>
                 <div>
-                  <span className="font-medium">WACC:</span>{" "}
-                  {nbFmt1.format((params.wacc || 0) * 100)}%
-                </div>
-                <div>
                   <span className="font-medium">Skattesats:</span>{" "}
                   {nbFmt1.format((params.tax_rate || 0) * 100)}%
                 </div>
+                {level === 2 && (
+                  <>
+                    <div>
+                      <span className="font-medium">Ordinaer EK:</span>{" "}
+                      {nbFmt1.format(params.ordinary_equity || 0)} NOKm
+                    </div>
+                    <div>
+                      <span className="font-medium">Netto gjeld:</span>{" "}
+                      {nbFmt1.format(params.net_debt || 0)} NOKm
+                    </div>
+                    {(params.preferred_equity ?? 0) > 0 && (
+                      <div>
+                        <span className="font-medium">Pref. equity:</span>{" "}
+                        {nbFmt1.format(params.preferred_equity || 0)} NOKm @ {nbFmt1.format((params.preferred_equity_rate || 0) * 100)}%
+                      </div>
+                    )}
+                  </>
+                )}
+                {level === 1 && (
+                  <div>
+                    <span className="font-medium">D&A proxy:</span>{" "}
+                    {nbFmt1.format((params.da_pct_revenue || 0) * 100)}% av revenue
+                  </div>
+                )}
               </div>
             </div>
           )}

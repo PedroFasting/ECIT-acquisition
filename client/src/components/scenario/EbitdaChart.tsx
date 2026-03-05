@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import type { FinancialPeriod, ProFormaPeriod } from "../../types";
 import { toNum, formatTooltip } from "./helpers";
+import CopyChartButton from "./CopyChartButton";
 
 interface EbitdaChartProps {
   acquirerPeriods: FinancialPeriod[];
@@ -45,39 +46,41 @@ export default function EbitdaChart({
   );
 
   return (
-    <div>
-      <h4 className="text-sm font-semibold text-gray-900 mb-4">
-        EBITDA-utvikling (NOKm)
-      </h4>
-      <ResponsiveContainer width="100%" height={300}>
-        <LineChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis dataKey="year" fontSize={12} />
-          <YAxis fontSize={12} />
-          <Tooltip
-            formatter={(value: any, name: string) => [
-              formatTooltip(value, "NOKm"),
-              name,
-            ]}
-          />
-          <Legend />
-          <Line type="monotone" dataKey="acquirer" stroke="#002C55" strokeWidth={2} name={acquirerName} />
-          <Line type="monotone" dataKey="target" stroke="#57A5E4" strokeWidth={2} name={targetName} strokeDasharray="5 5" />
-          {hasPf && hasSynergies && (
-            <Line
-              type="monotone"
-              dataKey="combinedExcl"
-              stroke="#a8b5d6"
-              strokeWidth={2}
-              name="Kombinert (ekskl. synergier)"
-              strokeDasharray="3 3"
+    <CopyChartButton fileName="ebitda-utvikling">
+      <div>
+        <h4 className="text-sm font-semibold text-gray-900 mb-4">
+          EBITDA-utvikling (NOKm)
+        </h4>
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis dataKey="year" fontSize={12} />
+            <YAxis fontSize={12} />
+            <Tooltip
+              formatter={(value: any, name: string) => [
+                formatTooltip(value, "NOKm"),
+                name,
+              ]}
             />
-          )}
-          {hasPf && (
-            <Line type="monotone" dataKey="combinedIncl" stroke="#03223F" strokeWidth={3} name="Kombinert PF" />
-          )}
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
+            <Legend />
+            <Line type="monotone" dataKey="acquirer" stroke="#002C55" strokeWidth={2} name={acquirerName} />
+            <Line type="monotone" dataKey="target" stroke="#57A5E4" strokeWidth={2} name={targetName} strokeDasharray="5 5" />
+            {hasPf && hasSynergies && (
+              <Line
+                type="monotone"
+                dataKey="combinedExcl"
+                stroke="#a8b5d6"
+                strokeWidth={2}
+                name="Kombinert (ekskl. synergier)"
+                strokeDasharray="3 3"
+              />
+            )}
+            {hasPf && (
+              <Line type="monotone" dataKey="combinedIncl" stroke="#03223F" strokeWidth={3} name="Kombinert PF" />
+            )}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </CopyChartButton>
   );
 }

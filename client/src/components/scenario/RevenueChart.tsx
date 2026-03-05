@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import type { FinancialPeriod, ProFormaPeriod } from "../../types";
 import { toNum, formatTooltip } from "./helpers";
+import CopyChartButton from "./CopyChartButton";
 
 interface RevenueChartProps {
   acquirerPeriods: FinancialPeriod[];
@@ -46,35 +47,37 @@ export default function RevenueChart({
   });
 
   return (
-    <div>
-      <h4 className="text-sm font-semibold text-gray-900 mb-4">
-        {hasPf ? "Revenue-sammensetning PF (NOKm)" : "Revenue-sammenligning (NOKm)"}
-      </h4>
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis dataKey="year" fontSize={12} />
-          <YAxis fontSize={12} />
-          <Tooltip
-            formatter={(value: any, name: string) => [
-              formatTooltip(value, "NOKm"),
-              name,
-            ]}
-          />
-          <Legend />
-          {hasPf ? (
-            <>
-              <Bar dataKey="acquirer" stackId="revenue" fill="#002C55" name={acquirerName} />
-              <Bar dataKey="target" stackId="revenue" fill="#57A5E4" name={targetName} />
-            </>
-          ) : (
-            <>
-              <Bar dataKey="acquirer" fill="#002C55" name={acquirerName} />
-              <Bar dataKey="target" fill="#57A5E4" name={targetName} />
-            </>
-          )}
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
+    <CopyChartButton fileName="revenue">
+      <div>
+        <h4 className="text-sm font-semibold text-gray-900 mb-4">
+          {hasPf ? "Revenue-sammensetning PF (NOKm)" : "Revenue-sammenligning (NOKm)"}
+        </h4>
+        <ResponsiveContainer width="100%" height={300}>
+          <BarChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis dataKey="year" fontSize={12} />
+            <YAxis fontSize={12} />
+            <Tooltip
+              formatter={(value: any, name: string) => [
+                formatTooltip(value, "NOKm"),
+                name,
+              ]}
+            />
+            <Legend />
+            {hasPf ? (
+              <>
+                <Bar dataKey="acquirer" stackId="revenue" fill="#002C55" name={acquirerName} />
+                <Bar dataKey="target" stackId="revenue" fill="#57A5E4" name={targetName} />
+              </>
+            ) : (
+              <>
+                <Bar dataKey="acquirer" fill="#002C55" name={acquirerName} />
+                <Bar dataKey="target" fill="#57A5E4" name={targetName} />
+              </>
+            )}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </CopyChartButton>
   );
 }

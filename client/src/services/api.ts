@@ -266,7 +266,7 @@ class ApiService {
   async calculateReturns(
     scenarioId: number,
     dealParameters: DealParameters
-  ): Promise<{ calculated_returns: CalculatedReturn[]; standalone_by_multiple: Record<number, { irr: number | null; mom: number | null }>; deal_parameters: DealParameters }> {
+  ): Promise<{ calculated_returns: CalculatedReturn[]; standalone_by_multiple: Record<number, { irr: number | null; mom: number | null }>; deal_parameters: DealParameters; level: 1 | 2; level_label: string }> {
     return this.request(`/scenarios/${scenarioId}/calculate-returns`, {
       method: "POST",
       body: JSON.stringify({ deal_parameters: dealParameters }),

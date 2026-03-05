@@ -11,6 +11,7 @@ import {
 import type { AcquisitionScenario, FinancialPeriod, ProFormaPeriod } from "../../types";
 import { toNum, formatNum, formatPct, formatPctDelta, formatTooltip, deltaColor } from "./helpers";
 import SectionHeader from "./SectionHeader";
+import CopyChartButton from "./CopyChartButton";
 
 interface AccretionAnalysisProps {
   scenario: AcquisitionScenario;
@@ -284,22 +285,24 @@ export default function AccretionAnalysis({
                 ]);
 
                 return (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={barData} barGap={0} barCategoryGap="20%">
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="group" fontSize={10} interval={0} angle={0} />
-                      <YAxis fontSize={12} />
-                      <Tooltip
-                        formatter={(value: any, name: string) => [
-                          formatTooltip(value, "NOKm"),
-                          name,
-                        ]}
-                      />
-                      <Legend />
-                      <Bar dataKey="Revenue" fill="#a8b5d6" name="Omsetning" />
-                      <Bar dataKey="EBITDA" fill="#002C55" name="EBITDA" />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <CopyChartButton fileName="standalone-vs-proforma">
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={barData} barGap={0} barCategoryGap="20%">
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis dataKey="group" fontSize={10} interval={0} angle={0} />
+                        <YAxis fontSize={12} />
+                        <Tooltip
+                          formatter={(value: any, name: string) => [
+                            formatTooltip(value, "NOKm"),
+                            name,
+                          ]}
+                        />
+                        <Legend />
+                        <Bar dataKey="Revenue" fill="#a8b5d6" name="Omsetning" />
+                        <Bar dataKey="EBITDA" fill="#002C55" name="EBITDA" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CopyChartButton>
                 );
               })()}
             </div>
@@ -309,43 +312,47 @@ export default function AccretionAnalysis({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* 8.1 Organic growth grouped bar chart */}
             {growthChartData && growthChartData.length > 0 && (
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                  Organisk vekst-sammenligning (%)
-                </h4>
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={growthChartData} barGap={2} barCategoryGap="20%">
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="year" fontSize={12} />
-                    <YAxis fontSize={12} tickFormatter={(v) => `${v}%`} />
-                    <Tooltip formatter={(value: any) => [`${value}%`, undefined]} />
-                    <Legend />
-                    <Bar dataKey={acquirerName} fill="#002C55" />
-                    <Bar dataKey={targetName} fill="#57A5E4" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <CopyChartButton fileName="organisk-vekst">
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                    Organisk vekst-sammenligning (%)
+                  </h4>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={growthChartData} barGap={2} barCategoryGap="20%">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="year" fontSize={12} />
+                      <YAxis fontSize={12} tickFormatter={(v) => `${v}%`} />
+                      <Tooltip formatter={(value: any) => [`${value}%`, undefined]} />
+                      <Legend />
+                      <Bar dataKey={acquirerName} fill="#002C55" />
+                      <Bar dataKey={targetName} fill="#57A5E4" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CopyChartButton>
             )}
 
             {/* 8.2 EBITDA margin grouped bar chart */}
             {marginChartData && marginChartData.length > 0 && (
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                  EBITDA-margin sammenligning (%)
-                </h4>
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={marginChartData} barGap={2} barCategoryGap="20%">
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="year" fontSize={12} />
-                    <YAxis fontSize={12} tickFormatter={(v) => `${v}%`} />
-                    <Tooltip formatter={(value: any) => [`${value}%`, undefined]} />
-                    <Legend />
-                    <Bar dataKey={acquirerName} fill="#002C55" />
-                    <Bar dataKey={targetName} fill="#57A5E4" />
-                    <Bar dataKey="Pro Forma" fill="#03223F" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <CopyChartButton fileName="ebitda-margin">
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                    EBITDA-margin sammenligning (%)
+                  </h4>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={marginChartData} barGap={2} barCategoryGap="20%">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="year" fontSize={12} />
+                      <YAxis fontSize={12} tickFormatter={(v) => `${v}%`} />
+                      <Tooltip formatter={(value: any) => [`${value}%`, undefined]} />
+                      <Legend />
+                      <Bar dataKey={acquirerName} fill="#002C55" />
+                      <Bar dataKey={targetName} fill="#57A5E4" />
+                      <Bar dataKey="Pro Forma" fill="#03223F" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CopyChartButton>
             )}
           </div>
 

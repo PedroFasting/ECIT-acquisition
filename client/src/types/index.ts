@@ -193,14 +193,27 @@ export interface DealReturn {
 }
 
 export interface DealParameters {
-  nwc_investment: number;
-  nibd_target: number;
-  wacc: number;
-  terminal_growth: number;
   price_paid: number;
   tax_rate: number;
   exit_multiples: number[];
   acquirer_entry_ev?: number;
+  // Fallback capex/NWC when period-level data is missing
+  nwc_investment?: number;
+  // D&A as % of revenue for EBT proxy (default 5%)
+  da_pct_revenue?: number;
+  // Level 2: Capital Structure (activates full equity IRR)
+  ordinary_equity?: number;
+  preferred_equity?: number;
+  preferred_equity_rate?: number;
+  net_debt?: number;
+  debt_amortisation?: number;
+  interest_rate?: number;
+  rollover_equity?: number;
+  cost_synergies?: number[];
+  // Deprecated (kept for backward compat)
+  nibd_target?: number;
+  wacc?: number;
+  terminal_growth?: number;
 }
 
 export interface CalculatedReturn {
@@ -257,4 +270,6 @@ export interface CompareResult {
   scenario: AcquisitionScenario | null;
   deal_returns: DealReturn[];
   calculated_returns: CalculatedReturn[] | null;
+  returns_level?: 1 | 2;
+  returns_level_label?: string;
 }
