@@ -1,6 +1,8 @@
 import { Router, Response } from "express";
 import pool from "../models/db.js";
 import { AuthRequest, authMiddleware } from "../middleware/auth.js";
+import { validate } from "../middleware/validate.js";
+import { CreateCompanySchema, UpdateCompanySchema, UpdateAssumptionsSchema } from "../schemas.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -50,7 +52,7 @@ router.get("/:id", async (req: AuthRequest, res: Response): Promise<void> => {
 });
 
 // Create company
-router.post("/", async (req: AuthRequest, res: Response): Promise<void> => {
+router.post("/", validate(CreateCompanySchema), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { name, company_type, description, currency, country, sector } =
       req.body;
@@ -85,7 +87,7 @@ router.post("/", async (req: AuthRequest, res: Response): Promise<void> => {
 });
 
 // Update company
-router.put("/:id", async (req: AuthRequest, res: Response): Promise<void> => {
+router.put("/:id", validate(UpdateCompanySchema), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const { name, description, currency, country, sector } = req.body;
@@ -228,7 +230,7 @@ router.get("/:id/assumptions", async (req: AuthRequest, res: Response): Promise<
 });
 
 // PUT /companies/:id/assumptions — saves to ALL models for the company
-router.put("/:id/assumptions", async (req: AuthRequest, res: Response): Promise<void> => {
+router.put("/:id/assumptions", validate(UpdateAssumptionsSchema), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const {

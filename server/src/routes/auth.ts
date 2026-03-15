@@ -2,18 +2,15 @@ import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import pool from "../models/db.js";
 import { generateToken, authMiddleware, AuthRequest } from "../middleware/auth.js";
+import { validate } from "../middleware/validate.js";
+import { LoginSchema, RegisterSchema } from "../schemas.js";
 
 const router = Router();
 
 // Login
-router.post("/login", async (req: Request, res: Response): Promise<void> => {
+router.post("/login", validate(LoginSchema), async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body;
-
-    if (!email || !password) {
-      res.status(400).json({ error: "Email and password are required" });
-      return;
-    }
 
     const result = await pool.query(
       "SELECT id, email, name, role, password_hash FROM users WHERE email = $1",
@@ -58,7 +55,7 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
 });
 
 // Register — admin only
-router.post("/register", authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post("/register", authMiddleware, validate(RegisterSchema), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     if (req.userRole !== "admin") {
       res.status(403).json({ error: "Only admins can register new users" });
@@ -66,18 +63,7 @@ router.post("/register", authMiddleware, async (req: AuthRequest, res: Response)
     }
 
     const { email, password, name, role } = req.body;
-
-    if (!email || !password || !name) {
-      res.status(400).json({ error: "Email, password, and name are required" });
-      return;
-    }
-    if (password.length < 8) {
-      res.status(400).json({ error: "Password must be at least 8 characters" });
-      return;
-    }
-
-    const validRoles = ["admin", "analyst", "viewer"];
-    const userRole = validRoles.includes(role) ? role : "analyst";
+    const userRole = role;
 
     const hash = await bcrypt.hash(password, 10);
 

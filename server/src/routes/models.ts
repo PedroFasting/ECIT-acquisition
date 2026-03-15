@@ -1,6 +1,8 @@
 import { Router, Response } from "express";
 import pool from "../models/db.js";
 import { AuthRequest, authMiddleware } from "../middleware/auth.js";
+import { validate } from "../middleware/validate.js";
+import { CreateModelSchema, UpdateModelSchema, BulkPeriodsSchema } from "../schemas.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -68,7 +70,7 @@ router.get("/:id", async (req: AuthRequest, res: Response): Promise<void> => {
 });
 
 // Create model
-router.post("/", async (req: AuthRequest, res: Response): Promise<void> => {
+router.post("/", validate(CreateModelSchema), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { company_id, name, description, model_type, model_parameters } = req.body;
 
@@ -91,7 +93,7 @@ router.post("/", async (req: AuthRequest, res: Response): Promise<void> => {
 });
 
 // Update model
-router.put("/:id", async (req: AuthRequest, res: Response): Promise<void> => {
+router.put("/:id", validate(UpdateModelSchema), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const { name, description, model_type, is_active, model_parameters } = req.body;
@@ -141,15 +143,11 @@ router.delete(
 // Bulk upsert financial periods for a model
 router.post(
   "/:id/periods",
+  validate(BulkPeriodsSchema),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
       const { periods } = req.body;
-
-      if (!Array.isArray(periods) || periods.length === 0) {
-        res.status(400).json({ error: "periods array is required" });
-        return;
-      }
 
       // Verify model exists
       const modelCheck = await pool.query(

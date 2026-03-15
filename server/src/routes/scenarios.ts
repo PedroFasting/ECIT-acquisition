@@ -1,6 +1,14 @@
 import { Router, Response } from "express";
 import pool from "../models/db.js";
 import { AuthRequest, authMiddleware } from "../middleware/auth.js";
+import { validate } from "../middleware/validate.js";
+import {
+  CreateScenarioSchema,
+  UpdateScenarioSchema,
+  CalculateReturnsSchema,
+  SensitivitySchema,
+  BulkReturnsSchema,
+} from "../schemas.js";
 import { calculateDealReturns, type DealParameters, type PeriodData, type CaseReturn, type CalculatedReturns } from "../services/dealReturns.js";
 import { generateExcelModel, type ExportData } from "../services/excelExporter.js";
 import {
@@ -269,7 +277,7 @@ router.get("/:id", async (req: AuthRequest, res: Response): Promise<void> => {
 });
 
 // Create scenario
-router.post("/", async (req: AuthRequest, res: Response): Promise<void> => {
+router.post("/", validate(CreateScenarioSchema), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const {
       name,
@@ -330,7 +338,7 @@ router.post("/", async (req: AuthRequest, res: Response): Promise<void> => {
 });
 
 // Update scenario
-router.put("/:id", async (req: AuthRequest, res: Response): Promise<void> => {
+router.put("/:id", validate(UpdateScenarioSchema), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const fields = req.body;
@@ -390,16 +398,11 @@ router.put("/:id", async (req: AuthRequest, res: Response): Promise<void> => {
 // Calculate returns from deal parameters + financial data
 router.post(
   "/:id/calculate-returns",
+  validate(CalculateReturnsSchema),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
-      const body = req.body || {};
-      const dp = body.deal_parameters as DealParameters | undefined;
-
-      if (!dp || !dp.price_paid) {
-        res.status(400).json({ error: "deal_parameters with price_paid is required" });
-        return;
-      }
+      const dp = req.body.deal_parameters as DealParameters;
 
       // Save deal_parameters to scenario
       await pool.query(
@@ -477,6 +480,7 @@ router.post(
 // ── Sensitivity analysis: run calculation grid over two variable axes ──
 router.post(
   "/:id/sensitivity",
+  validate(SensitivitySchema),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
@@ -488,13 +492,8 @@ router.post(
         return_case,   // 'Kombinert' | 'Standalone' (default: 'Kombinert')
       } = req.body;
 
-      if (!base_params || !row_axis?.param || !row_axis?.values?.length || !col_axis?.param || !col_axis?.values?.length) {
-        res.status(400).json({ error: "base_params, row_axis, and col_axis are required" });
-        return;
-      }
-
-      const metricKey = metric || "irr";
-      const targetCase = return_case || "Kombinert";
+      const metricKey = metric;
+      const targetCase = return_case;
 
       // ── Fetch scenario & period data (same prep as calculate-returns) ──
       const scenarioResult = await pool.query("SELECT * FROM acquisition_scenarios WHERE id = $1", [id]);
@@ -592,15 +591,11 @@ router.post(
 // Bulk upsert deal returns
 router.post(
   "/:id/returns",
+  validate(BulkReturnsSchema),
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
       const { returns } = req.body;
-
-      if (!Array.isArray(returns)) {
-        res.status(400).json({ error: "returns array is required" });
-        return;
-      }
 
       const client = await pool.connect();
       try {
