@@ -9,20 +9,21 @@ import {
   SensitivitySchema,
   BulkReturnsSchema,
 } from "../schemas.js";
-import { calculateDealReturns, type DealParameters, type PeriodData, type CaseReturn, type CalculatedReturns } from "../services/dealReturns.js";
+import { calculateDealReturns, type DealParameters, type CaseReturn, type CalculatedReturns } from "../services/dealReturns.js";
 import { generateExcelModel, type ExportData } from "../services/excelExporter.js";
 import {
   buildProFormaPeriods,
   applySynergies,
-  buildAcquirerPeriodData,
-  buildTargetPeriodData,
   buildProFormaPeriodData,
-  buildProFormaPeriodDataFromStored,
   computeNibdFcf,
   prepareFullDealParams,
-  extractPeriodLabels,
   sensitivityParamSetters,
 } from "../services/proForma.js";
+import {
+  loadScenarioContext,
+  buildComputationData,
+  runFullCalculation,
+} from "../services/scenarioContext.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -180,16 +181,14 @@ router.get(
 
       if (dp) {
         const synergiesTimeline = scenario.cost_synergies_timeline || {};
-        const mergedParams = prepareFullDealParams(
-          dp, scenario, acquirerPeriods.rows,
-          acquirerModel.rows[0].model_parameters, synergiesTimeline,
-        );
-
-        const acqData = buildAcquirerPeriodData(acquirerPeriods.rows);
-        const tgtData = buildTargetPeriodData(targetPeriods);
-        const pfData = buildProFormaPeriodDataFromStored(proFormaPeriods, synergiesTimeline);
-
-        const result = calculateDealReturns(acqData, tgtData, pfData, mergedParams);
+        const ctx = {
+          scenario,
+          acquirerPeriods: acquirerPeriods.rows,
+          targetPeriods,
+          acquirerModelParams: acquirerModel.rows[0].model_parameters ?? null,
+          synergiesTimeline,
+        };
+        const { result } = runFullCalculation(ctx, dp, proFormaPeriods);
         calculatedReturns = result.cases;
         returnsLevel = result.level;
         returnsLevelLabel = result.level_label;
@@ -344,7 +343,7 @@ router.put("/:id", validate(UpdateScenarioSchema), async (req: AuthRequest, res:
     const fields = req.body;
     
     const setParts: string[] = [];
-    const values: any[] = [];
+    const values: unknown[] = [];
     let paramIdx = 1;
 
     const allowedFields = [
@@ -410,56 +409,14 @@ router.post(
         [JSON.stringify(dp), id]
       );
 
-      // Get scenario with model refs
-      const scenarioResult = await pool.query(
-        "SELECT * FROM acquisition_scenarios WHERE id = $1",
-        [id]
-      );
-      if (scenarioResult.rows.length === 0) {
+      // Load all scenario data
+      const loaded = await loadScenarioContext(id, { withNames: false });
+      if (!loaded) {
         res.status(404).json({ error: "Scenario not found" });
         return;
       }
-      const scenario = scenarioResult.rows[0];
 
-      // Get acquirer periods
-      const acquirerPeriods = await pool.query(
-        "SELECT * FROM financial_periods WHERE model_id = $1 ORDER BY period_date",
-        [scenario.acquirer_model_id]
-      );
-
-      // Get acquirer model_parameters (for MIP/TSO/warrants dilution)
-      const acquirerModelResult = await pool.query(
-        "SELECT model_parameters FROM financial_models WHERE id = $1",
-        [scenario.acquirer_model_id]
-      );
-      const acquirerModelParams = acquirerModelResult.rows[0]?.model_parameters ?? null;
-
-      // Get target periods
-      let targetPeriods: any[] = [];
-      if (scenario.target_model_id) {
-        const tp = await pool.query(
-          "SELECT * FROM financial_periods WHERE model_id = $1 ORDER BY period_date",
-          [scenario.target_model_id]
-        );
-        targetPeriods = tp.rows;
-      }
-
-      // Get synergies timeline from scenario
-      const synergiesTimeline = scenario.cost_synergies_timeline || {};
-
-      // Build period data arrays using extracted helpers
-      const tgtNibdFcf = computeNibdFcf(targetPeriods);
-      const acqData = buildAcquirerPeriodData(acquirerPeriods.rows);
-      const tgtData = buildTargetPeriodData(targetPeriods, tgtNibdFcf);
-      const pfData = buildProFormaPeriodData(acquirerPeriods.rows, targetPeriods, synergiesTimeline, dp, tgtNibdFcf);
-
-      // Merge capital structure + share tracking + dilution + synergies
-      const mergedDp = prepareFullDealParams(dp, scenario, acquirerPeriods.rows, acquirerModelParams, synergiesTimeline);
-
-      // Extract period labels for debt schedule (e.g. ["2026E", "2027E", ...])
-      const periodLabels = extractPeriodLabels(acquirerPeriods.rows);
-
-      const result = calculateDealReturns(acqData, tgtData, pfData, mergedDp, periodLabels);
+      const { mergedDp, result } = runFullCalculation(loaded.ctx, dp);
 
       res.json({
         calculated_returns: result.cases,
@@ -495,39 +452,10 @@ router.post(
       const metricKey = metric;
       const targetCase = return_case;
 
-      // ── Fetch scenario & period data (same prep as calculate-returns) ──
-      const scenarioResult = await pool.query("SELECT * FROM acquisition_scenarios WHERE id = $1", [id]);
-      if (scenarioResult.rows.length === 0) { res.status(404).json({ error: "Scenario not found" }); return; }
-      const scenario = scenarioResult.rows[0];
-
-      const acquirerPeriods = await pool.query(
-        "SELECT * FROM financial_periods WHERE model_id = $1 ORDER BY period_date",
-        [scenario.acquirer_model_id]
-      );
-
-      // Get acquirer model_parameters (for MIP/TSO/warrants dilution)
-      const acquirerModelResult = await pool.query(
-        "SELECT model_parameters FROM financial_models WHERE id = $1",
-        [scenario.acquirer_model_id]
-      );
-      const acquirerModelParams = acquirerModelResult.rows[0]?.model_parameters ?? null;
-
-      let targetPeriods: any[] = [];
-      if (scenario.target_model_id) {
-        const tp = await pool.query(
-          "SELECT * FROM financial_periods WHERE model_id = $1 ORDER BY period_date",
-          [scenario.target_model_id]
-        );
-        targetPeriods = tp.rows;
-      }
-
-      const synergiesTimeline = scenario.cost_synergies_timeline || {};
-
-      // Pre-compute shared period data (invariant across grid cells)
-      const tgtNibdFcf = computeNibdFcf(targetPeriods);
-      const acqData = buildAcquirerPeriodData(acquirerPeriods.rows);
-      const tgtData = buildTargetPeriodData(targetPeriods, tgtNibdFcf);
-      const periodLabels = extractPeriodLabels(acquirerPeriods.rows);
+      // ── Load scenario context (same data for all grid cells) ──
+      const loaded = await loadScenarioContext(id, { withNames: false });
+      if (!loaded) { res.status(404).json({ error: "Scenario not found" }); return; }
+      const { ctx } = loaded;
 
       const setRow = sensitivityParamSetters[row_axis.param];
       const setCol = sensitivityParamSetters[col_axis.param];
@@ -535,6 +463,10 @@ router.post(
         res.status(400).json({ error: `Invalid axis param: ${row_axis.param} or ${col_axis.param}` });
         return;
       }
+
+      // Pre-compute shared period data (invariant across grid cells)
+      const tgtNibdFcf = computeNibdFcf(ctx.targetPeriods);
+      const { acqData, tgtData, periodLabels } = buildComputationData(ctx, base_params, tgtNibdFcf);
 
       // ── Run the grid ──
       const matrix: (number | null)[][] = [];
@@ -555,8 +487,8 @@ router.post(
           // Force a single exit multiple to speed up calculation
           dp.exit_multiples = [exitMult];
 
-          const mergedDp = prepareFullDealParams(dp, scenario, acquirerPeriods.rows, acquirerModelParams, synergiesTimeline);
-          const pfData = buildProFormaPeriodData(acquirerPeriods.rows, targetPeriods, synergiesTimeline, mergedDp, tgtNibdFcf);
+          const mergedDp = prepareFullDealParams(dp, ctx.scenario, ctx.acquirerPeriods, ctx.acquirerModelParams, ctx.synergiesTimeline);
+          const pfData = buildProFormaPeriodData(ctx.acquirerPeriods, ctx.targetPeriods, ctx.synergiesTimeline, mergedDp, tgtNibdFcf);
 
           const result = calculateDealReturns(acqData, tgtData, pfData, mergedDp, periodLabels);
 
@@ -637,37 +569,21 @@ router.post(
     try {
       const { id } = req.params;
 
-      // Get scenario
-      const scenarioResult = await pool.query(
-        "SELECT * FROM acquisition_scenarios WHERE id = $1",
-        [id]
-      );
-      if (scenarioResult.rows.length === 0) {
+      // Load scenario context
+      const loaded = await loadScenarioContext(id, { withNames: false });
+      if (!loaded) {
         res.status(404).json({ error: "Scenario not found" });
         return;
       }
-      const scenario = scenarioResult.rows[0];
-
-      // Get acquirer periods
-      const acquirerPeriods = await pool.query(
-        "SELECT * FROM financial_periods WHERE model_id = $1 ORDER BY period_date",
-        [scenario.acquirer_model_id]
-      );
-
-      // Get target periods
-      const targetPeriods = await pool.query(
-        "SELECT * FROM financial_periods WHERE model_id = $1 ORDER BY period_date",
-        [scenario.target_model_id]
-      );
+      const { ctx } = loaded;
 
       // Build pro forma periods using extracted helper
-      const synergiesTimeline = scenario.cost_synergies_timeline || {};
       const proFormaRows = buildProFormaPeriods(
-        acquirerPeriods.rows,
-        targetPeriods.rows,
-        scenario.deal_parameters,
+        ctx.acquirerPeriods,
+        ctx.targetPeriods,
+        ctx.scenario.deal_parameters ?? undefined,
       );
-      applySynergies(proFormaRows, synergiesTimeline);
+      applySynergies(proFormaRows, ctx.synergiesTimeline);
 
       const client = await pool.connect();
       try {
@@ -741,44 +657,16 @@ router.get(
     try {
       const { id } = req.params;
 
-      // 1. Fetch scenario with company/model names
-      const scenarioResult = await pool.query(
-        `SELECT s.*,
-          ac.name as acquirer_company_name, am.name as acquirer_model_name,
-          tc.name as target_company_name, tm.name as target_model_name
-         FROM acquisition_scenarios s
-         LEFT JOIN financial_models am ON s.acquirer_model_id = am.id
-         LEFT JOIN companies ac ON am.company_id = ac.id
-         LEFT JOIN financial_models tm ON s.target_model_id = tm.id
-         LEFT JOIN companies tc ON tm.company_id = tc.id
-         WHERE s.id = $1`,
-        [id]
-      );
-      if (scenarioResult.rows.length === 0) {
+      // Load scenario context with names (for Excel headers) and stored pro forma
+      const loaded = await loadScenarioContext(id, { withNames: true, withStoredProForma: true });
+      if (!loaded) {
         res.status(404).json({ error: "Scenario not found" });
         return;
       }
-      const scenario = scenarioResult.rows[0];
+      const { ctx, storedProFormaPeriods } = loaded;
+      const scenario = ctx.scenario;
 
-      // 2. Fetch period data
-      const acquirerPeriods = await pool.query(
-        "SELECT * FROM financial_periods WHERE model_id = $1 ORDER BY period_date",
-        [scenario.acquirer_model_id]
-      );
-      let targetPeriods: any[] = [];
-      if (scenario.target_model_id) {
-        const tp = await pool.query(
-          "SELECT * FROM financial_periods WHERE model_id = $1 ORDER BY period_date",
-          [scenario.target_model_id]
-        );
-        targetPeriods = tp.rows;
-      }
-      const pfResult = await pool.query(
-        "SELECT * FROM pro_forma_periods WHERE scenario_id = $1 ORDER BY period_date",
-        [id]
-      );
-
-      // 3. Build deal parameters using extracted helpers
+      // Build deal parameters
       const baseDp: DealParameters = (scenario.deal_parameters &&
         Object.keys(scenario.deal_parameters).length > 0)
         ? scenario.deal_parameters
@@ -786,56 +674,31 @@ router.get(
             price_paid: 0,
             exit_multiples: [10, 11, 12, 13, 14],
             acquirer_entry_ev: 0,
-            exit_years: [3, 4, 5],
             tax_rate: 0.22,
             da_pct_revenue: 0.05,
           };
 
-      // 4. Calculate returns for export
-      const synergiesTimeline = scenario.cost_synergies_timeline || {};
-
-      // Get acquirer model_parameters for dilution
-      const acquirerModelResult = await pool.query(
-        "SELECT model_parameters FROM financial_models WHERE id = $1",
-        [scenario.acquirer_model_id]
-      );
-      const acquirerModelParams = acquirerModelResult.rows[0]?.model_parameters ?? null;
-
-      const mergedDp = prepareFullDealParams(baseDp, scenario, acquirerPeriods.rows, acquirerModelParams, synergiesTimeline);
-
-      // Build period data arrays
-      const acqData = buildAcquirerPeriodData(acquirerPeriods.rows);
-      const tgtData = buildTargetPeriodData(targetPeriods);
-
-      // Pro forma: use pro_forma_periods if available, else combine acquirer+target
-      const proFormaPeriods = pfResult.rows;
-      let pfData: PeriodData[];
-      if (proFormaPeriods.length > 0) {
-        pfData = buildProFormaPeriodDataFromStored(proFormaPeriods, synergiesTimeline);
-      } else {
-        // Fallback: combine acquirer + target periods (no NIBD FCF for export)
-        pfData = buildProFormaPeriodData(acquirerPeriods.rows, targetPeriods, synergiesTimeline, mergedDp);
-      }
-
-      const periodLabels = extractPeriodLabels(acquirerPeriods.rows);
-
+      // Run full calculation
       let calculatedReturns: CalculatedReturns;
+      let mergedDp: DealParameters;
       try {
-        calculatedReturns = calculateDealReturns(acqData, tgtData, pfData, mergedDp, periodLabels);
+        const calc = runFullCalculation(ctx, baseDp, storedProFormaPeriods);
+        calculatedReturns = calc.result;
+        mergedDp = calc.mergedDp;
       } catch (calcErr) {
         console.error("Deal returns calculation failed for export:", calcErr);
-        // Provide empty returns structure
         calculatedReturns = { cases: [], standalone_by_multiple: {}, level: 1 as const, level_label: "Level 1" };
+        mergedDp = baseDp;
       }
 
-      // 5. Build export data
+      // Build export data
       const exportData: ExportData = {
         scenarioName: scenario.name || `Scenario ${id}`,
         acquirerName: scenario.acquirer_company_name || "Acquirer",
         targetName: scenario.target_company_name || "Target",
-        acquirerPeriods: acquirerPeriods.rows,
-        targetPeriods: targetPeriods,
-        proFormaPeriods: pfResult.rows,
+        acquirerPeriods: ctx.acquirerPeriods,
+        targetPeriods: ctx.targetPeriods,
+        proFormaPeriods: storedProFormaPeriods || [],
         dealParams: mergedDp,
         sources: scenario.sources || [],
         uses: scenario.uses || [],
@@ -844,13 +707,13 @@ router.get(
         preferredEquityRate: mergedDp.preferred_equity_rate ?? 0.095,
         netDebt: mergedDp.net_debt ?? 0,
         calculatedReturns,
-        synergiesTimeline,
+        synergiesTimeline: ctx.synergiesTimeline,
       };
 
-      // 6. Generate workbook
+      // Generate workbook
       const workbook = await generateExcelModel(exportData);
 
-      // 7. Stream as download
+      // Stream as download
       const fileName = `${(scenario.name || "scenario").replace(/[^a-zA-Z0-9\-_ ]/g, "")}_${id}.xlsx`;
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
