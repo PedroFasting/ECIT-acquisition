@@ -5,6 +5,7 @@ import {
   Building2,
   GitMerge,
   LogOut,
+  Target,
 } from "lucide-react";
 
 export default function Layout() {
@@ -19,6 +20,7 @@ export default function Layout() {
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: "Oversikt" },
     { to: "/companies", icon: Building2, label: "Selskaper" },
+    { to: "/targets", icon: Target, label: "Targets" },
     { to: "/scenarios", icon: GitMerge, label: "Scenarier" },
   ];
 

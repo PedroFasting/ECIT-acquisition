@@ -23,17 +23,25 @@ export default function ProFormaTable({
 }: ProFormaTableProps) {
   if (pfPeriods.length === 0) return null;
 
-  // Build organic growth lookup by period label
+  // Build lookups by period label
   const acqOrgGrowthByLabel = new Map<string, number | null>();
   const tgtOrgGrowthByLabel = new Map<string, number | null>();
+  const acqMarginByLabel = new Map<string, number | null>();
+  const tgtMarginByLabel = new Map<string, number | null>();
   if (acquirerPeriods) {
     for (const p of acquirerPeriods) {
       acqOrgGrowthByLabel.set(p.period_label, toNum(p.organic_growth) || null);
+      const ebitda = toNum(p.ebitda_total);
+      const rev = toNum(p.revenue_total);
+      acqMarginByLabel.set(p.period_label, rev > 0 ? ebitda / rev : null);
     }
   }
   if (targetPeriods) {
     for (const p of targetPeriods) {
       tgtOrgGrowthByLabel.set(p.period_label, toNum(p.organic_growth) || null);
+      const ebitda = toNum(p.ebitda_total);
+      const rev = toNum(p.revenue_total);
+      tgtMarginByLabel.set(p.period_label, rev > 0 ? ebitda / rev : null);
     }
   }
 
@@ -47,7 +55,9 @@ export default function ProFormaTable({
     ...(hasTgtOrgGrowth ? [{ key: "target_org_growth", label: "Organisk vekst", pct: true, indent: true, custom: true }] : []),
     { key: "total_revenue", label: "Omsetning", bold: true },
     { key: "acquirer_ebitda", label: `${acquirerName} EBITDA` },
+    { key: "acquirer_ebitda_margin", label: "% margin", pct: true, indent: true, custom: true },
     { key: "target_ebitda", label: `${targetName} EBITDA` },
+    { key: "target_ebitda_margin", label: "% margin", pct: true, indent: true, custom: true },
     { key: "total_ebitda_excl_synergies", label: "Total EBITDA (ekskl. synergier)", bold: true },
     { key: "ebitda_margin_excl_synergies", label: "% margin", pct: true, indent: true },
     { key: "cost_synergies", label: "Kostnadssynergier" },
@@ -67,6 +77,14 @@ export default function ProFormaTable({
       }
       if (item.key === "target_org_growth") {
         const v = tgtOrgGrowthByLabel.get(p.period_label);
+        return v != null ? formatPct(v) : "-";
+      }
+      if (item.key === "acquirer_ebitda_margin") {
+        const v = acqMarginByLabel.get(p.period_label);
+        return v != null ? formatPct(v) : "-";
+      }
+      if (item.key === "target_ebitda_margin") {
+        const v = tgtMarginByLabel.get(p.period_label);
         return v != null ? formatPct(v) : "-";
       }
       return "-";

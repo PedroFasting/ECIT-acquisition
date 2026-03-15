@@ -185,7 +185,7 @@ CREATE TABLE IF NOT EXISTS deal_returns (
   scenario_id INTEGER NOT NULL REFERENCES acquisition_scenarios(id) ON DELETE CASCADE,
   
   -- Which case is this return for
-  return_case VARCHAR(100) NOT NULL,       -- e.g. "ECIT standalone", "ECIT + Argon - post DD", "ECIT + Argon - sellside"
+  return_case VARCHAR(100) NOT NULL,       -- e.g. "ECIT standalone", "ECIT + Target - post DD", "ECIT + Target - sellside"
   
   -- Exit parameters
   exit_multiple NUMERIC(8,2) NOT NULL,     -- NTM EBITDA exit multiple (10x, 11x, etc.)

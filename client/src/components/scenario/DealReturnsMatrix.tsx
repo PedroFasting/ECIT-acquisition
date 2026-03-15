@@ -5,6 +5,8 @@ import type {
   DealParameters,
   CalculatedReturn,
   FinancialPeriod,
+  ShareSummary,
+  DebtScheduleRow,
 } from "../../types";
 import { toNum } from "./helpers";
 import SectionHeader from "./SectionHeader";
@@ -71,7 +73,9 @@ interface DealReturnsMatrixProps {
   expanded: boolean;
   onToggle: (key: string) => void;
   calculatedReturns: CalculatedReturn[] | null;
-  onCalculated: (returns: CalculatedReturn[], params: DealParameters) => void;
+  onCalculated: (returns: CalculatedReturn[], params: DealParameters, shareSummary?: ShareSummary, debtSchedule?: DebtScheduleRow[]) => void;
+  /** Notify parent when exit multiples change so EquityBridgeTable can stay in sync */
+  onExitMultiplesChange?: (multiples: number[]) => void;
 }
 
 const DEFAULT_PARAMS: DealParameters = {
@@ -95,6 +99,7 @@ export default function DealReturnsMatrix({
   onToggle,
   calculatedReturns,
   onCalculated,
+  onExitMultiplesChange,
 }: DealReturnsMatrixProps) {
   const [showParams, setShowParams] = useState(false);
   const [showEquityParams, setShowEquityParams] = useState(false);
@@ -102,6 +107,7 @@ export default function DealReturnsMatrix({
   const [error, setError] = useState("");
   const [level, setLevel] = useState<1 | 2>(1);
   const [levelLabel, setLevelLabel] = useState("");
+  const [shareSummary, setShareSummary] = useState<ShareSummary | undefined>(undefined);
 
   // Initialize params from scenario or defaults
   const savedParams = scenario.deal_parameters;
@@ -114,6 +120,11 @@ export default function DealReturnsMatrix({
         : DEFAULT_PARAMS.exit_multiples,
   }));
 
+  // Local text state for exit multiples input to avoid eating trailing commas on keystroke
+  const [exitMultiplesText, setExitMultiplesText] = useState<string>(
+    () => (savedParams?.exit_multiples?.length ? savedParams.exit_multiples : DEFAULT_PARAMS.exit_multiples).join(", ")
+  );
+
   // Re-sync when scenario changes (different ID)
   useEffect(() => {
     const sp = scenario.deal_parameters;
@@ -123,27 +134,57 @@ export default function DealReturnsMatrix({
         ...sp,
         exit_multiples: sp.exit_multiples?.length ? sp.exit_multiples : prev.exit_multiples,
       }));
-    }
-    // Also pull capital structure from scenario fields
-    if (scenario.ordinary_equity || scenario.preferred_equity || scenario.net_debt) {
-      setParams((prev) => ({
-        ...prev,
-        ordinary_equity: prev.ordinary_equity || toNum(scenario.ordinary_equity) || undefined,
-        preferred_equity: prev.preferred_equity || toNum(scenario.preferred_equity) || undefined,
-        preferred_equity_rate: prev.preferred_equity_rate || toNum(scenario.preferred_equity_rate) || undefined,
-        net_debt: prev.net_debt || toNum(scenario.net_debt) || undefined,
-        rollover_equity: prev.rollover_equity || toNum(scenario.rollover_shareholders) || undefined,
-      }));
+      if (sp.exit_multiples?.length) {
+        setExitMultiplesText(sp.exit_multiples.join(", "));
+      }
     }
   }, [scenario.id]);
 
-  // Auto-derive acquirer_entry_ev from first-period EBITDA if not set
+  // Sync capital structure fields from scenario whenever they change
+  // (e.g. after CapitalStructure component saves OE/PE/PE-rate)
+  useEffect(() => {
+    const oe = toNum(scenario.ordinary_equity);
+    const pe = toNum(scenario.preferred_equity);
+    const peRate = toNum(scenario.preferred_equity_rate);
+    const nd = toNum(scenario.net_debt);
+    const ro = toNum(scenario.rollover_shareholders);
+
+    setParams((prev) => ({
+      ...prev,
+      ...(oe > 0 ? { ordinary_equity: oe } : {}),
+      ...(pe > 0 ? { preferred_equity: pe } : {}),
+      ...(peRate > 0 ? { preferred_equity_rate: peRate } : {}),
+      ...(nd > 0 ? { net_debt: nd } : {}),
+      ...(ro > 0 ? { rollover_equity: ro } : {}),
+    }));
+  }, [
+    scenario.ordinary_equity,
+    scenario.preferred_equity,
+    scenario.preferred_equity_rate,
+    scenario.net_debt,
+    scenario.rollover_shareholders,
+  ]);
+
+  // Auto-derive acquirer_entry_ev from acquirer periods' enterprise_value.
+  // Uses NTM logic: the second forecast/budget period (e.g. 2026 when deal year is 2025).
+  // Falls back to LTM (first forecast/budget period, e.g. 2025) if NTM has no EV.
   useEffect(() => {
     if (!params.acquirer_entry_ev && acquirerPeriods.length > 0) {
-      const firstEbitda = toNum(acquirerPeriods[0]?.ebitda_total);
-      if (firstEbitda > 0) {
-        const medMult = params.exit_multiples[Math.floor(params.exit_multiples.length / 2)];
-        setParams((p) => ({ ...p, acquirer_entry_ev: Math.round(firstEbitda * medMult) }));
+      const forwardPeriods = acquirerPeriods.filter(
+        (p) => p.period_type === "forecast" || p.period_type === "budget" || p.period_type === "estimate"
+      );
+
+      // NTM = second forward period (e.g. 2026), LTM = first forward period (e.g. 2025)
+      const ntmPeriod = forwardPeriods.length >= 2 ? forwardPeriods[1] : null;
+      const ltmPeriod = forwardPeriods.length >= 1 ? forwardPeriods[0] : null;
+
+      const ntmEv = ntmPeriod ? toNum(ntmPeriod.enterprise_value) : 0;
+      const ltmEv = ltmPeriod ? toNum(ltmPeriod.enterprise_value) : 0;
+
+      // Prefer NTM (matches "NTM exit multiple" convention), fall back to LTM
+      const ev = ntmEv > 0 ? ntmEv : ltmEv;
+      if (ev > 0) {
+        setParams((p) => ({ ...p, acquirer_entry_ev: Math.round(ev) }));
       }
     }
   }, [acquirerPeriods]);
@@ -159,7 +200,8 @@ export default function DealReturnsMatrix({
       const result = await api.calculateReturns(scenario.id, params);
       setLevel(result.level);
       setLevelLabel(result.level_label);
-      onCalculated(result.calculated_returns, result.deal_parameters);
+      setShareSummary(result.share_summary);
+      onCalculated(result.calculated_returns, result.deal_parameters, result.share_summary, result.debt_schedule);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -174,7 +216,7 @@ export default function DealReturnsMatrix({
   const caseNames: string[] = [];
   const matrixByCaseAndMult: Record<
     string,
-    Record<number, { irr: number | null; mom: number | null }>
+    Record<number, { irr: number | null; mom: number | null; per_share_entry?: number | null; per_share_exit?: number | null; per_share_irr?: number | null; per_share_mom?: number | null }>
   > = {};
 
   if (calculatedReturns) {
@@ -186,16 +228,35 @@ export default function DealReturnsMatrix({
       matrixByCaseAndMult[r.return_case][r.exit_multiple] = {
         irr: r.irr,
         mom: r.mom,
+        per_share_entry: r.per_share_entry,
+        per_share_exit: r.per_share_exit,
+        per_share_irr: r.per_share_irr,
+        per_share_mom: r.per_share_mom,
       };
     }
   }
+
+  // Check if any combined case has per-share data
+  const hasPerShareData = calculatedReturns?.some(
+    (r) => r.return_case === "Kombinert" && r.per_share_irr != null
+  ) ?? false;
 
   const standaloneCase = caseNames.find((c) => c === "Standalone");
   const combinedCase = caseNames.find((c) => c === "Kombinert");
 
   const updateParam = (key: keyof DealParameters, value: any) => {
     setParams((p) => ({ ...p, [key]: value }));
+    if (key === "exit_multiples" && onExitMultiplesChange) {
+      onExitMultiplesChange(value as number[]);
+    }
   };
+
+  // Notify parent of initial exit multiples on mount / when they change from scenario sync
+  useEffect(() => {
+    if (onExitMultiplesChange && params.exit_multiples?.length) {
+      onExitMultiplesChange(params.exit_multiples);
+    }
+  }, [params.exit_multiples]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const inputCls =
     "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-right focus:ring-2 focus:ring-[#002C55] focus:border-[#002C55] outline-none";
@@ -351,14 +412,29 @@ export default function DealReturnsMatrix({
                   <label className={labelCls}>Exit-multipler (kommasep.)</label>
                   <input
                     type="text"
-                    value={params.exit_multiples.join(", ")}
-                    onChange={(e) => {
-                      const mults = e.target.value
+                    value={exitMultiplesText}
+                    onChange={(e) => setExitMultiplesText(e.target.value)}
+                    onBlur={() => {
+                      const mults = exitMultiplesText
                         .split(",")
                         .map((s) => parseFloat(s.trim()))
                         .filter((n) => !isNaN(n) && n > 0);
-                      if (mults.length > 0)
+                      if (mults.length > 0) {
                         updateParam("exit_multiples", mults);
+                        setExitMultiplesText(mults.join(", "));
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        const mults = exitMultiplesText
+                          .split(",")
+                          .map((s) => parseFloat(s.trim()))
+                          .filter((n) => !isNaN(n) && n > 0);
+                        if (mults.length > 0) {
+                          updateParam("exit_multiples", mults);
+                          setExitMultiplesText(mults.join(", "));
+                        }
+                      }
                     }}
                     className={inputCls + " text-left"}
                     placeholder="10, 11, 12, 13, 14"
@@ -468,6 +544,26 @@ export default function DealReturnsMatrix({
                         className={inputCls}
                         placeholder="f.eks. 100"
                       />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Cash sweep (%)</label>
+                      <input
+                        type="number"
+                        step="5"
+                        min="0"
+                        max="100"
+                        value={
+                          params.cash_sweep_pct
+                            ? (params.cash_sweep_pct * 100).toFixed(0)
+                            : ""
+                        }
+                        onChange={(e) =>
+                          updateParam("cash_sweep_pct", Number(e.target.value) / 100 || undefined)
+                        }
+                        className={inputCls}
+                        placeholder="f.eks. 75"
+                      />
+                      <span className="text-[10px] text-gray-400">Andel overskudds-FCF til nedbetaling</span>
                     </div>
                     <div>
                       <label className={labelCls}>Rollover egenkapital (NOKm)</label>
@@ -610,9 +706,221 @@ export default function DealReturnsMatrix({
                         );
                       })}
                     </tbody>
-                  </table>
+                   </table>
                 </div>
               </div>
+
+              {/* Per-share returns table (when share data is available) */}
+              {hasPerShareData && combinedCase && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 mb-1">
+                    Per-aksje avkastning (etter utvanning)
+                  </h4>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Avkastning per eksisterende aksje etter utvanning fra MIP, warrants og rollover
+                    {shareSummary && shareSummary.dilution_value_pct != null && shareSummary.dilution_value_pct > 0 && (
+                      <span className={`ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                        shareSummary.dilution_value_pct > 0.15
+                          ? "bg-red-100 text-red-700"
+                          : shareSummary.dilution_value_pct > 0.08
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-green-100 text-green-700"
+                      }`}>
+                        {nbFmt1.format(shareSummary.dilution_value_pct * 100)} % verdi-utvanning
+                      </span>
+                    )}
+                    {shareSummary && !(shareSummary.dilution_value_pct != null && shareSummary.dilution_value_pct > 0) && (
+                      <span className="text-gray-400">
+                        {" "}&mdash; {nbFmt1.format(shareSummary.entry_shares)}m aksjer ved inngang,{" "}
+                        {nbFmt1.format(shareSummary.total_exit_shares)}m ved exit
+                        ({nbFmt1.format(shareSummary.dilution_pct * 100)}% utvanning)
+                      </span>
+                    )}
+                  </p>
+                  <div className="overflow-x-auto">
+                    <table className="ecit-table w-full">
+                      <thead>
+                        <tr>
+                          <th className="text-left min-w-[200px]">
+                            NTM exit multiple:
+                          </th>
+                          {exitMultiples.map((m) => (
+                            <th key={m} className="num min-w-[90px]">
+                              {m},0x
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {/* Per-share IRR/MoM row */}
+                        <tr className="!bg-[#EDE8F5]">
+                          <td className="font-semibold text-gray-900">
+                            <div>Per aksje (kombinert)</div>
+                            <div className="text-[10px] text-purple-600 font-normal">
+                              IRR / MoM per eksisterende aksje
+                            </div>
+                          </td>
+                          {exitMultiples.map((mult) => {
+                            const cell = matrixByCaseAndMult[combinedCase]?.[mult];
+                            return (
+                              <td
+                                key={mult}
+                                className={`num ${irrBgColor(cell?.per_share_irr ?? null)}`}
+                              >
+                                <div className="font-semibold">
+                                  {fmtIrr(cell?.per_share_irr ?? null)}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {fmtMom(cell?.per_share_mom ?? null)}
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                        {/* Per-share value row (NOK per share) */}
+                        <tr>
+                          <td className="text-gray-700 font-medium">
+                            <div>Verdi per aksje (NOK)</div>
+                            <div className="text-[10px] text-gray-400 font-normal">
+                              Inngang → exit
+                            </div>
+                          </td>
+                          {exitMultiples.map((mult) => {
+                            const cell = matrixByCaseAndMult[combinedCase]?.[mult];
+                            return (
+                              <td key={mult} className="num">
+                                <div className="text-xs text-gray-600">
+                                  {cell?.per_share_entry != null
+                                    ? `${nbFmt1.format(cell.per_share_entry)} →`
+                                    : "-"}
+                                </div>
+                                <div className="text-sm font-semibold text-gray-900">
+                                  {cell?.per_share_exit != null
+                                    ? nbFmt1.format(cell.per_share_exit)
+                                    : "-"}
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                        {/* Total equity vs per-share IRR delta */}
+                        <tr>
+                          <td className="text-gray-700 font-medium">
+                            IRR-differanse (total vs per-aksje)
+                          </td>
+                          {exitMultiples.map((mult) => {
+                            const cell = matrixByCaseAndMult[combinedCase]?.[mult];
+                            const totalIrr = cell?.irr;
+                            const perShareIrr = cell?.per_share_irr;
+                            const delta =
+                              totalIrr != null && perShareIrr != null
+                                ? perShareIrr - totalIrr
+                                : null;
+                            return (
+                              <td
+                                key={mult}
+                                className={`num text-xs font-medium ${deltaColor(delta)}`}
+                              >
+                                {delta != null
+                                  ? fmtDeltaIrr(delta)
+                                  : "-"}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Share summary callout */}
+                  {shareSummary && (
+                    <div className="mt-3 bg-purple-50 border border-purple-200 rounded-lg px-4 py-3 text-sm text-purple-900">
+                      {shareSummary.oe_implied && (
+                        <div className="text-xs text-purple-600 font-medium mb-2">
+                          Aksjetall justert for OE: {shareSummary.db_entry_shares
+                            ? `${nbFmt1.format(shareSummary.db_entry_shares)}m (DB) → ${nbFmt1.format(shareSummary.entry_shares)}m (OE / NOK ${nbFmt1.format(shareSummary.entry_price_per_share)}/aksje)`
+                            : `${nbFmt1.format(shareSummary.entry_shares)}m (OE-implied)`}
+                        </div>
+                      )}
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-x-6 gap-y-1 text-xs">
+                        <div>
+                          <span className="font-medium">Aksjer ved inngang:</span>{" "}
+                          {nbFmt1.format(shareSummary.entry_shares)}m
+                        </div>
+                        <div>
+                          <span className="font-medium">Aksjer ved exit (basis):</span>{" "}
+                          {nbFmt1.format(shareSummary.exit_shares_base)}m
+                        </div>
+                        <div>
+                          <span className="font-medium">Rollover-aksjer:</span>{" "}
+                          {nbFmt1.format(shareSummary.rollover_shares)}m
+                        </div>
+                        <div>
+                          <span className="font-medium">Totalt ved exit:</span>{" "}
+                          {nbFmt1.format(shareSummary.total_exit_shares)}m
+                        </div>
+                        <div>
+                          <span className="font-medium">Utvanning (aksjer):</span>{" "}
+                          {nbFmt1.format(shareSummary.dilution_pct * 100)}%
+                        </div>
+                        <div>
+                          <span className="font-medium">FMV per aksje (inngang):</span>{" "}
+                          NOK {nbFmt1.format(shareSummary.entry_price_per_share)}
+                        </div>
+                      </div>
+
+                      {/* MIP/TSO/Warrants dilution breakdown */}
+                      {(shareSummary.exit_eqv_gross ?? 0) > 0 && (
+                        <div className="mt-3 pt-3 border-t border-purple-200">
+                          <div className="text-xs font-semibold text-purple-800 mb-2">
+                            Verdi-utvanning ved exit (median multippel)
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-x-4 gap-y-1 text-xs">
+                            <div>
+                              <span className="font-medium">Exit EQV:</span>{" "}
+                              {nbFmt1.format(shareSummary.exit_eqv_gross!)} NOKm
+                            </div>
+                            {(shareSummary.exit_preferred_equity ?? 0) > 0 && (
+                              <div className="text-amber-700">
+                                <span className="font-medium">&minus; Pref:</span>{" "}
+                                ({nbFmt1.format(shareSummary.exit_preferred_equity!)})
+                              </div>
+                            )}
+                            {(shareSummary.exit_mip_amount ?? 0) > 0 && (
+                              <div className="text-red-700">
+                                <span className="font-medium">&minus; MIP:</span>{" "}
+                                ({nbFmt1.format(shareSummary.exit_mip_amount!)})
+                              </div>
+                            )}
+                            {(shareSummary.exit_tso_amount ?? 0) > 0 && (
+                              <div className="text-red-700">
+                                <span className="font-medium">&minus; TSO:</span>{" "}
+                                ({nbFmt1.format(shareSummary.exit_tso_amount!)})
+                              </div>
+                            )}
+                            {(shareSummary.exit_warrants_amount ?? 0) > 0 && (
+                              <div className="text-orange-700">
+                                <span className="font-medium">&minus; Warrants:</span>{" "}
+                                ({nbFmt1.format(shareSummary.exit_warrants_amount!)})
+                              </div>
+                            )}
+                            <div className="font-bold text-blue-800">
+                              <span className="font-medium">= Ord. EK:</span>{" "}
+                              {nbFmt1.format(shareSummary.exit_eqv_post_dilution ?? 0)} NOKm
+                            </div>
+                            {(shareSummary.exit_per_share_post ?? 0) > 0 && (
+                              <div className="font-bold text-blue-800">
+                                <span className="font-medium">Per aksje:</span>{" "}
+                                NOK {nbFmt1.format(shareSummary.exit_per_share_post!)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Delta / accretion table */}
               {standaloneCase && combinedCase && (
@@ -763,6 +1071,12 @@ export default function DealReturnsMatrix({
                       <div>
                         <span className="font-medium">Pref. equity:</span>{" "}
                         {nbFmt1.format(params.preferred_equity || 0)} NOKm @ {nbFmt1.format((params.preferred_equity_rate || 0) * 100)}%
+                      </div>
+                    )}
+                    {(params.cash_sweep_pct ?? 0) > 0 && (
+                      <div>
+                        <span className="font-medium">Cash sweep:</span>{" "}
+                        {nbFmt1.format((params.cash_sweep_pct || 0) * 100)}% av overskudds-FCF
                       </div>
                     )}
                   </>

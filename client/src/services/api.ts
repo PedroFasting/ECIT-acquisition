@@ -7,6 +7,9 @@ import type {
   CompareResult,
   DealParameters,
   CalculatedReturn,
+  SensitivityRequest,
+  SensitivityResponse,
+  CompanyAssumptions,
 } from "../types";
 
 const API_BASE = "/api";
@@ -109,6 +112,23 @@ class ApiService {
 
   async deleteCompany(id: number): Promise<void> {
     return this.request(`/companies/${id}`, { method: "DELETE" });
+  }
+
+  // Company Assumptions
+  async getAssumptions(companyId: number): Promise<{
+    has_models: boolean;
+    source_model: { id: number; name: string; model_type: string } | null;
+    assumptions: CompanyAssumptions;
+    all_model_count: number;
+  }> {
+    return this.request(`/companies/${companyId}/assumptions`);
+  }
+
+  async updateAssumptions(companyId: number, data: CompanyAssumptions): Promise<{ message: string; models_updated: number }> {
+    return this.request(`/companies/${companyId}/assumptions`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
   }
 
   // Models
@@ -266,11 +286,50 @@ class ApiService {
   async calculateReturns(
     scenarioId: number,
     dealParameters: DealParameters
-  ): Promise<{ calculated_returns: CalculatedReturn[]; standalone_by_multiple: Record<number, { irr: number | null; mom: number | null }>; deal_parameters: DealParameters; level: 1 | 2; level_label: string }> {
+  ): Promise<{ calculated_returns: CalculatedReturn[]; standalone_by_multiple: Record<number, { irr: number | null; mom: number | null }>; deal_parameters: DealParameters; level: 1 | 2; level_label: string; share_summary?: import("../types").ShareSummary; debt_schedule?: import("../types").DebtScheduleRow[] }> {
     return this.request(`/scenarios/${scenarioId}/calculate-returns`, {
       method: "POST",
       body: JSON.stringify({ deal_parameters: dealParameters }),
     });
+  }
+
+  async calculateSensitivity(
+    scenarioId: number,
+    request: SensitivityRequest
+  ): Promise<SensitivityResponse> {
+    return this.request(`/scenarios/${scenarioId}/sensitivity`, {
+      method: "POST",
+      body: JSON.stringify(request),
+    });
+  }
+
+  /**
+   * Export scenario as Excel (.xlsx) and trigger browser download.
+   */
+  async exportExcel(scenarioId: number, scenarioName?: string): Promise<void> {
+    const headers: Record<string, string> = {};
+    if (this.token) {
+      headers["Authorization"] = `Bearer ${this.token}`;
+    }
+
+    const res = await fetch(`${API_BASE}/scenarios/${scenarioId}/export-excel`, {
+      headers,
+    });
+
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(error.error || `Export failed: ${res.status}`);
+    }
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(scenarioName || "scenario").replace(/[^a-zA-Z0-9\-_ ]/g, "")}_${scenarioId}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   }
 }
 

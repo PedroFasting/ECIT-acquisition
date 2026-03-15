@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import type { FinancialPeriod } from "../../types";
+import type { FinancialPeriod, ProFormaPeriod } from "../../types";
 import { formatNum, toNum } from "./helpers";
 import SectionHeader from "./SectionHeader";
 
@@ -8,6 +8,7 @@ import SectionHeader from "./SectionHeader";
 interface EquityBridgeTableProps {
   acquirerPeriods: FinancialPeriod[];
   targetPeriods: FinancialPeriod[];
+  pfPeriods?: ProFormaPeriod[];
   acquirerName: string;
   targetName: string;
   expanded: boolean;
@@ -323,14 +324,16 @@ function computeBridge(
 
       eqvPostDilution = eqv - preferredEquity - mipAmount - tsoAmount - warrantsAmount;
 
-      // Dynamic share count: sequential chain
-      if (idx === 0) {
-        // First period: total SC = base shares (M&A shares for this period
-        // are already reflected in the base — they were issued before the model starts,
-        // or we treat the first period as the baseline)
+      // Share count: prefer imported value from DB (Excel's iterative solution
+      // is more accurate than our sequential chain which uses previous period's
+      // post-dilution price instead of the current period's).
+      const importedSc = toNum(p.share_count);
+      if (importedSc > 0) {
+        shareCount = importedSc;
+      } else if (idx === 0) {
         shareCount = baseShares;
       } else {
-        // New M&A shares issued at previous period's post-dilution price
+        // Fallback: dynamic chain for periods without imported data
         const newMaShares = prevPpsPost > 0 && revenueMa > 0
           ? revenueMa / prevPpsPost
           : 0;
@@ -339,7 +342,7 @@ function computeBridge(
 
       perSharePost = shareCount > 0 ? eqvPostDilution / shareCount : null;
 
-      // Save for next period's chain
+      // Save for next period's chain (used as fallback for future periods)
       prevPpsPost = perSharePost ?? 0;
       prevTotalSc = shareCount ?? 0;
     } else {
@@ -390,6 +393,174 @@ function computeBridge(
   return results;
 }
 
+/**
+ * Compute a Pro Forma (combined) equity bridge.
+ * Uses PF EBITDA (combined incl. synergies) as the basis,
+ * acquirer's NIBD/option_debt/preferred_equity/dilution for the equity walk.
+ * Aligns PF periods with acquirer periods by year.
+ */
+function computePfBridge(
+  pfPeriods: ProFormaPeriod[],
+  acquirerPeriods: FinancialPeriod[],
+  multiple: number,
+  basis: BasisMode,
+  ntmOverrides: NtmOverrides | null,
+  formulas: DilutionFormulas | null
+): ComputedBridge[] {
+  const results: ComputedBridge[] = [];
+  let prevPpsPost = 0;
+  let prevTotalSc = 0;
+
+  // Build a map of acquirer periods by year for NIBD/pref/dilution lookups
+  const acqByYear = new Map<number, FinancialPeriod>();
+  for (const p of acquirerPeriods) {
+    const yr = new Date(p.period_date).getFullYear();
+    acqByYear.set(yr, p);
+  }
+
+  for (let idx = 0; idx < pfPeriods.length; idx++) {
+    const pf = pfPeriods[idx];
+    const yr = new Date(pf.period_date).getFullYear();
+    const acq = acqByYear.get(yr);
+
+    // EBITDA basis
+    const ebitdaIncl = toNum(pf.total_ebitda_incl_synergies);
+    const ebitdaExcl = toNum(pf.total_ebitda_excl_synergies);
+    const synergies = toNum(pf.cost_synergies);
+    const pfRevenue = toNum(pf.total_revenue);
+
+    let basisEbitda: number;
+    let basisLabel: string;
+    let revenue: number | null = pfRevenue || null;
+
+    if (basis === "ltm") {
+      basisEbitda = ebitdaIncl;
+      basisLabel = `LTM ${pf.period_label}`;
+    } else {
+      // NTM: use next PF period if available
+      if (idx < pfPeriods.length - 1) {
+        const next = pfPeriods[idx + 1];
+        basisEbitda = toNum(next.total_ebitda_incl_synergies);
+        basisLabel = `NTM ${next.period_label}`;
+        revenue = toNum(next.total_revenue) || null;
+      } else {
+        // Project from last PF period
+        const overrides = ntmOverrides || { revenueGrowth: 0.05, ebitdaMargin: 0.10 };
+        const projectedRevenue = pfRevenue * (1 + overrides.revenueGrowth);
+        const projectedEbitda = projectedRevenue * overrides.ebitdaMargin;
+        const yearMatch = pf.period_label.match(/(\d{4})/);
+        const nextYear = yearMatch ? parseInt(yearMatch[1]) + 1 : "?";
+        basisEbitda = projectedEbitda;
+        basisLabel = `NTM ${nextYear}E`;
+        revenue = projectedRevenue;
+      }
+    }
+
+    // Adjustments from acquirer (PF doesn't have its own)
+    const adjustments = acq ? toNum(acq.adjustments) : 0;
+    const adjustedEbitda = basisEbitda + adjustments;
+    const ev = adjustedEbitda * multiple;
+
+    // NIBD, option debt from acquirer (combined debt = acquirer NIBD)
+    const nibd = acq ? toNum(acq.nibd) : 0;
+    const optionDebt = acq ? toNum(acq.option_debt) : 0;
+    const eqv = ev - nibd - optionDebt;
+    const preferredEquity = acq ? toNum(acq.preferred_equity) : 0;
+
+    // M&A revenue for share dilution (combined = acq + target M&A)
+    const revenueMa = toNum(pf.other_revenue) + (acq ? toNum(acq.revenue_ma) : 0);
+
+    // Revenue growth
+    let revenueGrowth: number | null = null;
+    if (idx > 0) {
+      const prevRev = toNum(pfPeriods[idx - 1].total_revenue);
+      if (prevRev > 0 && pfRevenue > 0) {
+        revenueGrowth = (pfRevenue - prevRev) / prevRev;
+      }
+    }
+
+    // Imported EV from acquirer for comparison
+    const importedEv = acq ? toNum(acq.enterprise_value) || null : null;
+    const impliedMultiple = importedEv && adjustedEbitda > 0
+      ? importedEv / adjustedEbitda
+      : null;
+
+    // ── Dynamic PPS & share count (using acquirer formulas) ──
+    let perSharePre: number | null = null;
+    let mipAmount: number;
+    let tsoAmount: number;
+    let warrantsAmount: number;
+    let eqvPostDilution: number;
+    let perSharePost: number | null = null;
+    let shareCount: number | null = null;
+
+    if (formulas && formulas.baseShares > 0) {
+      const baseShares = formulas.baseShares;
+      perSharePre = (eqv - preferredEquity) / baseShares;
+
+      mipAmount = formulas.mipPctEqv > 0 ? formulas.mipPctEqv * eqv : 0;
+      tsoAmount = formulas.tsoN > 0
+        ? formulas.tsoN * Math.max(perSharePre - formulas.tsoStrike, 0)
+        : 0;
+      warrantsAmount = formulas.warN > 0
+        ? formulas.warN * Math.max(perSharePre - formulas.warStrike, 0)
+        : 0;
+
+      eqvPostDilution = eqv - preferredEquity - mipAmount - tsoAmount - warrantsAmount;
+
+      // Share count: prefer imported value from acquirer period (same logic as standalone)
+      const importedSc = acq ? toNum(acq.share_count) : 0;
+      if (importedSc > 0) {
+        shareCount = importedSc;
+      } else if (idx === 0) {
+        shareCount = baseShares;
+      } else {
+        const newMaShares = prevPpsPost > 0 && revenueMa > 0
+          ? revenueMa / prevPpsPost
+          : 0;
+        shareCount = prevTotalSc + newMaShares;
+      }
+
+      perSharePost = shareCount > 0 ? eqvPostDilution / shareCount : null;
+      prevPpsPost = perSharePost ?? 0;
+      prevTotalSc = shareCount ?? 0;
+    } else {
+      mipAmount = 0;
+      tsoAmount = 0;
+      warrantsAmount = 0;
+      eqvPostDilution = eqv - preferredEquity;
+    }
+
+    results.push({
+      periodLabel: pf.period_label,
+      basisLabel,
+      basisEbitda,
+      adjustments,
+      adjustedEbitda,
+      ev,
+      nibd,
+      optionDebt,
+      eqv,
+      preferredEquity,
+      perSharePre,
+      mipAmount,
+      tsoAmount,
+      warrantsAmount,
+      eqvPostDilution,
+      perSharePost,
+      shareCount,
+      importedEv,
+      impliedMultiple,
+      revenue,
+      revenueMa: revenueMa || null,
+      revenueGrowth,
+      organicGrowth: null,
+    });
+  }
+
+  return results;
+}
+
 // ── Number formatting ──────────────────────────────────────
 
 const nbFmt1 = new Intl.NumberFormat("nb-NO", {
@@ -416,11 +587,11 @@ interface BridgeTableRow {
 
 function BridgeTable({
   title,
-  periods,
+  columnLabels,
   rows,
 }: {
   title: string;
-  periods: FinancialPeriod[];
+  columnLabels: string[];
   rows: BridgeTableRow[];
 }) {
   return (
@@ -431,9 +602,9 @@ function BridgeTable({
           <thead>
             <tr>
               <th className="text-left min-w-[220px]">NOKm</th>
-              {periods.map((p, i) => (
+              {columnLabels.map((label, i) => (
                 <th key={i} className="num min-w-[100px]">
-                  {p.period_label}
+                  {label}
                 </th>
               ))}
             </tr>
@@ -556,6 +727,7 @@ function NtmPanel({
 export default function EquityBridgeTable({
   acquirerPeriods,
   targetPeriods,
+  pfPeriods,
   acquirerName,
   targetName,
   expanded,
@@ -590,6 +762,15 @@ export default function EquityBridgeTable({
   const tgtBridge = useMemo(
     () => computeBridge(targetPeriods, selectedMultiple, basis, effectiveTgtNtm, tgtFormulas),
     [targetPeriods, selectedMultiple, basis, effectiveTgtNtm, tgtFormulas]
+  );
+
+  // Compute Pro Forma bridge (combined)
+  const pfBridge = useMemo(
+    () =>
+      pfPeriods && pfPeriods.length > 0
+        ? computePfBridge(pfPeriods, acquirerPeriods, selectedMultiple, basis, effectiveAcqNtm, acqFormulas)
+        : [],
+    [pfPeriods, acquirerPeriods, selectedMultiple, basis, effectiveAcqNtm, acqFormulas]
   );
 
   const acqHasData = hasEquityData(acquirerPeriods);
@@ -794,6 +975,163 @@ export default function EquityBridgeTable({
     return rows;
   }
 
+  /** Build table rows for Pro Forma combined bridge.
+   *  Uses acquirer periods for feature-detection (NIBD, pref, dilution).
+   *  Shows combined EBITDA with synergies breakdown. */
+  function buildPfRows(
+    bridge: ComputedBridge[],
+    formulas: DilutionFormulas | null
+  ): BridgeTableRow[] {
+    const rows: BridgeTableRow[] = [];
+    const hasShareData = bridge.some((b) => b.shareCount !== null);
+    const hasRevenue = bridge.some((b) => b.revenue !== null && b.revenue !== 0);
+    const hasBridgeItems = acqHasBridge; // PF uses acquirer's NIBD/pref
+
+    // Revenue
+    if (hasRevenue) {
+      rows.push({
+        label: "Omsetning (PF)",
+        values: bridge.map((b) => b.revenue),
+        bold: true,
+      });
+      if (bridge.some((b) => b.revenueGrowth !== null)) {
+        rows.push({
+          label: "Vekst %",
+          values: bridge.map((b) => b.revenueGrowth),
+          indent: true,
+          format: "pct",
+        });
+      }
+    }
+
+    // EBITDA (combined incl. synergies)
+    rows.push({
+      label: basis === "ltm" ? "EBITDA PF inkl. synergier (LTM)" : "EBITDA PF inkl. synergier (NTM)",
+      values: bridge.map((b) => b.basisEbitda || null),
+      bold: true,
+      divider: hasRevenue,
+      subtext: basis === "ntm"
+        ? bridge.map((b) => b.basisLabel)
+        : undefined,
+    });
+
+    // Adjustments
+    const hasAdjustments = bridge.some((b) => b.adjustments !== 0);
+    if (hasAdjustments) {
+      rows.push({
+        label: "Justeringer (EBITDA)",
+        values: bridge.map((b) => b.adjustments || null),
+        indent: true,
+      });
+      rows.push({
+        label: "Justert EBITDA",
+        values: bridge.map((b) => b.adjustedEbitda || null),
+        bold: true,
+      });
+    }
+
+    // Enterprise Value
+    rows.push({
+      label: `Enterprise Value (${nbFmt1.format(selectedMultiple)}x)`,
+      values: bridge.map((b) => b.ev || null),
+      bold: true,
+      divider: true,
+    });
+
+    if (hasBridgeItems) {
+      // NIBD from acquirer
+      if (acquirerPeriods.some((p) => p.nibd != null)) {
+        rows.push({
+          label: "NIBD (inkl. diverse)",
+          values: bridge.map((b) => b.nibd ? -b.nibd : null),
+          indent: true,
+        });
+      }
+      if (acquirerPeriods.some((p) => p.option_debt != null)) {
+        rows.push({
+          label: "Opsjonsgjeld",
+          values: bridge.map((b) => b.optionDebt ? -b.optionDebt : null),
+          indent: true,
+        });
+      }
+
+      // EQV
+      rows.push({
+        label: "Egenkapitalverdi (EQV)",
+        values: bridge.map((b) => b.eqv),
+        bold: true,
+        divider: true,
+      });
+
+      // Dilution items
+      if (acquirerPeriods.some((p) => p.preferred_equity != null)) {
+        rows.push({
+          label: "Preferanseaksjer",
+          values: bridge.map((b) => b.preferredEquity ? -b.preferredEquity : null),
+          indent: true,
+        });
+      }
+      if (hasShareData) {
+        rows.push({
+          label: "Per aksje (pre-utvanning)",
+          values: bridge.map((b) => b.perSharePre),
+          indent: true,
+        });
+      }
+      if (acquirerPeriods.some((p) => p.mip_amount != null) || (formulas && formulas.mipPctEqv > 0)) {
+        rows.push({
+          label: "MIP",
+          values: bridge.map((b) => b.mipAmount ? -b.mipAmount : null),
+          indent: true,
+        });
+      }
+      if (acquirerPeriods.some((p) => p.tso_amount != null) || (formulas && formulas.tsoN > 0)) {
+        rows.push({
+          label: "TSO",
+          values: bridge.map((b) => b.tsoAmount ? -b.tsoAmount : null),
+          indent: true,
+        });
+      }
+      if (acquirerPeriods.some((p) => p.warrants_amount != null) || (formulas && formulas.warN > 0)) {
+        rows.push({
+          label: "Eksisterende tegningsretter",
+          values: bridge.map((b) => b.warrantsAmount ? -b.warrantsAmount : null),
+          indent: true,
+        });
+      }
+
+      // Post-dilution
+      rows.push({
+        label: "EQV (post-utvanning)",
+        values: bridge.map((b) => b.eqvPostDilution),
+        bold: true,
+      });
+      if (hasShareData) {
+        rows.push({
+          label: "Per aksje (post-utvanning)",
+          values: bridge.map((b) => b.perSharePost),
+          bold: true,
+        });
+        rows.push({
+          label: "Aksjer (mill.)",
+          values: bridge.map((b) => b.shareCount),
+          indent: true,
+          format: "share",
+        });
+      }
+    } else {
+      rows.push({
+        label: "Egenkapitalverdi (EQV)",
+        values: bridge.map((b) => b.eqv),
+        bold: true,
+        divider: true,
+        subtext: bridge.map(() => "= EV (ingen NIBD/justeringer importert)"),
+      });
+    }
+
+    return rows;
+  }
+
   const multipleButtons = (
     <div className="flex gap-1">
       {multiples.map((m) => (
@@ -865,7 +1203,7 @@ export default function EquityBridgeTable({
           {acqHasData && (
             <BridgeTable
               title={`${acquirerName} Egenkapitalbrygge`}
-              periods={acquirerPeriods}
+              columnLabels={acquirerPeriods.map((p) => p.period_label)}
               rows={buildRows(acqBridge, acquirerPeriods, acqHasBridge, acqFormulas)}
             />
           )}
@@ -881,8 +1219,17 @@ export default function EquityBridgeTable({
           {tgtHasData && (
             <BridgeTable
               title={`${targetName} Egenkapitalbrygge`}
-              periods={targetPeriods}
+              columnLabels={targetPeriods.map((p) => p.period_label)}
               rows={buildRows(tgtBridge, targetPeriods, tgtHasBridge, tgtFormulas)}
+            />
+          )}
+
+          {/* Pro Forma Combined Bridge */}
+          {pfBridge.length > 0 && pfPeriods && pfPeriods.length > 0 && (
+            <BridgeTable
+              title={`Pro Forma (${acquirerName} + ${targetName}) Egenkapitalbrygge`}
+              columnLabels={pfPeriods.map((p) => p.period_label)}
+              rows={buildPfRows(pfBridge, acqFormulas)}
             />
           )}
         </div>

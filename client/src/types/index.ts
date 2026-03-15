@@ -176,9 +176,12 @@ export interface AcquisitionScenario {
   updated_at: string;
 }
 
+export type SourceType = "debt" | "equity" | "preferred";
+
 export interface SourceUseItem {
   name: string;
   amount: number;
+  type?: SourceType;
 }
 
 export interface DealReturn {
@@ -209,7 +212,23 @@ export interface DealParameters {
   debt_amortisation?: number;
   interest_rate?: number;
   rollover_equity?: number;
+  // Cash sweep: % of excess FCF after mandatory amort applied to debt repayment (0-1)
+  cash_sweep_pct?: number;
   cost_synergies?: number[];
+  // Share tracking (per-share returns with dilution)
+  entry_shares?: number;
+  exit_shares?: number;
+  entry_price_per_share?: number;
+  rollover_shares?: number;
+  // Equity from Sources & Uses that finances the target acquisition
+  equity_from_sources?: number;
+  // ── Dilution: MIP / TSO warrants / Existing warrants ──
+  mip_share_pct?: number;         // e.g. 0.0559 = 5.59%
+  tso_warrants_count?: number;    // number of warrant units (millions)
+  tso_warrants_price?: number;    // strike price per share (NOK)
+  existing_warrants_count?: number;
+  existing_warrants_price?: number;
+  dilution_base_shares?: number;  // base shares for PPS_pre calc
   // Deprecated (kept for backward compat)
   nibd_target?: number;
   wacc?: number;
@@ -221,6 +240,52 @@ export interface CalculatedReturn {
   exit_multiple: number;
   irr: number | null;
   mom: number | null;
+  // Per-share metrics (when share data is available)
+  per_share_entry?: number | null;
+  per_share_exit?: number | null;
+  per_share_irr?: number | null;
+  per_share_mom?: number | null;
+}
+
+export interface ShareSummary {
+  entry_shares: number;
+  exit_shares_base: number;
+  rollover_shares: number;
+  total_exit_shares: number;
+  dilution_pct: number;
+  entry_price_per_share: number;
+  db_entry_shares?: number;
+  db_exit_shares?: number;
+  target_ek_shares?: number;      // new shares from EK financing of target
+  equity_from_sources?: number;   // EK amount from Sources & Uses
+  // Post-dilution breakdown (at exit)
+  exit_eqv_gross?: number;
+  exit_preferred_equity?: number;
+  exit_mip_amount?: number;
+  exit_tso_amount?: number;
+  exit_warrants_amount?: number;
+  exit_eqv_post_dilution?: number;
+  exit_per_share_pre?: number;
+  exit_per_share_post?: number;
+  dilution_value_pct?: number;    // total dilution as % of EQV
+}
+
+export interface DebtScheduleRow {
+  year: number;
+  period_label: string;
+  ebitda: number;
+  unlevered_fcf: number;
+  opening_debt: number;
+  interest: number;
+  mandatory_amort: number;
+  sweep: number;
+  total_debt_service: number;
+  closing_debt: number;
+  leverage: number | null;
+  opening_pref: number;
+  pik_accrual: number;
+  closing_pref: number;
+  fcf_to_equity: number;
 }
 
 export interface ExcelImportResult {
@@ -261,6 +326,30 @@ export interface ProFormaPeriod {
   cash_conversion: number | null;
 }
 
+// Sensitivity analysis
+export interface SensitivityAxis {
+  param: string;
+  values: number[];
+}
+
+export type SensitivityMetric = 'irr' | 'mom' | 'per_share_irr' | 'per_share_mom';
+
+export interface SensitivityRequest {
+  base_params: DealParameters;
+  row_axis: SensitivityAxis;
+  col_axis: SensitivityAxis;
+  metric: SensitivityMetric;
+  return_case?: 'Kombinert' | 'Standalone';
+}
+
+export interface SensitivityResponse {
+  matrix: (number | null)[][];
+  row_axis: SensitivityAxis;
+  col_axis: SensitivityAxis;
+  metric: SensitivityMetric;
+  return_case: string;
+}
+
 export interface CompareResult {
   acquirer_model: FinancialModel & { company_name: string; company_type: string };
   acquirer_periods: FinancialPeriod[];
@@ -272,4 +361,21 @@ export interface CompareResult {
   calculated_returns: CalculatedReturn[] | null;
   returns_level?: 1 | 2;
   returns_level_label?: string;
+  share_summary?: ShareSummary;
+}
+
+// Company-level assumptions (stored in model_parameters JSONB, synced across all models)
+export interface CompanyAssumptions {
+  shares_at_completion?: number | null;
+  shares_at_year_end?: number | null;
+  preferred_equity?: number | null;
+  preferred_equity_rate?: number | null;
+  mip_share_pct?: number | null;
+  tso_warrants_count?: number | null;
+  tso_warrants_strike?: number | null;
+  existing_warrants_count?: number | null;
+  existing_warrants_strike?: number | null;
+  nibd?: number | null;
+  enterprise_value?: number | null;
+  equity_value?: number | null;
 }

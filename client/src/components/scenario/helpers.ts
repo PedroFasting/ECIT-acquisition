@@ -59,6 +59,98 @@ export const formatTooltip = (val: any, suffix = "") => {
   return `${nbFmt1.format(num)}${suffix ? ` ${suffix}` : ""}`;
 };
 
+/**
+ * Auto-classify a source by name using keyword heuristics.
+ * Used as fallback when a source has no explicit `type` field (backward compat).
+ * Returns: "debt" | "equity" | "preferred"
+ */
+export type SourceType = "debt" | "equity" | "preferred";
+
+export const autoClassifySource = (name: string): SourceType => {
+  const n = (name || "").toLowerCase().trim();
+
+  // Preferred equity keywords (check first — "preferred equity" should not match "equity")
+  if (n.includes("prefer") || n.includes("preferanse") || n.includes("pref equity") || n.includes("pref ek")) {
+    return "preferred";
+  }
+
+  // Debt keywords
+  if (
+    n.includes("debt") ||
+    n.includes("gjeld") ||
+    n.includes("lån") ||
+    n.includes("loan") ||
+    n.includes("credit") ||
+    n.includes("kreditt") ||
+    n.includes("obligasjon") ||
+    n.includes("bond")
+  ) {
+    return "debt";
+  }
+
+  // Ordinary equity keywords
+  if (
+    n.includes("equity") ||
+    n.includes("egenkapital") ||
+    n.includes("ordinær") ||
+    n.includes("ordinary") ||
+    n.includes("share issue") ||
+    n.includes("aksjeemisjon") ||
+    n.includes("emisjon") ||
+    n.includes("kapitalforhøyelse") ||
+    n.includes("ny kapital") ||
+    n.includes("new capital") ||
+    n === "ek" ||
+    n === "oe"
+  ) {
+    return "equity";
+  }
+
+  // Default: treat unclassified as debt (conservative — doesn't inflate equity)
+  return "debt";
+};
+
+/**
+ * Get the effective type of a source: explicit type if set, otherwise auto-classify.
+ */
+export const getSourceType = (s: { name: string; amount?: any; type?: SourceType }): SourceType => {
+  if (s.type && (s.type === "debt" || s.type === "equity" || s.type === "preferred")) {
+    return s.type;
+  }
+  return autoClassifySource(s.name);
+};
+
+/**
+ * Extract the equity amount from Sources & Uses that finances the acquisition.
+ * Prefers explicit `type` field; falls back to keyword auto-classification.
+ */
+export const getEquityFromSources = (sources: Array<{ name: string; amount: any; type?: SourceType }> | undefined | null): number => {
+  if (!sources || sources.length === 0) return 0;
+  return sources
+    .filter((s) => getSourceType(s) === "equity")
+    .reduce((sum, s) => sum + toNum(s.amount), 0);
+};
+
+/**
+ * Extract preferred equity amount from Sources.
+ */
+export const getPreferredFromSources = (sources: Array<{ name: string; amount: any; type?: SourceType }> | undefined | null): number => {
+  if (!sources || sources.length === 0) return 0;
+  return sources
+    .filter((s) => getSourceType(s) === "preferred")
+    .reduce((sum, s) => sum + toNum(s.amount), 0);
+};
+
+/**
+ * Extract debt amount from Sources.
+ */
+export const getDebtFromSources = (sources: Array<{ name: string; amount: any; type?: SourceType }> | undefined | null): number => {
+  if (!sources || sources.length === 0) return 0;
+  return sources
+    .filter((s) => getSourceType(s) === "debt")
+    .reduce((sum, s) => sum + toNum(s.amount), 0);
+};
+
 export const deltaColor = (val: number | null | undefined) => {
   if (val === null || val === undefined) return "";
   if (val > 0) return "text-green-700 bg-green-50";

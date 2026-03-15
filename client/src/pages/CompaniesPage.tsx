@@ -113,7 +113,7 @@ export default function CompaniesPage() {
                   setFormData({ ...formData, name: e.target.value })
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#002C55] outline-none"
-                placeholder="f.eks. Argon"
+                placeholder="f.eks. Selskapsnavn AS"
               />
             </div>
             <div>

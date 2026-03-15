@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   X,
 } from "lucide-react";
+import CompanyAssumptions from "../components/CompanyAssumptions";
 
 export default function CompanyDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -431,6 +432,9 @@ export default function CompanyDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Company Assumptions Section */}
+      {models.length > 0 && <CompanyAssumptions companyId={Number(id)} />}
 
       {/* Models list */}
       <h2 className="text-lg font-semibold text-gray-900 mb-4">

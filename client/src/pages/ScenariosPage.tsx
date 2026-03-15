@@ -10,8 +10,10 @@ import type {
   SourceUseItem,
   CalculatedReturn,
   DealParameters,
+  DebtScheduleRow,
+  ShareSummary,
 } from "../types";
-import { GitMerge, ChevronDown } from "lucide-react";
+import { GitMerge, ChevronDown, Download, RefreshCw } from "lucide-react";
 
 // Reuse analysis components from scenario detail
 import KeyMetricsCards from "../components/scenario/KeyMetricsCards";
@@ -23,6 +25,10 @@ import EquityBridgeTable from "../components/scenario/EquityBridgeTable";
 import AccretionAnalysis from "../components/scenario/AccretionAnalysis";
 import DealReturnsMatrix from "../components/scenario/DealReturnsMatrix";
 import CapitalStructure from "../components/scenario/CapitalStructure";
+import SynergiesEditor from "../components/scenario/SynergiesEditor";
+import ShareTracker from "../components/scenario/ShareTracker";
+import DebtScheduleTable from "../components/scenario/DebtScheduleTable";
+import SensitivityHeatmap from "../components/scenario/SensitivityHeatmap";
 
 export default function ScenariosPage() {
   // Data state
@@ -55,10 +61,14 @@ export default function ScenariosPage() {
     overview: true,
     charts: true,
     proforma: true,
+    synergies: true,
     equityBridge: true,
     returns: true,
     capital: true,
     accretion: true,
+    shareTracker: true,
+    debtSchedule: true,
+    sensitivity: true,
   });
 
   const toggleSection = (key: string) =>
@@ -67,6 +77,24 @@ export default function ScenariosPage() {
   const showSuccess = (msg: string) => {
     setSuccessMsg(msg);
     setTimeout(() => setSuccessMsg(""), 3000);
+  };
+
+  // ─── Excel export (uses current scenario) ─────────────────
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportExcel = async () => {
+    const scenarioId = compareResult?.scenario?.id;
+    if (!scenarioId) return;
+    setExporting(true);
+    setError("");
+    try {
+      await api.exportExcel(scenarioId, compareResult?.scenario?.name);
+      showSuccess("Excel-fil lastet ned");
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setExporting(false);
+    }
   };
 
   // ─── Load models on mount ─────────────────────────────────
@@ -139,6 +167,14 @@ export default function ScenariosPage() {
 
   // ─── Calculated returns state ─────────────────────────────
   const [calcReturns, setCalcReturns] = useState<CalculatedReturn[] | null>(null);
+  // ─── Deal parameters for sensitivity analysis ──────────────
+  const [dealParams, setDealParams] = useState<DealParameters | null>(null);
+  // ─── Debt schedule from Level 2 returns calculation ──────
+  const [debtSchedule, setDebtSchedule] = useState<DebtScheduleRow[] | null>(null);
+  // ─── Share summary from deal returns (for dilution waterfall) ──
+  const [shareSummary, setShareSummary] = useState<ShareSummary | null>(null);
+  // ─── Shared exit multiples (synced from DealReturnsMatrix → EquityBridgeTable) ──
+  const [exitMultiples, setExitMultiples] = useState<number[]>([]);
 
   // Sync from compare result when it changes
   useEffect(() => {
@@ -146,13 +182,21 @@ export default function ScenariosPage() {
   }, [compareResult]);
 
   const handleCalculated = useCallback(
-    (returns: CalculatedReturn[], params: DealParameters) => {
+    (returns: CalculatedReturn[], params: DealParameters, ss?: ShareSummary, debtSched?: DebtScheduleRow[]) => {
       setCalcReturns(returns);
+      setDealParams(params);
+      setDebtSchedule(debtSched ?? null);
+      setShareSummary(ss ?? null);
+      // Sync deal_parameters back into local compare result without full re-fetch
+      // (the server already persisted them via the calculate endpoint)
+      setCompareResult((prev) =>
+        prev?.scenario
+          ? { ...prev, scenario: { ...prev.scenario, deal_parameters: params } }
+          : prev
+      );
       showSuccess("IRR/MoM beregnet og lagret");
-      // Also refresh compare to get updated deal_parameters
-      fetchComparison();
     },
-    [fetchComparison]
+    []
   );
 
   // ─── Save handlers (use auto-created scenario) ────────────
@@ -167,6 +211,37 @@ export default function ScenariosPage() {
       await api.updateScenario(scenarioId, { sources, uses } as any);
       await fetchComparison();
       showSuccess("Sources & Uses lagret");
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const handleSaveCapitalFields = async (fields: {
+    ordinary_equity: number | null;
+    preferred_equity: number | null;
+    preferred_equity_rate: number | null;
+    net_debt: number | null;
+  }) => {
+    const scenarioId = compareResult?.scenario?.id;
+    if (!scenarioId) return;
+    setError("");
+    try {
+      await api.updateScenario(scenarioId, fields as any);
+      await fetchComparison();
+      showSuccess("Kapitalstruktur lagret");
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const handleSaveSynergies = async (timeline: Record<string, number>) => {
+    const scenarioId = compareResult?.scenario?.id;
+    if (!scenarioId) return;
+    setError("");
+    try {
+      await api.updateScenario(scenarioId, { cost_synergies_timeline: timeline } as any);
+      await fetchComparison();
+      showSuccess("Synergier lagret");
     } catch (err: any) {
       setError(err.message);
     }
@@ -278,12 +353,26 @@ export default function ScenariosPage() {
   return (
     <div className="p-8 max-w-[1400px]">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Scenarioanalyse</h1>
-        <p className="text-gray-500 mt-1">
-          Velg ECIT-modell som utgangspunkt, deretter en target-modell for
-          kombinert analyse
-        </p>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Scenarioanalyse</h1>
+          <p className="text-gray-500 mt-1">
+            Velg ECIT-modell som utgangspunkt, deretter en target-modell for
+            kombinert analyse
+          </p>
+        </div>
+        {compareResult?.scenario && compareResult.scenario.id > 0 && (
+          <div className="flex gap-3 flex-shrink-0">
+            <button
+              onClick={handleExportExcel}
+              disabled={exporting}
+              className="flex items-center gap-2 px-4 py-2.5 bg-[#1B6B3A] text-white rounded-lg hover:bg-[#155a2f] transition-colors text-sm font-medium disabled:opacity-50 shadow-sm"
+            >
+              <Download size={16} className={exporting ? "animate-bounce" : ""} />
+              {exporting ? "Eksporterer..." : "Excel Export"}
+            </button>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -378,16 +467,17 @@ export default function ScenariosPage() {
       </div>
 
       {/* ─── Loading indicator for comparison ────────────── */}
-      {comparing && (
+      {comparing && !compareResult && (
         <div className="flex items-center justify-center py-12">
           <div className="text-gray-400 text-sm">Laster analyse...</div>
         </div>
       )}
 
       {/* ─── Analysis content ────────────────────────────── */}
-      {!comparing && scenario && acquirerPeriods.length > 0 && (
-        <>
-          {/* Key metrics cards */}
+      {scenario && acquirerPeriods.length > 0 && (
+        <div className={comparing ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
+          <>
+          {/* 1. Key metrics cards */}
           <KeyMetricsCards
             scenario={scenario}
             acquirerPeriods={acquirerPeriods}
@@ -395,7 +485,19 @@ export default function ScenariosPage() {
             pfPeriods={pfPeriods}
           />
 
-          {/* Charts section */}
+          {/* 2. Accretion Analysis — "why do this deal?" comes early */}
+          {selectedTargetId && pfPeriods.length > 0 && (
+            <AccretionAnalysis
+              scenario={scenario}
+              acquirerPeriods={acquirerPeriods}
+              targetPeriods={targetPeriods}
+              pfPeriods={pfPeriods}
+              expanded={expandedSections.accretion}
+              onToggle={toggleSection}
+            />
+          )}
+
+          {/* 3. Charts section */}
           <div className="bg-white rounded-xl border border-gray-200 mb-8">
             <SectionHeader
               sectionKey="charts"
@@ -424,7 +526,28 @@ export default function ScenariosPage() {
             )}
           </div>
 
-          {/* Pro Forma table (only if target is selected) */}
+          {/* 4. Capital Structure / Sources & Uses — financing before returns */}
+          {selectedTargetId && scenario.id > 0 && (
+            <CapitalStructure
+              scenario={scenario}
+              expanded={expandedSections.capital}
+              onToggle={toggleSection}
+              onSaveSU={handleSaveSU}
+              onSaveCapitalFields={handleSaveCapitalFields}
+            />
+          )}
+
+          {/* 4b. Debt Schedule (only shown when Level 2 is active) */}
+          {debtSchedule && debtSchedule.length > 0 && (
+            <DebtScheduleTable
+              debtSchedule={debtSchedule}
+              dealParameters={scenario.deal_parameters}
+              expanded={expandedSections.debtSchedule}
+              onToggle={toggleSection}
+            />
+          )}
+
+          {/* 5. Pro Forma table (only if target is selected) */}
           {selectedTargetId && pfPeriods.length > 0 && (
             <ProFormaTable
               pfPeriods={pfPeriods}
@@ -437,17 +560,45 @@ export default function ScenariosPage() {
             />
           )}
 
-          {/* Equity Bridge */}
+          {/* 6. Synergies Editor (only when target selected with a real scenario) */}
+          {selectedTargetId && scenario.id > 0 && pfPeriods.length > 0 && (
+            <SynergiesEditor
+              scenario={scenario}
+              acquirerPeriods={acquirerPeriods}
+              targetPeriods={targetPeriods}
+              pfPeriods={pfPeriods}
+              acquirerName={acquirerName}
+              targetName={targetName}
+              expanded={expandedSections.synergies}
+              onToggle={toggleSection}
+              onSave={handleSaveSynergies}
+            />
+          )}
+
+          {/* 6b. Share Tracker (share count waterfall) */}
+          {acquirerPeriods.some((p) => p.share_count !== null) && (
+            <ShareTracker
+              scenario={scenario}
+              acquirerPeriods={acquirerPeriods}
+              shareSummary={shareSummary}
+              expanded={expandedSections.shareTracker}
+              onToggle={toggleSection}
+            />
+          )}
+
+          {/* 7. Equity Bridge */}
           <EquityBridgeTable
             acquirerPeriods={acquirerPeriods}
             targetPeriods={targetPeriods}
+            pfPeriods={pfPeriods}
             acquirerName={acquirerName}
             targetName={targetName}
             expanded={expandedSections.equityBridge}
             onToggle={toggleSection}
+            exitMultiples={exitMultiples.length > 0 ? exitMultiples : undefined}
           />
 
-          {/* Deal Returns (IRR / MoM) — only when target selected */}
+          {/* 8. Deal Returns (IRR / MoM) — only when target selected */}
           {selectedTargetId && scenario.id > 0 && (
             <DealReturnsMatrix
               scenario={scenario}
@@ -459,27 +610,16 @@ export default function ScenariosPage() {
               onToggle={toggleSection}
               calculatedReturns={calcReturns}
               onCalculated={handleCalculated}
+              onExitMultiplesChange={setExitMultiples}
             />
           )}
 
-          {/* Capital Structure / Sources & Uses — only when target selected */}
-          {selectedTargetId && scenario.id > 0 && (
-            <CapitalStructure
+          {/* 9. Sensitivity Analysis Heatmap */}
+          {selectedTargetId && scenario.id > 0 && dealParams && (
+            <SensitivityHeatmap
               scenario={scenario}
-              expanded={expandedSections.capital}
-              onToggle={toggleSection}
-              onSaveSU={handleSaveSU}
-            />
-          )}
-
-          {/* Accretion Analysis (only if target is selected) */}
-          {selectedTargetId && pfPeriods.length > 0 && (
-            <AccretionAnalysis
-              scenario={scenario}
-              acquirerPeriods={acquirerPeriods}
-              targetPeriods={targetPeriods}
-              pfPeriods={pfPeriods}
-              expanded={expandedSections.accretion}
+              dealParams={dealParams}
+              expanded={expandedSections.sensitivity}
               onToggle={toggleSection}
             />
           )}
@@ -496,6 +636,7 @@ export default function ScenariosPage() {
             </div>
           )}
         </>
+        </div>
       )}
     </div>
   );
