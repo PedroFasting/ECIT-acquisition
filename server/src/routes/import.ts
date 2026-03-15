@@ -4,6 +4,14 @@ import { parse } from "csv-parse/sync";
 import pool from "../models/db.js";
 import { AuthRequest, authMiddleware } from "../middleware/auth.js";
 import { parseExcelBuffer } from "../services/excelParser.js";
+import {
+  buildPeriodUpsertSQL,
+  extractPeriodParams,
+  COLUMNS_JSON,
+  COLUMNS_CSV,
+  COLUMNS_EXCEL,
+  type PeriodColumn,
+} from "../services/periodUpsert.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -47,99 +55,18 @@ router.post(
 
       // Forward to the periods upsert endpoint logic
       const client = await pool.connect();
+      const { sql } = buildPeriodUpsertSQL({ columns: COLUMNS_JSON, strategy: "overwrite" });
       try {
         await client.query("BEGIN");
         let count = 0;
 
         for (const p of periods) {
-          await client.query(
-            `INSERT INTO financial_periods (
-              model_id, period_date, period_label, period_type,
-              revenue_managed_services, revenue_professional_services, revenue_other,
-              revenue_total, revenue_organic, revenue_ma,
-              revenue_growth, organic_growth,
-              ebitda_managed_services, ebitda_professional_services, ebitda_central_costs,
-              ebitda_organic, ebitda_ma, ebitda_total,
-              margin_managed_services, margin_professional_services, margin_central_costs, ebitda_margin,
-              capex, capex_pct_revenue, change_nwc, other_cash_flow_items,
-              operating_fcf, minority_interest, operating_fcf_excl_minorities, cash_conversion,
-              share_count, nibd, option_debt, adjustments, enterprise_value, equity_value,
-              preferred_equity, per_share_pre, mip_amount, tso_amount, warrants_amount,
-              eqv_post_dilution, per_share_post, acquired_revenue,
-              extra_data
-            ) VALUES (
-              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-              $13, $14, $15, $16, $17, $18,
-              $19, $20, $21, $22,
-              $23, $24, $25, $26, $27, $28, $29, $30,
-              $31, $32, $33, $34, $35, $36,
-              $37, $38, $39, $40, $41,
-              $42, $43, $44,
-              $45
-            )
-            ON CONFLICT (model_id, period_date) DO UPDATE SET
-              period_label = EXCLUDED.period_label,
-              period_type = EXCLUDED.period_type,
-              revenue_managed_services = EXCLUDED.revenue_managed_services,
-              revenue_professional_services = EXCLUDED.revenue_professional_services,
-              revenue_other = EXCLUDED.revenue_other,
-              revenue_total = EXCLUDED.revenue_total,
-              revenue_organic = EXCLUDED.revenue_organic,
-              revenue_ma = EXCLUDED.revenue_ma,
-              revenue_growth = EXCLUDED.revenue_growth,
-              organic_growth = EXCLUDED.organic_growth,
-              ebitda_managed_services = EXCLUDED.ebitda_managed_services,
-              ebitda_professional_services = EXCLUDED.ebitda_professional_services,
-              ebitda_central_costs = EXCLUDED.ebitda_central_costs,
-              ebitda_organic = EXCLUDED.ebitda_organic,
-              ebitda_ma = EXCLUDED.ebitda_ma,
-              ebitda_total = EXCLUDED.ebitda_total,
-              margin_managed_services = EXCLUDED.margin_managed_services,
-              margin_professional_services = EXCLUDED.margin_professional_services,
-              margin_central_costs = EXCLUDED.margin_central_costs,
-              ebitda_margin = EXCLUDED.ebitda_margin,
-              capex = EXCLUDED.capex,
-              capex_pct_revenue = EXCLUDED.capex_pct_revenue,
-              change_nwc = EXCLUDED.change_nwc,
-              other_cash_flow_items = EXCLUDED.other_cash_flow_items,
-              operating_fcf = EXCLUDED.operating_fcf,
-              minority_interest = EXCLUDED.minority_interest,
-              operating_fcf_excl_minorities = EXCLUDED.operating_fcf_excl_minorities,
-              cash_conversion = EXCLUDED.cash_conversion,
-              share_count = EXCLUDED.share_count,
-              nibd = EXCLUDED.nibd,
-              option_debt = EXCLUDED.option_debt,
-              adjustments = EXCLUDED.adjustments,
-              enterprise_value = EXCLUDED.enterprise_value,
-              equity_value = EXCLUDED.equity_value,
-              preferred_equity = EXCLUDED.preferred_equity,
-              per_share_pre = EXCLUDED.per_share_pre,
-              mip_amount = EXCLUDED.mip_amount,
-              tso_amount = EXCLUDED.tso_amount,
-              warrants_amount = EXCLUDED.warrants_amount,
-              eqv_post_dilution = EXCLUDED.eqv_post_dilution,
-              per_share_post = EXCLUDED.per_share_post,
-              acquired_revenue = EXCLUDED.acquired_revenue,
-              extra_data = EXCLUDED.extra_data,
-              updated_at = NOW()`,
-            [
-              modelId, p.period_date, p.period_label, p.period_type || "estimate",
-              p.revenue_managed_services, p.revenue_professional_services, p.revenue_other,
-              p.revenue_total, p.revenue_organic, p.revenue_ma,
-              p.revenue_growth, p.organic_growth,
-              p.ebitda_managed_services, p.ebitda_professional_services, p.ebitda_central_costs,
-              p.ebitda_organic, p.ebitda_ma, p.ebitda_total,
-              p.margin_managed_services, p.margin_professional_services, p.margin_central_costs, p.ebitda_margin,
-              p.capex, p.capex_pct_revenue, p.change_nwc, p.other_cash_flow_items,
-              p.operating_fcf, p.minority_interest, p.operating_fcf_excl_minorities, p.cash_conversion,
-              p.share_count ?? null, p.nibd ?? null, p.option_debt ?? null,
-              p.adjustments ?? null, p.enterprise_value ?? null, p.equity_value ?? null,
-              p.preferred_equity ?? null, p.per_share_pre ?? null,
-              p.mip_amount ?? null, p.tso_amount ?? null, p.warrants_amount ?? null,
-              p.eqv_post_dilution ?? null, p.per_share_post ?? null, p.acquired_revenue ?? null,
-              JSON.stringify(p.extra_data || {}),
-            ]
-          );
+          const params = extractPeriodParams(modelId, p.period_date, p, COLUMNS_JSON, (col, row) => {
+            if (col === "period_type") return row.period_type || "estimate";
+            if (col === "extra_data") return JSON.stringify(row.extra_data || {});
+            return row[col] ?? null;
+          });
+          await client.query(sql, params);
           count++;
         }
 
@@ -217,6 +144,7 @@ router.post(
 
       // Map CSV columns to our schema
       const client = await pool.connect();
+      const { sql: csvSql } = buildPeriodUpsertSQL({ columns: COLUMNS_CSV, strategy: "coalesce" });
       try {
         await client.query("BEGIN");
         let count = 0;
@@ -247,49 +175,33 @@ router.post(
             return isNaN(n) ? null : n / 100;
           };
 
+          const csvValueMapper = (col: PeriodColumn, row: Record<string, any>): any => {
+            const aliases: Record<string, string[]> = {
+              revenue_managed_services: ["Managed services"],
+              revenue_professional_services: ["Professional services"],
+              revenue_total: ["Total revenue", "Revenue"],
+              revenue_organic: ["Organic revenue"],
+              revenue_growth: ["% growth", "Revenue growth"],
+              organic_growth: ["Organic growth"],
+              ebitda_central_costs: ["Central costs"],
+              ebitda_organic: ["Organic EBITDA (pre-IFRS)"],
+              ebitda_total: ["Total EBITDA (pre-IFRS)", "EBITDA"],
+              ebitda_margin: ["% margin", "EBITDA margin"],
+            };
+            const pctCols = new Set(["revenue_growth", "organic_growth", "ebitda_margin"]);
+            const keys = aliases[col] || [];
+            let val = row[col];
+            for (const k of keys) {
+              if (val == null) val = row[k];
+            }
+            if (val == null || val === undefined) return null;
+            if (pctCols.has(col)) return parsePct(val);
+            return val;
+          };
+
           await client.query(
-            `INSERT INTO financial_periods (
-              model_id, period_date, period_label, period_type,
-              revenue_managed_services, revenue_professional_services,
-              revenue_total, revenue_organic,
-              revenue_growth, organic_growth,
-              ebitda_managed_services, ebitda_professional_services, ebitda_central_costs,
-              ebitda_organic, ebitda_total, ebitda_margin
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
-            ON CONFLICT (model_id, period_date) DO UPDATE SET
-              period_label = EXCLUDED.period_label,
-              period_type = EXCLUDED.period_type,
-              revenue_managed_services = COALESCE(EXCLUDED.revenue_managed_services, financial_periods.revenue_managed_services),
-              revenue_professional_services = COALESCE(EXCLUDED.revenue_professional_services, financial_periods.revenue_professional_services),
-              revenue_total = COALESCE(EXCLUDED.revenue_total, financial_periods.revenue_total),
-              revenue_organic = COALESCE(EXCLUDED.revenue_organic, financial_periods.revenue_organic),
-              revenue_growth = COALESCE(EXCLUDED.revenue_growth, financial_periods.revenue_growth),
-              organic_growth = COALESCE(EXCLUDED.organic_growth, financial_periods.organic_growth),
-              ebitda_managed_services = COALESCE(EXCLUDED.ebitda_managed_services, financial_periods.ebitda_managed_services),
-              ebitda_professional_services = COALESCE(EXCLUDED.ebitda_professional_services, financial_periods.ebitda_professional_services),
-              ebitda_central_costs = COALESCE(EXCLUDED.ebitda_central_costs, financial_periods.ebitda_central_costs),
-              ebitda_organic = COALESCE(EXCLUDED.ebitda_organic, financial_periods.ebitda_organic),
-              ebitda_total = COALESCE(EXCLUDED.ebitda_total, financial_periods.ebitda_total),
-              ebitda_margin = COALESCE(EXCLUDED.ebitda_margin, financial_periods.ebitda_margin),
-              updated_at = NOW()`,
-            [
-              modelId,
-              periodDate,
-              periodLabel,
-              periodType,
-              row.revenue_managed_services || row["Managed services"] || null,
-              row.revenue_professional_services || row["Professional services"] || null,
-              row.revenue_total || row["Total revenue"] || row.Revenue || null,
-              row.revenue_organic || row["Organic revenue"] || null,
-              parsePct(row.revenue_growth || row["% growth"] || row["Revenue growth"]),
-              parsePct(row.organic_growth || row["Organic growth"]),
-              row.ebitda_managed_services || null,
-              row.ebitda_professional_services || null,
-              row.ebitda_central_costs || row["Central costs"] || null,
-              row.ebitda_organic || row["Organic EBITDA (pre-IFRS)"] || null,
-              row.ebitda_total || row["Total EBITDA (pre-IFRS)"] || row.EBITDA || null,
-              parsePct(row.ebitda_margin || row["% margin"] || row["EBITDA margin"]),
-            ]
+            csvSql,
+            extractPeriodParams(modelId, periodDate, { ...row, period_label: periodLabel, period_type: periodType }, COLUMNS_CSV, csvValueMapper),
           );
           count++;
         }
@@ -354,6 +266,7 @@ router.post(
       }
 
       const client = await pool.connect();
+      const { sql: excelSql } = buildPeriodUpsertSQL({ columns: COLUMNS_EXCEL, strategy: "coalesce" });
       const summary: {
         models_created: number;
         models_updated: number;
@@ -417,123 +330,8 @@ router.post(
           // Upsert periods — includes all fields the parser can output
           let periodCount = 0;
           for (const p of modelBlock.periods) {
-            await client.query(
-              `INSERT INTO financial_periods (
-                model_id, period_date, period_label, period_type,
-                revenue_managed_services, revenue_professional_services, revenue_other,
-                revenue_total, revenue_organic, revenue_ma,
-                revenue_growth, organic_growth,
-                ebitda_managed_services, ebitda_professional_services, ebitda_central_costs,
-                ebitda_organic, ebitda_ma, ebitda_total,
-                margin_managed_services, margin_professional_services, margin_central_costs, ebitda_margin,
-                capex, capex_pct_revenue, change_nwc, other_cash_flow_items,
-                operating_fcf, minority_interest, operating_fcf_excl_minorities, cash_conversion,
-                acquired_revenue,
-                share_count, nibd, option_debt, adjustments,
-                enterprise_value, equity_value, preferred_equity, per_share_pre,
-                mip_amount, tso_amount, warrants_amount,
-                eqv_post_dilution, per_share_post
-              ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-                $13, $14, $15, $16, $17, $18,
-                $19, $20, $21, $22,
-                $23, $24, $25, $26, $27, $28, $29, $30,
-                $31, $32, $33, $34, $35,
-                $36, $37, $38, $39,
-                $40, $41, $42,
-                $43, $44
-              )
-              ON CONFLICT (model_id, period_date) DO UPDATE SET
-                period_label = EXCLUDED.period_label,
-                period_type = EXCLUDED.period_type,
-                revenue_managed_services = COALESCE(EXCLUDED.revenue_managed_services, financial_periods.revenue_managed_services),
-                revenue_professional_services = COALESCE(EXCLUDED.revenue_professional_services, financial_periods.revenue_professional_services),
-                revenue_other = COALESCE(EXCLUDED.revenue_other, financial_periods.revenue_other),
-                revenue_total = COALESCE(EXCLUDED.revenue_total, financial_periods.revenue_total),
-                revenue_organic = COALESCE(EXCLUDED.revenue_organic, financial_periods.revenue_organic),
-                revenue_ma = COALESCE(EXCLUDED.revenue_ma, financial_periods.revenue_ma),
-                revenue_growth = COALESCE(EXCLUDED.revenue_growth, financial_periods.revenue_growth),
-                organic_growth = COALESCE(EXCLUDED.organic_growth, financial_periods.organic_growth),
-                ebitda_managed_services = COALESCE(EXCLUDED.ebitda_managed_services, financial_periods.ebitda_managed_services),
-                ebitda_professional_services = COALESCE(EXCLUDED.ebitda_professional_services, financial_periods.ebitda_professional_services),
-                ebitda_central_costs = COALESCE(EXCLUDED.ebitda_central_costs, financial_periods.ebitda_central_costs),
-                ebitda_organic = COALESCE(EXCLUDED.ebitda_organic, financial_periods.ebitda_organic),
-                ebitda_ma = COALESCE(EXCLUDED.ebitda_ma, financial_periods.ebitda_ma),
-                ebitda_total = COALESCE(EXCLUDED.ebitda_total, financial_periods.ebitda_total),
-                margin_managed_services = COALESCE(EXCLUDED.margin_managed_services, financial_periods.margin_managed_services),
-                margin_professional_services = COALESCE(EXCLUDED.margin_professional_services, financial_periods.margin_professional_services),
-                margin_central_costs = COALESCE(EXCLUDED.margin_central_costs, financial_periods.margin_central_costs),
-                ebitda_margin = COALESCE(EXCLUDED.ebitda_margin, financial_periods.ebitda_margin),
-                capex = COALESCE(EXCLUDED.capex, financial_periods.capex),
-                capex_pct_revenue = COALESCE(EXCLUDED.capex_pct_revenue, financial_periods.capex_pct_revenue),
-                change_nwc = COALESCE(EXCLUDED.change_nwc, financial_periods.change_nwc),
-                other_cash_flow_items = COALESCE(EXCLUDED.other_cash_flow_items, financial_periods.other_cash_flow_items),
-                operating_fcf = COALESCE(EXCLUDED.operating_fcf, financial_periods.operating_fcf),
-                minority_interest = COALESCE(EXCLUDED.minority_interest, financial_periods.minority_interest),
-                operating_fcf_excl_minorities = COALESCE(EXCLUDED.operating_fcf_excl_minorities, financial_periods.operating_fcf_excl_minorities),
-                cash_conversion = COALESCE(EXCLUDED.cash_conversion, financial_periods.cash_conversion),
-                acquired_revenue = COALESCE(EXCLUDED.acquired_revenue, financial_periods.acquired_revenue),
-                share_count = COALESCE(EXCLUDED.share_count, financial_periods.share_count),
-                nibd = COALESCE(EXCLUDED.nibd, financial_periods.nibd),
-                option_debt = COALESCE(EXCLUDED.option_debt, financial_periods.option_debt),
-                adjustments = COALESCE(EXCLUDED.adjustments, financial_periods.adjustments),
-                enterprise_value = COALESCE(EXCLUDED.enterprise_value, financial_periods.enterprise_value),
-                equity_value = COALESCE(EXCLUDED.equity_value, financial_periods.equity_value),
-                preferred_equity = COALESCE(EXCLUDED.preferred_equity, financial_periods.preferred_equity),
-                per_share_pre = COALESCE(EXCLUDED.per_share_pre, financial_periods.per_share_pre),
-                mip_amount = COALESCE(EXCLUDED.mip_amount, financial_periods.mip_amount),
-                tso_amount = COALESCE(EXCLUDED.tso_amount, financial_periods.tso_amount),
-                warrants_amount = COALESCE(EXCLUDED.warrants_amount, financial_periods.warrants_amount),
-                eqv_post_dilution = COALESCE(EXCLUDED.eqv_post_dilution, financial_periods.eqv_post_dilution),
-                per_share_post = COALESCE(EXCLUDED.per_share_post, financial_periods.per_share_post),
-                updated_at = NOW()`,
-              [
-                modelId,
-                p.period_date,
-                p.period_label,
-                p.period_type,
-                p.revenue_managed_services ?? null,
-                p.revenue_professional_services ?? null,
-                p.revenue_other ?? null,
-                p.revenue_total ?? null,
-                p.revenue_organic ?? null,
-                p.revenue_ma ?? null,
-                p.revenue_growth ?? null,
-                p.organic_growth ?? null,
-                p.ebitda_managed_services ?? null,
-                p.ebitda_professional_services ?? null,
-                p.ebitda_central_costs ?? null,
-                p.ebitda_organic ?? null,
-                p.ebitda_ma ?? null,
-                p.ebitda_total ?? null,
-                p.margin_managed_services ?? null,
-                p.margin_professional_services ?? null,
-                p.margin_central_costs ?? null,
-                p.ebitda_margin ?? null,
-                p.capex ?? null,
-                p.capex_pct_revenue ?? null,
-                p.change_nwc ?? null,
-                p.other_cash_flow_items ?? null,
-                p.operating_fcf ?? null,
-                p.minority_interest ?? null,
-                p.operating_fcf_excl_minorities ?? null,
-                p.cash_conversion ?? null,
-                p.acquired_revenue ?? null,
-                p.share_count ?? null,
-                p.nibd ?? null,
-                p.option_debt ?? null,
-                p.adjustments ?? null,
-                p.enterprise_value ?? null,
-                p.equity_value ?? null,
-                p.preferred_equity ?? null,
-                p.per_share_pre ?? null,
-                p.mip_amount ?? null,
-                p.tso_amount ?? null,
-                p.warrants_amount ?? null,
-                p.eqv_post_dilution ?? null,
-                p.per_share_post ?? null,
-              ]
-            );
+            const params = extractPeriodParams(modelId, p.period_date, p, COLUMNS_EXCEL);
+            await client.query(excelSql, params);
             periodCount++;
           }
 
