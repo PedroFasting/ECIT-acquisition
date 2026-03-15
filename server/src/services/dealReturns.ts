@@ -469,7 +469,9 @@ function computeCaseReturn(
   return computeLevel1Return(entryEV, periods, params, exitMultiple);
 }
 
-// ── Public API ─────────────────────────────────────────────────────
+// ── Exported for testing ──────────────────────────────────────────
+
+export { computeIRR, bisectionIRR, isLevel2, computeLevel1Return, computeLevel2Return };
 
 /**
  * Calculate deal returns for all cases and exit multiples.
