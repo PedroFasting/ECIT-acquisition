@@ -275,6 +275,7 @@ function computeLevel1Return(
   const daPctRevenue = params.da_pct_revenue ?? 0.05;
   const fallbackNwc = params.nwc_investment ?? 0;
   const capexPctRevenue = params.capex_pct_revenue ?? 0.03;
+  const minorityPct = params.minority_pct ?? 0;
 
   const fcfs: number[] = [];
   for (let i = 0; i < periods.length; i++) {
@@ -282,7 +283,10 @@ function computeLevel1Return(
 
     // Prefer NIBD-derived FCF when available (from year-over-year NIBD change)
     if (p.nibd_fcf != null) {
-      fcfs.push(p.nibd_fcf);
+      let fcf = p.nibd_fcf;
+      // Apply minority interest deduction (reduces FCF available to acquirer)
+      if (minorityPct > 0) fcf = fcf * (1 - minorityPct);
+      fcfs.push(fcf);
       continue;
     }
 
@@ -299,7 +303,10 @@ function computeLevel1Return(
     // Only tax positive EBT
     const tax = ebtProxy > 0 ? -ebtProxy * taxRate : 0;
 
-    fcfs.push(ebitda + tax + capex + changeNwc);
+    let fcf = ebitda + tax + capex + changeNwc;
+    // Apply minority interest deduction (reduces FCF available to acquirer)
+    if (minorityPct > 0) fcf = fcf * (1 - minorityPct);
+    fcfs.push(fcf);
   }
 
   // Exit value: exit EBITDA × multiple
@@ -339,6 +346,7 @@ function computeLevel2Return(
   const daPctRevenue = params.da_pct_revenue ?? 0.05;
   const fallbackNwc = params.nwc_investment ?? 0;
   const capexPctRevenue = params.capex_pct_revenue ?? 0.03;
+  const minorityPct = params.minority_pct ?? 0;
 
   const ordinaryEquity = params.ordinary_equity ?? 0;
   const rolloverEquity = params.rollover_equity ?? 0;
@@ -386,6 +394,9 @@ function computeLevel2Return(
 
       unleveredFCF = ebitda + tax + capex + changeNwc;
     }
+
+    // Apply minority interest deduction (reduces FCF available to acquirer)
+    if (minorityPct > 0) unleveredFCF = unleveredFCF * (1 - minorityPct);
 
     // Debt service: interest on opening balance + mandatory amortisation
     const interestPayment = debtBalance * interestRate;

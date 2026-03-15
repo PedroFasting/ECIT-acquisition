@@ -306,6 +306,10 @@ export function buildProFormaPeriodData(
     targetByDate.set(t.period_date.toISOString().split("T")[0], t);
   }
 
+  // Target-specific capex/NWC rates (mirrors buildProFormaPeriods display logic)
+  const tgtCapexPct = dp.target_capex_pct_revenue ?? 0;
+  const tgtNwcPct = dp.target_nwc_pct_revenue ?? 0;
+
   return acquirerPeriods.map((ap: any, idx: number) => {
     const dateKey = ap.period_date.toISOString().split("T")[0];
     const tp = targetByDate.get(dateKey);
@@ -314,6 +318,7 @@ export function buildProFormaPeriodData(
 
     const acqEbitda = parseFloat(ap.ebitda_total) || 0;
     const tgtEbitda = tp ? parseFloat(tp.ebitda_total) || 0 : 0;
+    const tgtRevenue = tp ? parseFloat(tp.revenue_total) || 0 : 0;
 
     // Find the target index matching this date for NIBD FCF lookup
     const tgtIdx = tgtNibdFcf
@@ -337,15 +342,34 @@ export function buildProFormaPeriodData(
       pfNibdFcf = acqFcf + tgtFcf + synergy;
     }
 
+    // Acquirer capex/NWC: use period data as-is
+    const acqCapex = ap.capex != null ? parseFloat(ap.capex) : undefined;
+    const acqNwc = ap.change_nwc != null ? parseFloat(ap.change_nwc) : undefined;
+
+    // Target capex/NWC: use period data if available, otherwise apply target-specific % assumptions
+    // (mirrors buildProFormaPeriods display logic for consistency)
+    const rawTgtCapex = tp?.capex != null ? parseFloat(tp.capex) : NaN;
+    const rawTgtNwc = tp?.change_nwc != null ? parseFloat(tp.change_nwc) : NaN;
+    const tgtCapex = (!isNaN(rawTgtCapex) && rawTgtCapex !== 0)
+      ? rawTgtCapex
+      : (tgtCapexPct > 0 ? -(tgtRevenue * tgtCapexPct) : undefined);
+    const tgtNwc = (!isNaN(rawTgtNwc) && rawTgtNwc !== 0)
+      ? rawTgtNwc
+      : (tgtNwcPct > 0 ? -(tgtRevenue * tgtNwcPct) : undefined);
+
+    // Combine capex/NWC: only defined if at least one side has a value
+    const combinedCapex = (acqCapex != null || tgtCapex != null)
+      ? (acqCapex ?? 0) + (tgtCapex ?? 0)
+      : undefined;
+    const combinedNwc = (acqNwc != null || tgtNwc != null)
+      ? (acqNwc ?? 0) + (tgtNwc ?? 0)
+      : undefined;
+
     return {
       ebitda: acqEbitda + tgtEbitda + synergy,
-      revenue: (parseFloat(ap.revenue_total) || 0) + (tp ? parseFloat(tp.revenue_total) || 0 : 0),
-      capex: (ap.capex != null || tp?.capex != null)
-        ? (ap.capex != null ? parseFloat(ap.capex) : 0) + (tp?.capex != null ? parseFloat(tp.capex) : 0)
-        : undefined,
-      change_nwc: (ap.change_nwc != null || tp?.change_nwc != null)
-        ? (ap.change_nwc != null ? parseFloat(ap.change_nwc) : 0) + (tp?.change_nwc != null ? parseFloat(tp.change_nwc) : 0)
-        : undefined,
+      revenue: (parseFloat(ap.revenue_total) || 0) + tgtRevenue,
+      capex: combinedCapex,
+      change_nwc: combinedNwc,
       nibd_fcf: pfNibdFcf,
     };
   });

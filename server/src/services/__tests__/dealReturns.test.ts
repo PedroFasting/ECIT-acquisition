@@ -9,6 +9,7 @@ import {
   type DealParameters,
   type PeriodData,
 } from "../dealReturns.js";
+import { buildProFormaPeriodData } from "../proForma.js";
 
 // ── Helpers ────────────────────────────────────────────────────────
 
@@ -769,8 +770,8 @@ describe("FCF calculation — baseline", () => {
     });
   });
 
-  describe("Level 2 — minority_pct is NOT applied by the engine", () => {
-    it("minority_pct param has zero effect on Level 2 returns", () => {
+  describe("Level 2 — minority_pct IS applied by the engine", () => {
+    it("minority_pct reduces Level 2 returns", () => {
       const periods = makePeriods(3, { ebitda: 200, revenue: 1000 });
       const withMinority = level2Params({ minority_pct: 0.20 });
       const withoutMinority = level2Params({ minority_pct: 0 });
@@ -778,12 +779,14 @@ describe("FCF calculation — baseline", () => {
       const r1 = computeLevel2Return(2000, periods, withMinority, 12);
       const r2 = computeLevel2Return(2000, periods, withoutMinority, 12);
 
-      // Current engine ignores minority_pct entirely
-      expect(r1.irr).toEqual(r2.irr);
-      expect(r1.mom).toEqual(r2.mom);
+      // minority_pct = 20% reduces FCF → lower returns
+      expect(r1.irr).not.toBeNull();
+      expect(r2.irr).not.toBeNull();
+      expect(r1.irr!).toBeLessThan(r2.irr!);
+      expect(r1.mom!).toBeLessThan(r2.mom!);
     });
 
-    it("minority_pct param has zero effect on Level 1 returns", () => {
+    it("minority_pct reduces Level 1 returns", () => {
       const periods = makePeriods(3, { ebitda: 200, revenue: 1000 });
       const withMinority = level1Params({ minority_pct: 0.20 });
       const withoutMinority = level1Params({ minority_pct: 0 });
@@ -791,13 +794,15 @@ describe("FCF calculation — baseline", () => {
       const r1 = computeLevel1Return(2000, periods, withMinority, 12);
       const r2 = computeLevel1Return(2000, periods, withoutMinority, 12);
 
-      expect(r1.irr).toEqual(r2.irr);
-      expect(r1.mom).toEqual(r2.mom);
+      expect(r1.irr).not.toBeNull();
+      expect(r2.irr).not.toBeNull();
+      expect(r1.irr!).toBeLessThan(r2.irr!);
+      expect(r1.mom!).toBeLessThan(r2.mom!);
     });
   });
 
-  describe("target_capex/nwc_pct_revenue are NOT used by the engine", () => {
-    it("target_capex_pct_revenue has zero effect (engine uses capex_pct_revenue)", () => {
+  describe("target_capex/nwc_pct_revenue — engine uses generic fallbacks (target rates applied in data layer)", () => {
+    it("target_capex_pct_revenue does not affect engine directly (applied by buildProFormaPeriodData)", () => {
       const periods = makePeriods(3, { ebitda: 100, revenue: 500 }); // no actual capex
       const params1 = level1Params({ target_capex_pct_revenue: 0.01 });
       const params2 = level1Params({ target_capex_pct_revenue: 0.10 });
@@ -805,12 +810,13 @@ describe("FCF calculation — baseline", () => {
       const r1 = computeLevel1Return(600, periods, params1, 12);
       const r2 = computeLevel1Return(600, periods, params2, 12);
 
-      // Both give identical results because target_capex_pct_revenue is ignored
+      // Engine uses capex_pct_revenue (generic), not target-specific.
+      // Target-specific rates are applied by buildProFormaPeriodData before data reaches engine.
       expect(r1.irr).toEqual(r2.irr);
       expect(r1.mom).toEqual(r2.mom);
     });
 
-    it("target_nwc_pct_revenue has zero effect (engine uses nwc_investment)", () => {
+    it("target_nwc_pct_revenue does not affect engine directly (applied by buildProFormaPeriodData)", () => {
       const periods = makePeriods(3, { ebitda: 100, revenue: 500 });
       const params1 = level1Params({ target_nwc_pct_revenue: 0.01 });
       const params2 = level1Params({ target_nwc_pct_revenue: 0.05 });
@@ -908,9 +914,10 @@ describe("FCF calculation — baseline", () => {
       interest_rate: 0.05,
       debt_amortisation: 50,
       cash_sweep_pct: 1.0,
-      // Target-specific (currently ignored by engine)
+      // Target-specific (applied by buildProFormaPeriodData in data layer, not directly by engine)
       target_capex_pct_revenue: 0.01,
       target_nwc_pct_revenue: 0.0097,
+      // Minority interest (applied by engine as FCF deduction)
       minority_pct: 0.20,
       // Generic fallbacks (these ARE used)
       capex_pct_revenue: 0.03,
@@ -992,31 +999,85 @@ describe("FCF calculation — baseline", () => {
       expect(round(standaloneCase!.irr!, 4)).toBe(round(standaloneResult.irr!, 4));
     });
 
-    it("target periods (no capex/NWC) use generic fallbacks, not target-specific", () => {
+    it("target periods (no capex/NWC) use generic fallbacks in engine, but buildProFormaPeriodData applies target-specific rates", () => {
       // When herjedalLikePeriods are used directly (no capex/NWC),
-      // the engine falls back to capex_pct_revenue (0.03) and nwc_investment (0).
-      // It does NOT use target_capex_pct_revenue (0.01) or target_nwc_pct_revenue (0.0097).
+      // the ENGINE falls back to capex_pct_revenue (0.03) and nwc_investment (0).
       //
-      // This is the root inconsistency: scenarios.ts pre-computes with target-specific
-      // rates for the pro forma display, but if deal returns were to use target periods
-      // directly, they'd get different (generic) rates.
+      // However, buildProFormaPeriodData now applies target_capex_pct_revenue and
+      // target_nwc_pct_revenue as fallbacks when target period data is missing,
+      // consistent with the display function buildProFormaPeriods.
+      //
+      // So in the full pipeline: data layer pre-computes correct capex/NWC
+      // → engine receives PeriodData with capex/NWC populated → uses actuals.
 
-      // Compute what engine does with target periods directly
+      // Compute what engine does with target periods directly (generic fallback path)
       const targetOnly = computeLevel1Return(600, herjedalLikePeriods, realisticParams, 12);
 
-      // Manually compute expected FCF with generic fallbacks:
+      // Engine uses generic fallbacks when called directly:
       // capex = -(500 * 0.03) = -15, NWC = 0
       // D&A proxy = 500 * 0.05 = 25, EBT = 55-25 = 30, tax = -6.6
-      // FCF = 55 - 6.6 - 15 = 33.4
+      // FCF_before_minority = 55 - 6.6 - 15 = 33.4
+      // minority_pct = 0.20 → FCF = 33.4 * 0.8 = 26.72
       //
-      // If target-specific rates were used:
-      // capex = -(500 * 0.01) = -5, NWC = -(500 * 0.0097) = -4.85
-      // FCF = 55 - 6.6 - 5 - 4.85 = 38.55
+      // Exit = 55 * 12 = 660 (exit value NOT reduced by minority — it's the EV)
+      // CFs: [-600, 26.72, 26.72, 26.72, 26.72, 26.72+660]
+      // MoM = (26.72*5 + 660)/600 = (133.6+660)/600 = 793.6/600 = 1.32267
       //
-      // These are different values → inconsistency documented.
+      // Note: minority_pct is now applied by the engine, changing
+      // the MoM from 1.378 (old, no minority) to 1.323 (new, with minority).
+      expect(round(targetOnly.mom!, 3)).toBe(1.323);
+    });
+  });
 
-      // MoM with generic: (33.4*5 + 660)/600 = (167+660)/600 = 1.378
-      expect(round(targetOnly.mom!, 3)).toBe(1.378);
+  // ── Minority pct — exact numerical verification ─────────────────
+
+  describe("minority_pct — exact FCF deduction", () => {
+    it("minority_pct = 0.20 reduces FCF by exactly 20%", () => {
+      // Single period: revenue=500, ebitda=100, no capex/NWC in period data
+      // Default: capex_pct=0.03, nwc_investment=0
+      // capex = -(500*0.03) = -15, NWC = 0
+      // D&A = 500*0.05 = 25, EBT = 100-25 = 75, tax = -75*0.22 = -16.5
+      // FCF_before_minority = 100 - 16.5 - 15 = 68.5
+      // FCF_after_minority = 68.5 * 0.8 = 54.8
+      const periods = makePeriods(1, { ebitda: 100, revenue: 500 });
+      const params = level1Params({ minority_pct: 0.20 });
+      const result = computeLevel1Return(1000, periods, params, 12);
+
+      // Exit = 100 * 12 = 1200
+      // CFs: [-1000, 54.8 + 1200] = [-1000, 1254.8]
+      // MoM = 1254.8 / 1000 = 1.2548
+      expect(round(result.mom!, 4)).toBe(1.2548);
+    });
+
+    it("minority_pct = 0 gives same result as omitting it", () => {
+      const periods = makePeriods(3, { ebitda: 100, revenue: 500 });
+      const withZero = computeLevel1Return(1000, periods, level1Params({ minority_pct: 0 }), 12);
+      const withUndefined = computeLevel1Return(1000, periods, level1Params(), 12);
+      expect(withZero.irr).toEqual(withUndefined.irr);
+      expect(withZero.mom).toEqual(withUndefined.mom);
+    });
+
+    it("minority_pct applies to NIBD-derived FCF path too", () => {
+      const periods = makePeriods(3, { ebitda: 100, revenue: 500, nibd_fcf: 80 });
+      const withMinority = computeLevel1Return(1000, periods, level1Params({ minority_pct: 0.20 }), 12);
+      const withoutMinority = computeLevel1Return(1000, periods, level1Params({ minority_pct: 0 }), 12);
+
+      // NIBD FCF = 80, after minority = 64
+      // Without: CFs [-1000, 80, 80, 80+1200] → MoM = (80+80+1280)/1000 = 1.44
+      // With:    CFs [-1000, 64, 64, 64+1200] → MoM = (64+64+1264)/1000 = 1.392
+      expect(round(withoutMinority.mom!, 3)).toBe(1.44);
+      expect(round(withMinority.mom!, 3)).toBe(1.392);
+    });
+
+    it("minority_pct works in Level 2 debt schedule", () => {
+      const periods = makePeriods(3, { ebitda: 200, revenue: 1000, capex: -30, change_nwc: -20 });
+      const params = level2Params({ minority_pct: 0.20 });
+      const result = computeLevel2Return(2000, periods, params, 12, true);
+      const schedule = result.schedule!;
+
+      // Without minority: unlevered FCF = 117 (as in baseline tests)
+      // With 20% minority: unlevered FCF = 117 * 0.8 = 93.6
+      expect(round(schedule[0].unlevered_fcf, 2)).toBe(93.6);
     });
   });
 });
