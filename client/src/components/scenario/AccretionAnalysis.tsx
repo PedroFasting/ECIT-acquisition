@@ -12,6 +12,7 @@ import type { AcquisitionScenario, FinancialPeriod, ProFormaPeriod } from "../..
 import { toNum, formatNum, formatPct, formatPctDelta, formatTooltip, deltaColor } from "./helpers";
 import SectionHeader from "./SectionHeader";
 import CopyChartButton from "./CopyChartButton";
+import { useTranslation } from "react-i18next";
 
 interface AccretionAnalysisProps {
   scenario: AcquisitionScenario;
@@ -51,6 +52,7 @@ export default function AccretionAnalysis({
   expanded,
   onToggle,
 }: AccretionAnalysisProps) {
+  const { t } = useTranslation();
   const getAccretionData = (): AccretionYear[] | null => {
     if (acquirerPeriods.length === 0 || targetPeriods.length === 0) return null;
 
@@ -135,7 +137,7 @@ export default function AccretionAnalysis({
     <div className="bg-white rounded-xl border border-gray-200 mb-8">
       <SectionHeader
         sectionKey="accretion"
-        title="Kombinasjonsrasjonale: Verdiøkning i finansiell profil"
+        title={t("accretion.title")}
         expanded={expanded}
         onToggle={onToggle}
       />
@@ -146,7 +148,7 @@ export default function AccretionAnalysis({
             {/* Organic growth comparison table */}
             <div>
               <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                {targetName} vs {acquirerName} nøkkeltall
+                {t("accretion.targetVsAcquirerMetrics", { target: targetName, acquirer: acquirerName })}
               </h4>
 
               <div className="mb-4">
@@ -154,7 +156,7 @@ export default function AccretionAnalysis({
                   <thead>
                     <tr>
                       <th className="text-left">
-                        Organisk vekst
+                        {t("accretion.organicGrowth")}
                       </th>
                       {accretionData.map((d) => (
                         <th key={d.label} className="num">
@@ -181,7 +183,7 @@ export default function AccretionAnalysis({
                       ))}
                     </tr>
                     <tr className="!bg-[#F4EDDC]">
-                      <td className="font-semibold text-gray-900 text-xs">delta</td>
+                      <td className="font-semibold text-gray-900 text-xs">{t("accretion.delta")}</td>
                       {accretionData.map((d) => {
                         // Revenue-weighted combined organic growth vs acquirer standalone
                         const totalRev = d.acqRev + d.tgtRev;
@@ -208,7 +210,7 @@ export default function AccretionAnalysis({
                 <table className="ecit-table border border-gray-200 rounded-lg overflow-hidden">
                   <thead>
                     <tr>
-                      <th className="text-left">EBITDA margin</th>
+                      <th className="text-left">{t("accretion.ebitdaMargin")}</th>
                       {accretionData.map((d) => (
                         <th key={d.label} className="num">{d.label}</th>
                       ))}
@@ -228,7 +230,7 @@ export default function AccretionAnalysis({
                       ))}
                     </tr>
                     <tr className="!bg-[#F4EDDC]">
-                      <td className="font-semibold text-gray-900 text-xs">delta</td>
+                      <td className="font-semibold text-gray-900 text-xs">{t("accretion.delta")}</td>
                       {accretionData.map((d) => {
                         // Pro forma weighted margin vs acquirer standalone
                         const delta = d.pfMargin - d.acquirerMargin;
@@ -249,7 +251,7 @@ export default function AccretionAnalysis({
 
             {/* Standalone vs PF bar charts */}
             <div>
-              <h4 className="text-sm font-semibold text-gray-900 mb-3">Frittstående vs Pro Forma</h4>
+              <h4 className="text-sm font-semibold text-gray-900 mb-3">{t("accretion.standaloneVsPf")}</h4>
               {(() => {
                 const firstForecast = accretionData.find(
                   (d) =>
@@ -298,7 +300,7 @@ export default function AccretionAnalysis({
                           ]}
                         />
                         <Legend />
-                        <Bar dataKey="Revenue" fill="#a8b5d6" name="Omsetning" />
+                        <Bar dataKey="Revenue" fill="#a8b5d6" name={t("accretion.revenueBarName")} />
                         <Bar dataKey="EBITDA" fill="#002C55" name="EBITDA" />
                       </BarChart>
                     </ResponsiveContainer>
@@ -315,7 +317,7 @@ export default function AccretionAnalysis({
               <CopyChartButton fileName="organisk-vekst">
                 <div>
                   <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                    Organisk vekst-sammenligning (%)
+                    {t("accretion.organicGrowthComparison")}
                   </h4>
                   <ResponsiveContainer width="100%" height={280}>
                     <BarChart data={growthChartData} barGap={2} barCategoryGap="20%">
@@ -337,7 +339,7 @@ export default function AccretionAnalysis({
               <CopyChartButton fileName="ebitda-margin">
                 <div>
                   <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                    EBITDA-margin sammenligning (%)
+                    {t("accretion.ebitdaMarginComparison")}
                   </h4>
                   <ResponsiveContainer width="100%" height={280}>
                     <BarChart data={marginChartData} barGap={2} barCategoryGap="20%">
@@ -360,46 +362,46 @@ export default function AccretionAnalysis({
           {accretionTableData && pfPeriods.length > 0 && (
             <div>
               <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                Frittstående vs Pro Forma verdiøkning ({accretionTableData.label})
+                {t("accretion.standaloneVsPfAccretion", { year: accretionTableData.label })}
               </h4>
               <table className="ecit-table border border-gray-200 rounded-lg overflow-hidden">
                 <thead>
                   <tr>
-                     <th className="text-left">Nøkkeltall</th>
-                    <th className="num">{acquirerName} frittstående</th>
-                    <th className="num">Pro Forma</th>
-                    <th className="num">Verdiøkning</th>
-                    <th className="num">%</th>
+                     <th className="text-left">{t("accretion.keyMetrics")}</th>
+                    <th className="num">{acquirerName} {t("accretion.standalone")}</th>
+                    <th className="num">{t("accretion.proForma")}</th>
+                    <th className="num">{t("accretion.valueAccretion")}</th>
+                    <th className="num">{t("accretion.pctColumn")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {[
                     {
-                      label: "Omsetning",
+                      label: t("accretion.revenue"),
                       standalone: accretionTableData.acqRev,
                       pf: accretionTableData.pfRev,
                       format: "num",
                     },
                     {
-                      label: "EBITDA",
+                      label: t("common.ebitda"),
                       standalone: accretionTableData.acqEbitda,
                       pf: accretionTableData.pfEbitda,
                       format: "num",
                     },
                     {
-                      label: "EBITDA Margin",
+                      label: t("accretion.ebitdaMargin"),
                       standalone: accretionTableData.acquirerMargin,
                       pf: accretionTableData.pfMargin,
                       format: "pct",
                     },
                     {
-                      label: "Operasjonell FCF",
+                      label: t("accretion.operatingFcf"),
                       standalone: accretionTableData.acqFcf,
                       pf: accretionTableData.pfFcf,
                       format: "num",
                     },
                     {
-                      label: "Kontantkonvertering",
+                      label: t("accretion.cashConversion"),
                       standalone: accretionTableData.acqCashConversion,
                       pf: accretionTableData.pfCashConversion,
                       format: "pct",
@@ -444,7 +446,7 @@ export default function AccretionAnalysis({
 
       {expanded && (!accretionData || accretionData.length === 0) && (
         <div className="p-8 text-center text-gray-400">
-          Importer data for begge selskaper for å se verdiøkningsanalyse.
+          {t("accretion.importDataBoth")}
         </div>
       )}
     </div>

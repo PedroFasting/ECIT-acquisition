@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import type { FinancialPeriod, ProFormaPeriod } from "../../types";
 import { formatNum, toNum } from "./helpers";
 import SectionHeader from "./SectionHeader";
@@ -679,6 +680,7 @@ function NtmPanel({
   onChange: (o: NtmOverrides) => void;
   lastPeriodLabel: string;
 }) {
+  const { t } = useTranslation();
   const yearMatch = lastPeriodLabel.match(/(\d{4})/);
   const nextYear = yearMatch ? parseInt(yearMatch[1]) + 1 : "?";
 
@@ -689,10 +691,10 @@ function NtmPanel({
     <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4">
       <div className="flex items-center gap-6 flex-wrap">
         <span className="text-sm font-medium text-amber-900">
-          NTM-projeksjon for {nextYear}E (basert pa {lastPeriodLabel}):
+          {t("bridge.ntmProjectionFor", { year: nextYear, period: lastPeriodLabel })}
         </span>
         <label className="flex items-center gap-2 text-sm text-amber-800">
-          Organisk vekst
+          {t("bridge.organicGrowthLabel")}
           <input
             type="number"
             step="0.1"
@@ -705,7 +707,7 @@ function NtmPanel({
           %
         </label>
         <label className="flex items-center gap-2 text-sm text-amber-800">
-          EBITDA-margin
+          {t("bridge.ebitdaMargin")}
           <input
             type="number"
             step="0.1"
@@ -734,6 +736,7 @@ export default function EquityBridgeTable({
   onToggle,
   exitMultiples,
 }: EquityBridgeTableProps) {
+  const { t } = useTranslation();
   const multiples = exitMultiples?.length ? exitMultiples : DEFAULT_MULTIPLES;
   const [selectedMultiple, setSelectedMultiple] = useState(
     () => multiples[Math.floor(multiples.length / 2)]
@@ -795,13 +798,13 @@ export default function EquityBridgeTable({
     // Revenue section (if data exists)
     if (hasRevenue) {
       rows.push({
-        label: "Omsetning",
+        label: t("bridge.revenue"),
         values: bridge.map((b) => b.revenue),
         bold: true,
       });
       if (bridge.some((b) => b.revenueGrowth !== null)) {
         rows.push({
-          label: "Vekst %",
+          label: t("bridge.growthPct"),
           values: bridge.map((b) => b.revenueGrowth),
           indent: true,
           format: "pct",
@@ -809,14 +812,14 @@ export default function EquityBridgeTable({
       }
       if (hasRevenueMa) {
         rows.push({
-          label: "Oppkjøpt omsetning",
+          label: t("bridge.acquiredRevenue"),
           values: bridge.map((b) => b.revenueMa),
           indent: true,
         });
       }
       if (bridge.some((b) => b.organicGrowth !== null)) {
         rows.push({
-          label: "Organisk vekst",
+          label: t("bridge.organicGrowth"),
           values: bridge.map((b) => b.organicGrowth),
           indent: true,
           format: "pct",
@@ -826,7 +829,7 @@ export default function EquityBridgeTable({
 
     // EBITDA
     rows.push({
-      label: basis === "ltm" ? "EBITDA (LTM)" : "EBITDA (NTM)",
+      label: basis === "ltm" ? t("bridge.ebitdaLtm") : t("bridge.ebitdaNtm"),
       values: bridge.map((b) => b.basisEbitda || null),
       bold: true,
       divider: hasRevenue,
@@ -838,7 +841,7 @@ export default function EquityBridgeTable({
     // Organic growth (if no revenue section showed it)
     if (!hasRevenue && bridge.some((b) => b.organicGrowth !== null)) {
       rows.push({
-        label: "Organisk vekst",
+        label: t("bridge.organicGrowth"),
         values: bridge.map((b) => b.organicGrowth),
         indent: true,
         format: "pct",
@@ -849,12 +852,12 @@ export default function EquityBridgeTable({
     const hasAdjustments = bridge.some((b) => b.adjustments !== 0);
     if (hasAdjustments) {
       rows.push({
-        label: "Justeringer (EBITDA)",
+        label: t("bridge.adjustments"),
         values: bridge.map((b) => b.adjustments || null),
         indent: true,
       });
       rows.push({
-        label: "Justert EBITDA",
+        label: t("bridge.adjustedEbitda"),
         values: bridge.map((b) => b.adjustedEbitda || null),
         bold: true,
       });
@@ -862,13 +865,13 @@ export default function EquityBridgeTable({
 
     // Enterprise Value = (Adjusted) EBITDA x multiple
     rows.push({
-      label: `Enterprise Value (${nbFmt1.format(selectedMultiple)}x)`,
+      label: t("bridge.evAtMultiple", { mult: nbFmt1.format(selectedMultiple) }),
       values: bridge.map((b) => b.ev || null),
       bold: true,
       divider: true,
       subtext: bridge.map((b) =>
         b.importedEv
-          ? `Importert: ${formatNum(b.importedEv)} (${fmtMult(b.impliedMultiple)})`
+          ? t("bridge.importedValue", { value: formatNum(b.importedEv), mult: fmtMult(b.impliedMultiple) })
           : ""
       ),
     });
@@ -876,14 +879,14 @@ export default function EquityBridgeTable({
     if (hasBridgeItems) {
       if (periods.some((p) => p.nibd != null)) {
         rows.push({
-          label: "NIBD (inkl. diverse)",
+          label: t("bridge.nibdIncl"),
           values: bridge.map((b) => b.nibd ? -b.nibd : null),
           indent: true,
         });
       }
       if (periods.some((p) => p.option_debt != null)) {
         rows.push({
-          label: "Opsjonsgjeld",
+          label: t("bridge.optionDebt"),
           values: bridge.map((b) => b.optionDebt ? -b.optionDebt : null),
           indent: true,
         });
@@ -891,7 +894,7 @@ export default function EquityBridgeTable({
 
       // Equity value
       rows.push({
-        label: "Egenkapitalverdi (EQV)",
+        label: t("bridge.equityValue"),
         values: bridge.map((b) => b.eqv),
         bold: true,
         divider: true,
@@ -900,35 +903,35 @@ export default function EquityBridgeTable({
       // Dilution items
       if (periods.some((p) => p.preferred_equity != null)) {
         rows.push({
-          label: "Preferanseaksjer",
+          label: t("bridge.preferredEquity"),
           values: bridge.map((b) => b.preferredEquity ? -b.preferredEquity : null),
           indent: true,
         });
       }
       if (hasShareData) {
         rows.push({
-          label: "Per aksje (pre-utvanning)",
+          label: t("bridge.perSharePre"),
           values: bridge.map((b) => b.perSharePre),
           indent: true,
         });
       }
       if (periods.some((p) => p.mip_amount != null) || (formulas && formulas.mipPctEqv > 0)) {
         rows.push({
-          label: "MIP",
+          label: t("bridge.mip"),
           values: bridge.map((b) => b.mipAmount ? -b.mipAmount : null),
           indent: true,
         });
       }
       if (periods.some((p) => p.tso_amount != null) || (formulas && formulas.tsoN > 0)) {
         rows.push({
-          label: "TSO",
+          label: t("bridge.tso"),
           values: bridge.map((b) => b.tsoAmount ? -b.tsoAmount : null),
           indent: true,
         });
       }
       if (periods.some((p) => p.warrants_amount != null) || (formulas && formulas.warN > 0)) {
         rows.push({
-          label: "Eksisterende tegningsretter",
+          label: t("bridge.existingWarrants"),
           values: bridge.map((b) => b.warrantsAmount ? -b.warrantsAmount : null),
           indent: true,
         });
@@ -936,18 +939,18 @@ export default function EquityBridgeTable({
 
       // Post-dilution
       rows.push({
-        label: "EQV (post-utvanning)",
+        label: t("bridge.eqvPost"),
         values: bridge.map((b) => b.eqvPostDilution),
         bold: true,
       });
       if (hasShareData) {
         rows.push({
-          label: "Per aksje (post-utvanning)",
+          label: t("bridge.perSharePost"),
           values: bridge.map((b) => b.perSharePost),
           bold: true,
         });
         rows.push({
-          label: "Aksjer (mill.)",
+          label: t("bridge.sharesMill"),
           values: bridge.map((b) => b.shareCount),
           indent: true,
           format: "share",
@@ -956,7 +959,7 @@ export default function EquityBridgeTable({
             const computed = bridge[i].shareCount;
             // Show imported SC as reference when it differs from computed
             if (imported > 0 && computed !== null && Math.abs(imported - computed) > 0.01) {
-              return `Importert: ${nbFmt1.format(imported)}`;
+              return t("bridge.importedShareCount", { value: nbFmt1.format(imported) });
             }
             return "";
           }),
@@ -964,11 +967,11 @@ export default function EquityBridgeTable({
       }
     } else {
       rows.push({
-        label: "Egenkapitalverdi (EQV)",
+        label: t("bridge.equityValue"),
         values: bridge.map((b) => b.eqv),
         bold: true,
         divider: true,
-        subtext: bridge.map(() => "= EV (ingen NIBD/justeringer importert)"),
+        subtext: bridge.map(() => t("bridge.noNibdFallback")),
       });
     }
 
@@ -990,13 +993,13 @@ export default function EquityBridgeTable({
     // Revenue
     if (hasRevenue) {
       rows.push({
-        label: "Omsetning (PF)",
+        label: t("bridge.revenuePf"),
         values: bridge.map((b) => b.revenue),
         bold: true,
       });
       if (bridge.some((b) => b.revenueGrowth !== null)) {
         rows.push({
-          label: "Vekst %",
+          label: t("bridge.growthPct"),
           values: bridge.map((b) => b.revenueGrowth),
           indent: true,
           format: "pct",
@@ -1006,7 +1009,7 @@ export default function EquityBridgeTable({
 
     // EBITDA (combined incl. synergies)
     rows.push({
-      label: basis === "ltm" ? "EBITDA PF inkl. synergier (LTM)" : "EBITDA PF inkl. synergier (NTM)",
+      label: basis === "ltm" ? t("bridge.ebitdaPfInclSynLtm") : t("bridge.ebitdaPfInclSynNtm"),
       values: bridge.map((b) => b.basisEbitda || null),
       bold: true,
       divider: hasRevenue,
@@ -1019,12 +1022,12 @@ export default function EquityBridgeTable({
     const hasAdjustments = bridge.some((b) => b.adjustments !== 0);
     if (hasAdjustments) {
       rows.push({
-        label: "Justeringer (EBITDA)",
+        label: t("bridge.adjustments"),
         values: bridge.map((b) => b.adjustments || null),
         indent: true,
       });
       rows.push({
-        label: "Justert EBITDA",
+        label: t("bridge.adjustedEbitda"),
         values: bridge.map((b) => b.adjustedEbitda || null),
         bold: true,
       });
@@ -1032,7 +1035,7 @@ export default function EquityBridgeTable({
 
     // Enterprise Value
     rows.push({
-      label: `Enterprise Value (${nbFmt1.format(selectedMultiple)}x)`,
+      label: t("bridge.evAtMultiple", { mult: nbFmt1.format(selectedMultiple) }),
       values: bridge.map((b) => b.ev || null),
       bold: true,
       divider: true,
@@ -1042,14 +1045,14 @@ export default function EquityBridgeTable({
       // NIBD from acquirer
       if (acquirerPeriods.some((p) => p.nibd != null)) {
         rows.push({
-          label: "NIBD (inkl. diverse)",
+          label: t("bridge.nibdIncl"),
           values: bridge.map((b) => b.nibd ? -b.nibd : null),
           indent: true,
         });
       }
       if (acquirerPeriods.some((p) => p.option_debt != null)) {
         rows.push({
-          label: "Opsjonsgjeld",
+          label: t("bridge.optionDebt"),
           values: bridge.map((b) => b.optionDebt ? -b.optionDebt : null),
           indent: true,
         });
@@ -1057,7 +1060,7 @@ export default function EquityBridgeTable({
 
       // EQV
       rows.push({
-        label: "Egenkapitalverdi (EQV)",
+        label: t("bridge.equityValue"),
         values: bridge.map((b) => b.eqv),
         bold: true,
         divider: true,
@@ -1066,35 +1069,35 @@ export default function EquityBridgeTable({
       // Dilution items
       if (acquirerPeriods.some((p) => p.preferred_equity != null)) {
         rows.push({
-          label: "Preferanseaksjer",
+          label: t("bridge.preferredEquity"),
           values: bridge.map((b) => b.preferredEquity ? -b.preferredEquity : null),
           indent: true,
         });
       }
       if (hasShareData) {
         rows.push({
-          label: "Per aksje (pre-utvanning)",
+          label: t("bridge.perSharePre"),
           values: bridge.map((b) => b.perSharePre),
           indent: true,
         });
       }
       if (acquirerPeriods.some((p) => p.mip_amount != null) || (formulas && formulas.mipPctEqv > 0)) {
         rows.push({
-          label: "MIP",
+          label: t("bridge.mip"),
           values: bridge.map((b) => b.mipAmount ? -b.mipAmount : null),
           indent: true,
         });
       }
       if (acquirerPeriods.some((p) => p.tso_amount != null) || (formulas && formulas.tsoN > 0)) {
         rows.push({
-          label: "TSO",
+          label: t("bridge.tso"),
           values: bridge.map((b) => b.tsoAmount ? -b.tsoAmount : null),
           indent: true,
         });
       }
       if (acquirerPeriods.some((p) => p.warrants_amount != null) || (formulas && formulas.warN > 0)) {
         rows.push({
-          label: "Eksisterende tegningsretter",
+          label: t("bridge.existingWarrants"),
           values: bridge.map((b) => b.warrantsAmount ? -b.warrantsAmount : null),
           indent: true,
         });
@@ -1102,18 +1105,18 @@ export default function EquityBridgeTable({
 
       // Post-dilution
       rows.push({
-        label: "EQV (post-utvanning)",
+        label: t("bridge.eqvPost"),
         values: bridge.map((b) => b.eqvPostDilution),
         bold: true,
       });
       if (hasShareData) {
         rows.push({
-          label: "Per aksje (post-utvanning)",
+          label: t("bridge.perSharePost"),
           values: bridge.map((b) => b.perSharePost),
           bold: true,
         });
         rows.push({
-          label: "Aksjer (mill.)",
+          label: t("bridge.sharesMill"),
           values: bridge.map((b) => b.shareCount),
           indent: true,
           format: "share",
@@ -1121,11 +1124,11 @@ export default function EquityBridgeTable({
       }
     } else {
       rows.push({
-        label: "Egenkapitalverdi (EQV)",
+        label: t("bridge.equityValue"),
         values: bridge.map((b) => b.eqv),
         bold: true,
         divider: true,
-        subtext: bridge.map(() => "= EV (ingen NIBD/justeringer importert)"),
+        subtext: bridge.map(() => t("bridge.noNibdFallback")),
       });
     }
 
@@ -1179,8 +1182,8 @@ export default function EquityBridgeTable({
     <div className="bg-white rounded-xl border border-gray-200 mb-8">
       <SectionHeader
         sectionKey="equityBridge"
-        title="Egenkapitalbrygge"
-        subtitle="Verdsettelse per periode"
+        title={t("bridge.title")}
+        subtitle={t("bridge.subtitle")}
         expanded={expanded}
         onToggle={onToggle}
         actions={
@@ -1202,7 +1205,7 @@ export default function EquityBridgeTable({
 
           {acqHasData && (
             <BridgeTable
-              title={`${acquirerName} Egenkapitalbrygge`}
+              title={t("bridge.equityBridgeFor", { name: acquirerName })}
               columnLabels={acquirerPeriods.map((p) => p.period_label)}
               rows={buildRows(acqBridge, acquirerPeriods, acqHasBridge, acqFormulas)}
             />
@@ -1218,7 +1221,7 @@ export default function EquityBridgeTable({
 
           {tgtHasData && (
             <BridgeTable
-              title={`${targetName} Egenkapitalbrygge`}
+              title={t("bridge.equityBridgeFor", { name: targetName })}
               columnLabels={targetPeriods.map((p) => p.period_label)}
               rows={buildRows(tgtBridge, targetPeriods, tgtHasBridge, tgtFormulas)}
             />
@@ -1227,7 +1230,7 @@ export default function EquityBridgeTable({
           {/* Pro Forma Combined Bridge */}
           {pfBridge.length > 0 && pfPeriods && pfPeriods.length > 0 && (
             <BridgeTable
-              title={`Pro Forma (${acquirerName} + ${targetName}) Egenkapitalbrygge`}
+              title={t("bridge.pfEquityBridge", { acquirer: acquirerName, target: targetName })}
               columnLabels={pfPeriods.map((p) => p.period_label)}
               rows={buildPfRows(pfBridge, acqFormulas)}
             />

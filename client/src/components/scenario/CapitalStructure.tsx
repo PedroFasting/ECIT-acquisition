@@ -4,6 +4,7 @@ import type { AcquisitionScenario, SourceUseItem } from "../../types";
 import { toNum, formatNum, formatPct, getSourceType, autoClassifySource, getDebtFromSources, getEquityFromSources, getPreferredFromSources } from "./helpers";
 import type { SourceType } from "./helpers";
 import SectionHeader from "./SectionHeader";
+import { useTranslation } from "react-i18next";
 
 interface CapitalStructureProps {
   scenario: AcquisitionScenario;
@@ -15,6 +16,7 @@ interface CapitalStructureProps {
     preferred_equity: number | null;
     preferred_equity_rate: number | null;
     net_debt: number | null;
+    deal_parameters?: Record<string, unknown>;
   }) => Promise<void>;
 }
 
@@ -33,6 +35,7 @@ export default function CapitalStructure({
   onSaveSU,
   onSaveCapitalFields,
 }: CapitalStructureProps) {
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [sources, setSources] = useState<SourceUseItem[]>(scenario.sources || []);
   const [uses, setUses] = useState<SourceUseItem[]>(scenario.uses || []);
@@ -43,6 +46,16 @@ export default function CapitalStructure({
     scenario.preferred_equity_rate != null
       ? String(scenario.preferred_equity_rate * 100)
       : "9.5"
+  );
+  const [editCashSweep, setEditCashSweep] = useState<string>(
+    scenario.deal_parameters?.cash_sweep_pct != null
+      ? String(scenario.deal_parameters.cash_sweep_pct * 100)
+      : "100"
+  );
+  const [editDebtAmort, setEditDebtAmort] = useState<string>(
+    scenario.deal_parameters?.debt_amortisation != null
+      ? String(scenario.deal_parameters.debt_amortisation)
+      : "0"
   );
 
   const effectiveSources = scenario.sources || [];
@@ -172,12 +185,23 @@ export default function CapitalStructure({
     // Only save PIK rate (which is always editable).
     if (onSaveCapitalFields) {
       const peRateVal = editPERate ? Number(editPERate) / 100 : null;
+      const cashSweepVal = editCashSweep ? Number(editCashSweep) / 100 : 1.0;
+      const debtAmortVal = editDebtAmort ? Number(editDebtAmort) : 0;
+
+      // Merge new debt parameters into existing deal_parameters
+      const existingDp = scenario.deal_parameters || {};
+      const updatedDp = {
+        ...existingDp,
+        cash_sweep_pct: cashSweepVal,
+        debt_amortisation: debtAmortVal,
+      };
 
       await onSaveCapitalFields({
         ordinary_equity: scenario.ordinary_equity ?? null,
         preferred_equity: scenario.preferred_equity ?? null,
         preferred_equity_rate: peRateVal,
         net_debt: scenario.net_debt ?? null,
+        deal_parameters: updatedDp,
       });
     }
     setEditing(false);
@@ -195,6 +219,16 @@ export default function CapitalStructure({
       scenario.preferred_equity_rate != null
         ? String(scenario.preferred_equity_rate * 100)
         : "9.5"
+    );
+    setEditCashSweep(
+      scenario.deal_parameters?.cash_sweep_pct != null
+        ? String(scenario.deal_parameters.cash_sweep_pct * 100)
+        : "100"
+    );
+    setEditDebtAmort(
+      scenario.deal_parameters?.debt_amortisation != null
+        ? String(scenario.deal_parameters.debt_amortisation)
+        : "0"
     );
     setEditing(true);
   };
@@ -243,15 +277,15 @@ export default function CapitalStructure({
     barSegments.push({
       val: acquisitionDebt,
       color: "#1B3A5C",
-      label: "Oppkjøpsgjeld",
-      detail: "(ny gjeld fra S&U)",
+      label: t("capital.acquisitionDebt"),
+      detail: t("capital.newDebtFromSU"),
     });
   }
   if (basePE > 0) {
     barSegments.push({
       val: basePE,
       color: "#C9A84C",
-      label: `Preferred Equity${peRate > 0 ? ` (${formatPct(peRate)} PIK)` : ""}`,
+      label: `${t("capital.preferredEquity")}${peRate > 0 ? ` (${formatPct(peRate)} PIK)` : ""}`,
       detail: null,
     });
   }
@@ -259,7 +293,7 @@ export default function CapitalStructure({
     barSegments.push({
       val: acquisitionPreferred,
       color: "#D4B968",
-      label: "Ny Preferred (S&U)",
+      label: t("capital.newPreferred"),
       detail: null,
     });
   }
@@ -269,26 +303,26 @@ export default function CapitalStructure({
       barSegments.push({
         val: nonRollover,
         color: "#7A8B6E",
-        label: "Ordinary Equity",
+        label: t("capital.ordinaryEquity"),
         detail: pricePerShare > 0
-          ? `~${formatNum(nonRollover / pricePerShare, 1)}m aksjer`
+          ? t("capital.sharesAnnotation", { count: formatNum(nonRollover / pricePerShare, 1) })
           : null,
       });
       barSegments.push({
         val: rollover,
         color: "#3D8B8B",
-        label: "Rollover Equity",
+        label: t("capital.rolloverEquity"),
         detail: pricePerShare > 0
-          ? `~${formatNum(rollover / pricePerShare, 1)}m aksjer`
+          ? t("capital.sharesAnnotation", { count: formatNum(rollover / pricePerShare, 1) })
           : null,
       });
     } else {
       barSegments.push({
         val: baseOE,
         color: "#7A8B6E",
-        label: "Ordinary Equity",
+        label: t("capital.ordinaryEquity"),
         detail: pricePerShare > 0
-          ? `~${formatNum(baseOE / pricePerShare, 1)}m aksjer @ NOK ${formatNum(pricePerShare, 1)}/aksje`
+          ? t("capital.sharesAtPrice", { count: formatNum(baseOE / pricePerShare, 1), price: formatNum(pricePerShare, 1) })
           : null,
       });
     }
@@ -298,9 +332,9 @@ export default function CapitalStructure({
     barSegments.push({
       val: acquisitionEquity,
       color: "#98AE8B",
-      label: "Ny EK (S&U)",
+      label: t("capital.newEquity"),
       detail: pricePerShare > 0
-        ? `~${formatNum(newShares, 1)}m nye aksjer @ NOK ${formatNum(pricePerShare, 1)}/aksje`
+        ? t("capital.newSharesAtPrice", { count: formatNum(newShares, 1), price: formatNum(pricePerShare, 1) })
         : null,
     });
   }
@@ -320,8 +354,8 @@ export default function CapitalStructure({
     <div className="bg-white rounded-xl border border-gray-200 mb-8">
       <SectionHeader
         sectionKey="capital"
-        title="PF kapitalstruktur"
-        subtitle="Kilder og anvendelser"
+        title={t("capital.title")}
+        subtitle={t("capital.sourcesAndUses")}
         dark
         expanded={expanded}
         onToggle={onToggle}
@@ -331,7 +365,7 @@ export default function CapitalStructure({
               onClick={startEditing}
               className="px-3 py-1 text-xs bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium"
             >
-              Rediger
+              {t("capital.edit")}
             </button>
           ) : (
             <div className="flex gap-2">
@@ -339,7 +373,7 @@ export default function CapitalStructure({
                 onClick={handleSave}
                 className="flex items-center gap-1 px-3 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium"
               >
-                <Save size={12} /> Lagre
+                <Save size={12} /> {t("capital.save")}
               </button>
               <button
                 onClick={() => {
@@ -349,7 +383,7 @@ export default function CapitalStructure({
                 }}
                 className="px-3 py-1 text-xs bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium"
               >
-                Avbryt
+                {t("capital.cancel")}
               </button>
             </div>
           )
@@ -365,45 +399,45 @@ export default function CapitalStructure({
               {/* Capital Structure Summary — base + acquisition financing */}
               <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                 <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                  PF kapitalstruktur (NOKm) — <span className="text-gray-500 font-normal">eksisterende + oppkjøpsfinansiering</span>
+                  {t("capital.editSummaryHeading")} — <span className="text-gray-500 font-normal">{t("capital.editSummaryDetail")}</span>
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">
-                      Ordinary Equity
+                      {t("capital.ordinaryEquity")}
                     </label>
                     <div className="w-full px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-right tabular-nums text-gray-700">
                       {formatNum(baseOE + getEquityFromSources(sources), 1) || "0"}
                     </div>
                     <div className="text-[10px] text-gray-400 mt-0.5">
-                      Base {formatNum(baseOE, 1)} + S&U {formatNum(getEquityFromSources(sources), 1)}
+                      {t("capital.base")} {formatNum(baseOE, 1)} + {t("capital.suLabel")} {formatNum(getEquityFromSources(sources), 1)}
                     </div>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">
-                      Preferred Equity
+                      {t("capital.preferredEquity")}
                     </label>
                     <div className="w-full px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-right tabular-nums text-gray-700">
                       {formatNum(basePE + getPreferredFromSources(sources), 1) || "0"}
                     </div>
                     <div className="text-[10px] text-gray-400 mt-0.5">
-                      Base {formatNum(basePE, 1)} + S&U {formatNum(getPreferredFromSources(sources), 1)}
+                      {t("capital.base")} {formatNum(basePE, 1)} + {t("capital.suLabel")} {formatNum(getPreferredFromSources(sources), 1)}
                     </div>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">
-                      Net Debt
+                      {t("capital.netDebt")}
                     </label>
                     <div className="w-full px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-right tabular-nums text-gray-700">
                       {formatNum(acquirerNibd + getDebtFromSources(sources), 1) || "0"}
                     </div>
                     <div className="text-[10px] text-gray-400 mt-0.5">
-                      NIBD {formatNum(acquirerNibd, 1)} + S&U {formatNum(getDebtFromSources(sources), 1)}
+                      {t("capital.nibd")} {formatNum(acquirerNibd, 1)} + {t("capital.suLabel")} {formatNum(getDebtFromSources(sources), 1)}
                     </div>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">
-                      PIK-rente (%)
+                      {t("capital.pikRate")} (%)
                     </label>
                     <input
                       type="number"
@@ -415,9 +449,44 @@ export default function CapitalStructure({
                     />
                     {!scenario.preferred_equity_rate && (
                       <div className="text-[10px] text-gray-400 mt-0.5">
-                        Standard: 9.5% PIK (compound)
+                        {t("capital.pikDefault")}
                       </div>
                     )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      {t("capital.cashSweep")} (%)
+                    </label>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      max="100"
+                      value={editCashSweep}
+                      onChange={(e) => setEditCashSweep(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-right tabular-nums"
+                      placeholder="100"
+                    />
+                    <div className="text-[10px] text-gray-400 mt-0.5">
+                      {t("capital.cashSweepHint")}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      {t("capital.debtAmortisation")}
+                    </label>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={editDebtAmort}
+                      onChange={(e) => setEditDebtAmort(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-right tabular-nums"
+                      placeholder="0"
+                    />
+                    <div className="text-[10px] text-gray-400 mt-0.5">
+                      {t("capital.debtAmortHint")}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -426,7 +495,7 @@ export default function CapitalStructure({
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Sources */}
               <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">Kilder (NOKm)</h4>
+                <h4 className="text-sm font-semibold text-gray-900 mb-3">{t("capital.sources")}</h4>
                 <div className="space-y-2">
                   {sources.map((s, i) => (
                     <div key={i} className="flex gap-2">
@@ -443,7 +512,7 @@ export default function CapitalStructure({
                           setSources(newSources);
                         }}
                         className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
-                        placeholder="Navn"
+                        placeholder={t("capital.namePlaceholder")}
                       />
                       <select
                         value={s.type || autoClassifySource(s.name)}
@@ -460,9 +529,9 @@ export default function CapitalStructure({
                             : "border-amber-300 bg-amber-50 text-amber-800"
                         }`}
                       >
-                        <option value="debt">Gjeld</option>
-                        <option value="equity">Egenkapital</option>
-                        <option value="preferred">Preferanse</option>
+                        <option value="debt">{t("capital.typeDebt")}</option>
+                        <option value="equity">{t("capital.typeEquity")}</option>
+                        <option value="preferred">{t("capital.typePreferred")}</option>
                       </select>
                       <input
                         type="number"
@@ -487,13 +556,13 @@ export default function CapitalStructure({
                     onClick={() => setSources([...sources, { name: "", amount: 0, type: "debt" }])}
                     className="flex items-center gap-1 text-xs text-[#002C55] hover:underline font-medium"
                   >
-                    <Plus size={12} /> Legg til kilde
+                    <Plus size={12} /> {t("capital.addSource")}
                   </button>
                 </div>
               </div>
               {/* Uses */}
               <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">Anvendelser (NOKm)</h4>
+                <h4 className="text-sm font-semibold text-gray-900 mb-3">{t("capital.uses")}</h4>
                 <div className="space-y-2">
                   {uses.map((u, i) => (
                     <div key={i} className="flex gap-2">
@@ -506,7 +575,7 @@ export default function CapitalStructure({
                           setUses(newUses);
                         }}
                         className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
-                        placeholder="Navn"
+                        placeholder={t("capital.namePlaceholder")}
                       />
                       <input
                         type="number"
@@ -531,7 +600,7 @@ export default function CapitalStructure({
                     onClick={() => setUses([...uses, { name: "", amount: 0 }])}
                     className="flex items-center gap-1 text-xs text-[#002C55] hover:underline font-medium"
                   >
-                    <Plus size={12} /> Legg til anvendelse
+                    <Plus size={12} /> {t("capital.addUse")}
                   </button>
                 </div>
               </div>
@@ -548,7 +617,7 @@ export default function CapitalStructure({
               {/* ─── LEFT: PF Capital Structure ─── */}
               <div className="lg:w-1/2 flex-shrink-0 lg:border-r lg:border-gray-200 lg:pr-6">
                 <div className="bg-[#6B2D5B] text-white px-3 py-2 text-xs font-semibold mb-4">
-                  PF kapitalstruktur (pre re-rating)
+                  {t("capital.pfCapitalPreRerating")}
                 </div>
 
                 {hasCapData ? (
@@ -625,7 +694,7 @@ export default function CapitalStructure({
                   </div>
                 ) : (
                   <div className="text-gray-400 text-sm py-8 text-center">
-                    Fyll inn kapitalstruktur-felter for å se figur
+                    {t("capital.fillInFields")}
                   </div>
                 )}
               </div>
@@ -633,7 +702,7 @@ export default function CapitalStructure({
               {/* ─── RIGHT: Sources & Uses tables ─── */}
               <div className="lg:w-1/2 flex-shrink-0 lg:pl-6 space-y-4 mt-6 lg:mt-0">
                 <div className="bg-[#6B2D5B] text-white px-3 py-2 text-xs font-semibold">
-                  Sources and uses
+                  {t("capital.sourcesAndUses")}
                 </div>
 
                 {/* Sources */}
@@ -641,7 +710,7 @@ export default function CapitalStructure({
                   <thead>
                     <tr className="bg-[#8B4D7B] text-white">
                       <th className="text-left px-3 py-1.5 text-xs font-semibold">
-                        {scenario.target_company_name || "Target"} kilder
+                        {t("capital.sourcesHeader", { name: scenario.target_company_name || "Target" })}
                       </th>
                       <th className="text-left px-3 py-1.5 text-xs font-semibold w-20">Type</th>
                       <th className="text-right px-3 py-1.5 text-xs font-semibold w-24">NOKm</th>
@@ -653,10 +722,10 @@ export default function CapitalStructure({
                         {effectiveSources.map((s, i) => {
                           const sType = getSourceType(s);
                           const badge = sType === "debt"
-                            ? { bg: "bg-blue-100 text-blue-800", label: "Gjeld" }
+                            ? { bg: "bg-blue-100 text-blue-800", label: t("capital.typeBadgeDebt") }
                             : sType === "equity"
-                            ? { bg: "bg-green-100 text-green-800", label: "EK" }
-                            : { bg: "bg-amber-100 text-amber-800", label: "Pref" };
+                            ? { bg: "bg-green-100 text-green-800", label: t("capital.typeBadgeEquity") }
+                            : { bg: "bg-amber-100 text-amber-800", label: t("capital.typeBadgePref") };
                           return (
                             <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
                               <td className="px-3 py-1.5 text-gray-700">{s.name}</td>
@@ -681,7 +750,7 @@ export default function CapitalStructure({
                     ) : (
                       <tr>
                         <td colSpan={3} className="px-3 py-3 text-gray-400 text-center text-xs">
-                          Ingen kilder registrert
+                          {t("capital.noSources")}
                         </td>
                       </tr>
                     )}
@@ -693,7 +762,7 @@ export default function CapitalStructure({
                   <thead>
                     <tr className="bg-[#8B4D7B] text-white">
                       <th className="text-left px-3 py-1.5 text-xs font-semibold">
-                        {scenario.target_company_name || "Target"} anvendelser
+                        {t("capital.usesHeader", { name: scenario.target_company_name || "Target" })}
                       </th>
                       <th className="text-right px-3 py-1.5 text-xs font-semibold w-24">NOKm</th>
                     </tr>
@@ -733,7 +802,7 @@ export default function CapitalStructure({
                     ) : (
                       <tr>
                         <td colSpan={2} className="px-3 py-3 text-gray-400 text-center text-xs">
-                          Ingen anvendelser registrert
+                          {t("capital.noUses")}
                         </td>
                       </tr>
                     )}
@@ -752,14 +821,16 @@ export default function CapitalStructure({
                     {isBalanced ? (
                       <>
                         <CheckCircle size={14} />
-                        Kilder og anvendelser er i balanse ({formatNum(sourcesTotal, 0)} NOKm)
+                        {t("capital.balancedWithAmount", { amount: formatNum(sourcesTotal, 0) })}
                       </>
                     ) : (
                       <>
                         <AlertTriangle size={14} />
-                        Ubalanse: Kilder {formatNum(sourcesTotal, 0)} vs Anvendelser{" "}
-                        {formatNum(usesTotal, 0)} (diff:{" "}
-                        {formatNum(Math.abs(sourcesTotal - usesTotal), 1)} NOKm)
+                        {t("capital.imbalanceDetail", {
+                          sources: formatNum(sourcesTotal, 0),
+                          uses: formatNum(usesTotal, 0),
+                          diff: formatNum(Math.abs(sourcesTotal - usesTotal), 1),
+                        })}
                       </>
                     )}
                   </div>
@@ -771,12 +842,12 @@ export default function CapitalStructure({
                EMPTY STATE
                ══════════════════════════════════════════════ */
             <div className="text-center text-gray-400 py-4">
-              <p className="mb-2">Ingen kapitalstruktur registrert</p>
+              <p className="mb-2">{t("capital.noCapitalStructure")}</p>
               <button
                 onClick={startEditing}
                 className="text-[#002C55] hover:underline text-sm font-medium"
               >
-                Legg til sources & uses
+                {t("capital.addSourcesAndUses")}
               </button>
             </div>
           )}

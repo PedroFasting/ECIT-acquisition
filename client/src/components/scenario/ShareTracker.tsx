@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { AcquisitionScenario, FinancialPeriod, ShareSummary } from "../../types";
 import { formatNum, formatPct, toNum, getEquityFromSources } from "./helpers";
 import SectionHeader from "./SectionHeader";
+import { useTranslation } from "react-i18next";
 
 interface ShareTrackerProps {
   scenario: AcquisitionScenario;
@@ -26,6 +27,7 @@ export default function ShareTracker({
   expanded,
   onToggle,
 }: ShareTrackerProps) {
+  const { t } = useTranslation();
   const tracker = useMemo(() => {
     if (acquirerPeriods.length === 0) return null;
 
@@ -92,17 +94,17 @@ export default function ShareTracker({
 
     // Step 1: DB base shares (always shown)
     steps.push({
-      label: `Basisaksjer (${firstWithShares.period_label})`,
+      label: t("shareTracker.baseSharesLabel", { period: firstWithShares.period_label }),
       value: dbBaseShares,
       delta: dbBaseShares,
       color: "#7A8B6E",
-      annotation: pricePerShare > 0 ? `NOK ${formatNum(pricePerShare, 1)}/aksje` : undefined,
+      annotation: pricePerShare > 0 ? t("shareTracker.pricePerShare", { price: formatNum(pricePerShare, 1) }) : undefined,
     });
 
     // Step 2: Target equity financing shares (only if EK in sources)
     if (hasTargetEk) {
       steps.push({
-        label: "Nye aksjer (target EK-finansiering)",
+        label: t("shareTracker.newSharesTarget"),
         value: baseShares,
         delta: targetEkShares,
         color: "#5B8A72",
@@ -113,21 +115,21 @@ export default function ShareTracker({
     // Step 3: M&A shares from budgeted acquisitions (if any growth in DB)
     if (maShares > 0) {
       steps.push({
-        label: `M&A-aksjer (${firstWithShares.period_label}\u2013${lastPeriod.period_label})`,
+        label: t("shareTracker.maSharesLabel", { range: `${firstWithShares.period_label}\u2013${lastPeriod.period_label}` }),
         value: exitShares,
         delta: maShares,
         color: "#4A7C59",
-        annotation: `+${formatNum(dilutionFromMa * 100, 1)} % utvanning`,
+        annotation: t("shareTracker.dilutionPct", { pct: formatNum(dilutionFromMa * 100, 1) }),
       });
     }
 
     if (rolloverShares > 0) {
       steps.push({
-        label: "Rollover-aksjer",
+        label: t("shareTracker.rolloverShares"),
         value: totalShares,
         delta: rolloverShares,
         color: "#3D8B8B",
-        annotation: `${formatNum(rolloverEquity, 0)} NOKm rollover`,
+        annotation: t("shareTracker.rolloverAnnotation", { amount: formatNum(rolloverEquity, 0) }),
       });
     }
 
@@ -150,7 +152,7 @@ export default function ShareTracker({
       firstLabel: firstWithShares.period_label,
       lastLabel: lastPeriod.period_label,
     };
-  }, [acquirerPeriods, scenario]);
+  }, [acquirerPeriods, scenario, t]);
 
   if (!tracker) return null;
 
@@ -161,8 +163,8 @@ export default function ShareTracker({
     <div className="bg-white rounded-xl border border-gray-200 mb-8">
       <SectionHeader
         sectionKey="shareTracker"
-        title="Aksjeoversikt"
-        subtitle="Fra basisaksjer til total utvanning"
+        title={t("shareTracker.title")}
+        subtitle={t("shareTracker.subtitle")}
         expanded={expanded}
         onToggle={onToggle}
       />
@@ -230,14 +232,14 @@ export default function ShareTracker({
           <div className="mt-5 pt-4 border-t border-gray-200">
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <div className="text-center">
-                <div className="text-xs text-gray-500 mb-1">Basisaksjer</div>
+                <div className="text-xs text-gray-500 mb-1">{t("shareTracker.baseShares")}</div>
                 <div className="text-sm font-bold text-gray-900">
                   {formatNum(tracker.dbBaseShares, 1)}m
                 </div>
               </div>
               {tracker.hasTargetEk && (
                 <div className="text-center">
-                  <div className="text-xs text-gray-500 mb-1">+ Target EK</div>
+                  <div className="text-xs text-gray-500 mb-1">{t("shareTracker.plusTargetEk")}</div>
                   <div className="text-sm font-bold text-[#5B8A72]">
                     +{formatNum(tracker.targetEkShares, 1)}m
                   </div>
@@ -245,7 +247,7 @@ export default function ShareTracker({
               )}
               {tracker.maShares > 0 && (
                 <div className="text-center">
-                  <div className="text-xs text-gray-500 mb-1">+ M&A-aksjer</div>
+                  <div className="text-xs text-gray-500 mb-1">{t("shareTracker.plusMaShares")}</div>
                   <div className="text-sm font-bold text-[#4A7C59]">
                     +{formatNum(tracker.maShares, 1)}m
                   </div>
@@ -253,20 +255,20 @@ export default function ShareTracker({
               )}
               {tracker.rolloverShares > 0 && (
                 <div className="text-center">
-                  <div className="text-xs text-gray-500 mb-1">+ Rollover</div>
+                  <div className="text-xs text-gray-500 mb-1">{t("shareTracker.plusRollover")}</div>
                   <div className="text-sm font-bold text-[#3D8B8B]">
                     +{formatNum(tracker.rolloverShares, 1)}m
                   </div>
                 </div>
               )}
               <div className="text-center">
-                <div className="text-xs text-gray-500 mb-1">Total aksjer</div>
+                <div className="text-xs text-gray-500 mb-1">{t("shareTracker.totalShares")}</div>
                 <div className="text-sm font-bold text-gray-900">
                   {formatNum(totalShares, 1)}m
                 </div>
               </div>
               <div className="text-center">
-                <div className="text-xs text-gray-500 mb-1">Total utvanning</div>
+                <div className="text-xs text-gray-500 mb-1">{t("shareTracker.totalDilution")}</div>
                 <div
                   className={`text-sm font-bold ${
                     dilutionTotal > 0.1 ? "text-red-600" : "text-amber-600"
@@ -283,23 +285,23 @@ export default function ShareTracker({
             <div className="mt-4 bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
               <div className="flex justify-between">
                <span>
-                   FMV per aksje ({tracker.firstLabel}, fullt utvannet):
+                    {t("shareTracker.fmvEntry", { label: tracker.firstLabel })}
+                  </span>
+                 <span className="font-semibold text-gray-900">
+                   NOK {formatNum(tracker.entryPPS, 1)}
                  </span>
-                <span className="font-semibold text-gray-900">
-                  NOK {formatNum(tracker.entryPPS, 1)}
-                </span>
-              </div>
-              <div className="flex justify-between mt-1">
+               </div>
+               <div className="flex justify-between mt-1">
                <span>
-                   FMV per aksje ({tracker.lastLabel}, fullt utvannet):
+                    {t("shareTracker.fmvExit", { label: tracker.lastLabel })}
+                  </span>
+                 <span className="font-semibold text-gray-900">
+                   NOK {formatNum(tracker.exitPPS, 1)}
                  </span>
-                <span className="font-semibold text-gray-900">
-                  NOK {formatNum(tracker.exitPPS, 1)}
-                </span>
-              </div>
-              {tracker.pricePerShare > 0 && (
-                <div className="flex justify-between mt-1">
-                   <span>Implied FMV per aksje (fullt utvannet):</span>
+               </div>
+               {tracker.pricePerShare > 0 && (
+                 <div className="flex justify-between mt-1">
+                    <span>{t("shareTracker.impliedFmv")}</span>
                   <span className="font-semibold text-gray-900">
                     NOK {formatNum(tracker.pricePerShare, 1)}
                   </span>
@@ -334,6 +336,7 @@ const nbFmt1 = new Intl.NumberFormat("nb-NO", {
 });
 
 function DilutionWaterfall({ shareSummary }: { shareSummary: ShareSummary }) {
+  const { t } = useTranslation();
   const eqvGross = shareSummary.exit_eqv_gross ?? 0;
   const pref = shareSummary.exit_preferred_equity ?? 0;
   const mip = shareSummary.exit_mip_amount ?? 0;
@@ -351,28 +354,28 @@ function DilutionWaterfall({ shareSummary }: { shareSummary: ShareSummary }) {
 
   // Build waterfall steps
   const steps: DilutionStep[] = [
-    { label: "Exit EQV (brutto)", value: eqvGross, color: "#4A7C59", isDeduction: false },
+    { label: t("shareTracker.exitEqvGross"), value: eqvGross, color: "#4A7C59", isDeduction: false },
   ];
 
   if (pref > 0) {
-    steps.push({ label: "Preferred equity (PIK)", value: pref, color: "#B8860B", isDeduction: true });
+    steps.push({ label: t("shareTracker.preferredEquityPik"), value: pref, color: "#B8860B", isDeduction: true });
   }
   if (mip > 0) {
-    steps.push({ label: "MIP-program", value: mip, color: "#C0392B", isDeduction: true });
+    steps.push({ label: t("shareTracker.mipProgram"), value: mip, color: "#C0392B", isDeduction: true });
   }
   if (tso > 0) {
-    steps.push({ label: "TSO-warrants", value: tso, color: "#E74C3C", isDeduction: true });
+    steps.push({ label: t("shareTracker.tsoWarrants"), value: tso, color: "#E74C3C", isDeduction: true });
   }
   if (warrants > 0) {
-    steps.push({ label: "Eksisterende warrants", value: warrants, color: "#E67E22", isDeduction: true });
+    steps.push({ label: t("shareTracker.existingWarrants"), value: warrants, color: "#E67E22", isDeduction: true });
   }
-  steps.push({ label: "EQV til ordinaere aksjonaerer", value: eqvPost, color: "#2E86AB", isDeduction: false });
+  steps.push({ label: t("shareTracker.eqvToOrdinary"), value: eqvPost, color: "#2E86AB", isDeduction: false });
 
   return (
     <div className="mt-6 pt-5 border-t border-gray-200">
       <div className="flex items-center justify-between mb-4">
         <h4 className="text-sm font-semibold text-gray-900">
-          Verdi-utvanning ved exit (median multippel)
+          {t("shareTracker.valueDilution")}
         </h4>
         {dilutionPct > 0 && (
           <span className={`text-xs font-bold px-2 py-1 rounded-full ${
@@ -382,7 +385,7 @@ function DilutionWaterfall({ shareSummary }: { shareSummary: ShareSummary }) {
               ? "bg-amber-100 text-amber-700"
               : "bg-green-100 text-green-700"
           }`}>
-            {nbFmt1.format(dilutionPct * 100)} % verdi-utvanning
+            {t("shareTracker.valueDilutionPct", { pct: nbFmt1.format(dilutionPct * 100) })}
           </span>
         )}
       </div>
@@ -397,7 +400,7 @@ function DilutionWaterfall({ shareSummary }: { shareSummary: ShareSummary }) {
           if (mip > 0) segments.push({ label: "MIP", pct: mip / eqvGross, color: "#C0392B", isResult: false });
           if (tso > 0) segments.push({ label: "TSO", pct: tso / eqvGross, color: "#E74C3C", isResult: false });
           if (warrants > 0) segments.push({ label: "War.", pct: warrants / eqvGross, color: "#E67E22", isResult: false });
-          segments.push({ label: "Ordinaer EK", pct: eqvPost / eqvGross, color: "#2E86AB", isResult: true });
+          segments.push({ label: t("shareTracker.ordinaryEquity"), pct: eqvPost / eqvGross, color: "#2E86AB", isResult: true });
 
           let offset = 0;
           return segments.map((seg, i) => {
@@ -462,7 +465,7 @@ function DilutionWaterfall({ shareSummary }: { shareSummary: ShareSummary }) {
         <div className="mt-3 grid grid-cols-3 gap-3">
           {ppsEntry > 0 && (
             <div className="bg-gray-50 rounded-lg p-2.5 text-center">
-              <div className="text-[10px] text-gray-500 mb-0.5">Inngang per aksje</div>
+              <div className="text-[10px] text-gray-500 mb-0.5">{t("shareTracker.entryPerShare")}</div>
               <div className="text-sm font-bold text-gray-900">
                 NOK {formatNum(ppsEntry, 1)}
               </div>
@@ -470,14 +473,14 @@ function DilutionWaterfall({ shareSummary }: { shareSummary: ShareSummary }) {
           )}
           {ppsPre > 0 && (
             <div className="bg-gray-50 rounded-lg p-2.5 text-center">
-              <div className="text-[10px] text-gray-500 mb-0.5">Exit per aksje (for utvanning)</div>
+              <div className="text-[10px] text-gray-500 mb-0.5">{t("shareTracker.exitPerSharePre")}</div>
               <div className="text-sm font-bold text-gray-600">
                 NOK {formatNum(ppsPre, 1)}
               </div>
             </div>
           )}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5 text-center">
-            <div className="text-[10px] text-blue-600 mb-0.5">Exit per aksje (etter utvanning)</div>
+            <div className="text-[10px] text-blue-600 mb-0.5">{t("shareTracker.exitPerSharePost")}</div>
             <div className="text-sm font-bold text-blue-900">
               NOK {formatNum(ppsPost, 1)}
             </div>
@@ -494,8 +497,7 @@ function DilutionWaterfall({ shareSummary }: { shareSummary: ShareSummary }) {
 
       {/* Explanatory note */}
       <div className="mt-3 text-[10px] text-gray-400 leading-relaxed">
-        Verdi-utvanning viser hvordan exit-EQV fordeles mellom MIP-deltakere, warrantinnehavere,
-        preferred equity (PIK) og ordinaere aksjonaerer. Beregnet ved median exit-multippel fra Deal Returns.
+        {t("shareTracker.explanatoryNote")}
       </div>
     </div>
   );

@@ -1,27 +1,35 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard,
   Building2,
   GitMerge,
   LogOut,
   Target,
+  Globe,
 } from "lucide-react";
 
 export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
 
   const handleLogout = () => {
     logout();
     navigate("/login");
   };
 
+  const toggleLanguage = () => {
+    const next = i18n.language === "nb" ? "en" : "nb";
+    i18n.changeLanguage(next);
+  };
+
   const navItems = [
-    { to: "/", icon: LayoutDashboard, label: "Oversikt" },
-    { to: "/companies", icon: Building2, label: "Selskaper" },
-    { to: "/targets", icon: Target, label: "Targets" },
-    { to: "/scenarios", icon: GitMerge, label: "Scenarier" },
+    { to: "/", icon: LayoutDashboard, label: t("nav.overview") },
+    { to: "/companies", icon: Building2, label: t("nav.companies") },
+    { to: "/targets", icon: Target, label: t("nav.targets") },
+    { to: "/scenarios", icon: GitMerge, label: t("nav.scenarios") },
   ];
 
   return (
@@ -30,7 +38,7 @@ export default function Layout() {
       <aside className="w-64 bg-[#03223F] text-white flex flex-col">
         <div className="p-6 border-b border-white/10">
           <h1 className="text-xl font-bold tracking-tight">ECIT Acquisition</h1>
-          <p className="text-xs text-white/50 mt-1">Analyse & Verdsettelse</p>
+          <p className="text-xs text-white/50 mt-1">{t("nav.subtitle")}</p>
         </div>
 
         <nav className="flex-1 p-4 space-y-1">
@@ -54,6 +62,15 @@ export default function Layout() {
         </nav>
 
         <div className="p-4 border-t border-white/10">
+          {/* Language switcher */}
+          <button
+            onClick={toggleLanguage}
+            className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-xs text-white/50 hover:text-white hover:bg-white/5 transition-colors mb-3"
+          >
+            <Globe size={14} />
+            {i18n.language === "nb" ? "English" : "Norsk"}
+          </button>
+
           <div className="flex items-center justify-between">
             <div className="text-sm">
               <p className="font-medium">{user?.name}</p>
@@ -62,7 +79,7 @@ export default function Layout() {
             <button
               onClick={handleLogout}
               className="p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors"
-              title="Logg ut"
+              title={t("nav.logout")}
             >
               <LogOut size={16} />
             </button>

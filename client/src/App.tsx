@@ -31,24 +31,22 @@ function AppRoutes() {
           isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />
         }
       />
-      <Route
-        element={
+        <Route element={
           <ProtectedRoute>
             <Layout />
           </ProtectedRoute>
-        }
-      >
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/companies" element={<CompaniesPage />} />
-        <Route path="/companies/:id" element={<CompanyDetailPage />} />
-        <Route path="/targets" element={<TargetsListPage />} />
-        <Route path="/targets/compare" element={<TargetComparePage />} />
-        <Route path="/targets/:id" element={<TargetOverviewPage />} />
-        <Route path="/models" element={<ModelsOverviewPage />} />
-        <Route path="/models/:id" element={<ModelDetailPage />} />
-        <Route path="/scenarios" element={<ErrorBoundary><ScenariosPage /></ErrorBoundary>} />
-        <Route path="/scenarios/:id" element={<ErrorBoundary><ScenarioDetailPage /></ErrorBoundary>} />
-      </Route>
+        }>
+          <Route path="/" element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
+          <Route path="/companies" element={<ErrorBoundary><CompaniesPage /></ErrorBoundary>} />
+          <Route path="/companies/:id" element={<ErrorBoundary><CompanyDetailPage /></ErrorBoundary>} />
+          <Route path="/targets" element={<ErrorBoundary><TargetsListPage /></ErrorBoundary>} />
+          <Route path="/targets/compare" element={<ErrorBoundary><TargetComparePage /></ErrorBoundary>} />
+          <Route path="/targets/:id" element={<ErrorBoundary><TargetOverviewPage /></ErrorBoundary>} />
+          <Route path="/models" element={<ErrorBoundary><ModelsOverviewPage /></ErrorBoundary>} />
+          <Route path="/models/:id" element={<ErrorBoundary><ModelDetailPage /></ErrorBoundary>} />
+          <Route path="/scenarios" element={<ErrorBoundary><ScenariosPage /></ErrorBoundary>} />
+          <Route path="/scenarios/:id" element={<ErrorBoundary><ScenarioDetailPage /></ErrorBoundary>} />
+        </Route>
     </Routes>
   );
 }

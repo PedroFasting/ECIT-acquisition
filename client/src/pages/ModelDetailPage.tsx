@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import api from "../services/api";
 import type { FinancialModel, FinancialPeriod } from "../types";
 import { ArrowLeft, Settings, TrendingUp } from "lucide-react";
 
 export default function ModelDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { t } = useTranslation();
   const [model, setModel] = useState<FinancialModel | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -22,7 +24,7 @@ export default function ModelDetailPage() {
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center h-full">
-        <div className="text-gray-400">Laster modell...</div>
+        <div className="text-gray-400">{t("modelDetail.loadingModel")}</div>
       </div>
     );
   }
@@ -30,7 +32,7 @@ export default function ModelDetailPage() {
   if (!model) {
     return (
       <div className="p-8">
-        <p className="text-red-600">Modell ikke funnet. {error}</p>
+        <p className="text-red-600">{t("modelDetail.modelNotFound")} {error}</p>
       </div>
     );
   }
@@ -40,66 +42,66 @@ export default function ModelDetailPage() {
   // Financial line items to display
   const lineItems: {
     key: keyof FinancialPeriod;
-    label: string;
+    labelKey: string;
     format: "number" | "pct" | "growth";
     bold?: boolean;
     indent?: boolean;
-    section?: string;
+    sectionKey?: string;
   }[] = [
-    { key: "revenue_managed_services", label: "Managed services", format: "number", section: "Revenue" },
-    { key: "managed_services_growth", label: "% vekst", format: "pct", indent: true },
-    { key: "revenue_professional_services", label: "Professional services", format: "number" },
-    { key: "professional_services_growth", label: "% vekst", format: "pct", indent: true },
-    { key: "revenue_organic", label: "Organisk omsetning", format: "number", bold: true },
-    { key: "organic_growth", label: "% vekst", format: "pct", indent: true },
-    { key: "revenue_ma", label: "Revenue - M&A", format: "number" },
-    { key: "revenue_total", label: "Total omsetning", format: "number", bold: true },
-    { key: "revenue_growth", label: "% vekst", format: "pct", indent: true },
-    { key: "ebitda_managed_services", label: "EBITDA Managed services", format: "number", section: "EBITDA" },
-    { key: "margin_managed_services", label: "% margin", format: "pct", indent: true },
-    { key: "ebitda_professional_services", label: "EBITDA Professional services", format: "number" },
-    { key: "margin_professional_services", label: "% margin", format: "pct", indent: true },
-    { key: "ebitda_central_costs", label: "Sentrale kostnader", format: "number" },
-    { key: "margin_central_costs", label: "% margin", format: "pct", indent: true },
-    { key: "ebitda_organic", label: "Organic EBITDA (pre-IFRS)", format: "number", bold: true },
-    { key: "ebitda_margin", label: "% margin", format: "pct", indent: true },
-    { key: "ebitda_ma", label: "EBITDA - M&A", format: "number" },
-    { key: "ebitda_total", label: "Total EBITDA (pre-IFRS)", format: "number", bold: true },
-    { key: "cost_synergies", label: "Kostnadssynergier", format: "number", section: "Kontantstrøm" },
-    { key: "ebitda_incl_synergies", label: "EBITDA inkl. synergier", format: "number", bold: true },
-    { key: "capex", label: "Totale investeringer", format: "number" },
-    { key: "capex_pct_revenue", label: "% of revenue", format: "pct", indent: true },
-    { key: "change_nwc", label: "Total endring i arbeidskapital", format: "number" },
-    { key: "other_cash_flow_items", label: "Andre kontantstrømposter", format: "number" },
-    { key: "operating_fcf", label: "Operasjonell FCF", format: "number", bold: true },
-    { key: "minority_interest", label: "Minoritetsinteresser", format: "number" },
-    { key: "operating_fcf_excl_minorities", label: "Operasjonell FCF (ekskl. minoriteter)", format: "number", bold: true },
-    { key: "cash_conversion", label: "% kontantkonvertering", format: "pct", indent: true },
+    { key: "revenue_managed_services", labelKey: "modelDetail.lineItems.managedServices", format: "number", sectionKey: "modelDetail.sections.revenue" },
+    { key: "managed_services_growth", labelKey: "common.growth", format: "pct", indent: true },
+    { key: "revenue_professional_services", labelKey: "modelDetail.lineItems.professionalServices", format: "number" },
+    { key: "professional_services_growth", labelKey: "common.growth", format: "pct", indent: true },
+    { key: "revenue_organic", labelKey: "modelDetail.lineItems.organicRevenue", format: "number", bold: true },
+    { key: "organic_growth", labelKey: "common.growth", format: "pct", indent: true },
+    { key: "revenue_ma", labelKey: "modelDetail.lineItems.revenueMA", format: "number" },
+    { key: "revenue_total", labelKey: "modelDetail.lineItems.totalRevenue", format: "number", bold: true },
+    { key: "revenue_growth", labelKey: "common.growth", format: "pct", indent: true },
+    { key: "ebitda_managed_services", labelKey: "modelDetail.lineItems.ebitdaManagedServices", format: "number", sectionKey: "modelDetail.sections.ebitda" },
+    { key: "margin_managed_services", labelKey: "common.margin", format: "pct", indent: true },
+    { key: "ebitda_professional_services", labelKey: "modelDetail.lineItems.ebitdaProfessionalServices", format: "number" },
+    { key: "margin_professional_services", labelKey: "common.margin", format: "pct", indent: true },
+    { key: "ebitda_central_costs", labelKey: "modelDetail.lineItems.centralCosts", format: "number" },
+    { key: "margin_central_costs", labelKey: "common.margin", format: "pct", indent: true },
+    { key: "ebitda_organic", labelKey: "modelDetail.lineItems.organicEbitda", format: "number", bold: true },
+    { key: "ebitda_margin", labelKey: "common.margin", format: "pct", indent: true },
+    { key: "ebitda_ma", labelKey: "modelDetail.lineItems.ebitdaMA", format: "number" },
+    { key: "ebitda_total", labelKey: "modelDetail.lineItems.totalEbitda", format: "number", bold: true },
+    { key: "cost_synergies", labelKey: "modelDetail.lineItems.costSynergies", format: "number", sectionKey: "modelDetail.sections.cashFlow" },
+    { key: "ebitda_incl_synergies", labelKey: "modelDetail.lineItems.ebitdaInclSynergies", format: "number", bold: true },
+    { key: "capex", labelKey: "modelDetail.lineItems.totalCapex", format: "number" },
+    { key: "capex_pct_revenue", labelKey: "modelDetail.lineItems.capexPctRevenue", format: "pct", indent: true },
+    { key: "change_nwc", labelKey: "modelDetail.lineItems.changeNwc", format: "number" },
+    { key: "other_cash_flow_items", labelKey: "modelDetail.lineItems.otherCashFlow", format: "number" },
+    { key: "operating_fcf", labelKey: "modelDetail.lineItems.operatingFcf", format: "number", bold: true },
+    { key: "minority_interest", labelKey: "modelDetail.lineItems.minorityInterest", format: "number" },
+    { key: "operating_fcf_excl_minorities", labelKey: "modelDetail.lineItems.operatingFcfExclMinorities", format: "number", bold: true },
+    { key: "cash_conversion", labelKey: "modelDetail.lineItems.cashConversion", format: "pct", indent: true },
   ];
 
   // Equity bridge line items
   const equityBridgeItems: {
     key: keyof FinancialPeriod;
-    label: string;
+    labelKey: string;
     format: "number" | "pct";
     bold?: boolean;
     indent?: boolean;
-    section?: string;
+    sectionKey?: string;
   }[] = [
-    { key: "enterprise_value", label: "Enterprise Value (EV)", format: "number", bold: true, section: "Verdsettelse" },
-    { key: "nibd", label: "NIBD (inkl. diverse)", format: "number" },
-    { key: "option_debt", label: "Opsjonsgjeld", format: "number" },
-    { key: "adjustments", label: "Justeringer", format: "number" },
-    { key: "equity_value", label: "Egenkapitalverdi (EQV)", format: "number", bold: true, section: "Egenkapitalbrygge" },
-    { key: "preferred_equity", label: "Preferanseaksjer", format: "number" },
-    { key: "per_share_pre", label: "Per aksje (pre-dilution)", format: "number", indent: true },
-    { key: "mip_amount", label: "MIP", format: "number" },
-    { key: "tso_amount", label: "TSO", format: "number" },
-    { key: "warrants_amount", label: "Tegningsretter", format: "number" },
-    { key: "eqv_post_dilution", label: "EQV (post MIP, TSO, Warrants)", format: "number", bold: true },
-    { key: "per_share_post", label: "Per aksje (post-dilution)", format: "number", indent: true },
-    { key: "share_count", label: "Antall aksjer", format: "number", section: "Aksjer" },
-    { key: "acquired_revenue", label: "Omsetning fra oppkjøp", format: "number" },
+    { key: "enterprise_value", labelKey: "modelDetail.equityItems.enterpriseValue", format: "number", bold: true, sectionKey: "modelDetail.sections.valuation" },
+    { key: "nibd", labelKey: "modelDetail.equityItems.nibd", format: "number" },
+    { key: "option_debt", labelKey: "modelDetail.equityItems.optionDebt", format: "number" },
+    { key: "adjustments", labelKey: "modelDetail.equityItems.adjustments", format: "number" },
+    { key: "equity_value", labelKey: "modelDetail.equityItems.equityValue", format: "number", bold: true, sectionKey: "modelDetail.sections.equityBridge" },
+    { key: "preferred_equity", labelKey: "modelDetail.equityItems.preferredEquity", format: "number" },
+    { key: "per_share_pre", labelKey: "modelDetail.equityItems.perSharePre", format: "number", indent: true },
+    { key: "mip_amount", labelKey: "modelDetail.equityItems.mip", format: "number" },
+    { key: "tso_amount", labelKey: "modelDetail.equityItems.tso", format: "number" },
+    { key: "warrants_amount", labelKey: "modelDetail.equityItems.warrants", format: "number" },
+    { key: "eqv_post_dilution", labelKey: "modelDetail.equityItems.eqvPostDilution", format: "number", bold: true },
+    { key: "per_share_post", labelKey: "modelDetail.equityItems.perSharePost", format: "number", indent: true },
+    { key: "share_count", labelKey: "modelDetail.equityItems.shareCount", format: "number", sectionKey: "modelDetail.sections.shares" },
+    { key: "acquired_revenue", labelKey: "modelDetail.equityItems.acquiredRevenue", format: "number" },
   ];
 
   // Check if equity bridge has any data
@@ -115,16 +117,16 @@ export default function ModelDetailPage() {
   const hasModelParameters = params && Object.keys(params).length > 0;
 
   // Format parameter labels for display
-  const parameterLabels: Record<string, string> = {
-    shares_at_completion: "Aksjer ved completion",
-    shares_at_year_end: "Aksjer ved årsslutt",
-    tso_warrants: "TSO warrants",
-    mip_share_pct: "MIP-andel (%)",
-    existing_warrants: "Eksisterende warrants",
-    acquisition_multiple: "Oppkjøpsmultippel",
-    acquisition_share_pct: "Oppkjøp med aksjer (%)",
-    preferred_equity_rate: "Preferanseavkastning (%)",
-    ev_multiple: "EV-multippel",
+  const parameterLabelKeys: Record<string, string> = {
+    shares_at_completion: "modelDetail.paramLabels.sharesAtCompletion",
+    shares_at_year_end: "modelDetail.paramLabels.sharesAtYearEnd",
+    tso_warrants: "modelDetail.paramLabels.tsoWarrants",
+    mip_share_pct: "modelDetail.paramLabels.mipSharePct",
+    existing_warrants: "modelDetail.paramLabels.existingWarrants",
+    acquisition_multiple: "modelDetail.paramLabels.acquisitionMultiple",
+    acquisition_share_pct: "modelDetail.paramLabels.acquisitionSharePct",
+    preferred_equity_rate: "modelDetail.paramLabels.preferredEquityRate",
+    ev_multiple: "modelDetail.paramLabels.evMultiple",
   };
 
   const formatValue = (val: any, format: string) => {
@@ -146,11 +148,11 @@ export default function ModelDetailPage() {
       {/* Header */}
       <div className="mb-6">
         <Link
-          to={`/companies/${model.company_name ? "" : ""}`.replace(/\/$/, "") || "/companies"}
+          to={`/companies/${model.company_id}`}
           className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4"
         >
           <ArrowLeft size={14} />
-          Tilbake
+          {t("modelDetail.back")}
         </Link>
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-gray-900">
@@ -161,7 +163,7 @@ export default function ModelDetailPage() {
           </span>
         </div>
         <p className="text-gray-500 mt-1">
-          {periods.length} perioder
+          {periods.length} {t("common.periods")}
           {model.description && ` | ${model.description}`}
         </p>
       </div>
@@ -174,9 +176,9 @@ export default function ModelDetailPage() {
 
       {periods.length === 0 ? (
         <div className="bg-white rounded-xl border border-dashed border-gray-300 p-12 text-center text-gray-400">
-          <p className="text-lg mb-2">Ingen data ennå</p>
+          <p className="text-lg mb-2">{t("modelDetail.noDataYet")}</p>
           <p className="text-sm">
-            Importer JSON eller CSV-data via selskapssiden
+            {t("modelDetail.importViaCompany")}
           </p>
         </div>
       ) : (
@@ -211,13 +213,13 @@ export default function ModelDetailPage() {
 
                 return (
                   <>
-                    {item.section && (
-                      <tr key={`section-${item.section}`}>
+                    {item.sectionKey && (
+                      <tr key={`section-${item.sectionKey}`}>
                         <td
                           colSpan={periods.length + 1}
                           className="px-4 py-2 text-xs font-bold text-[#002C55] uppercase tracking-wider !bg-[#F4EDDC] border-t border-gray-200"
                         >
-                          {item.section}
+                          {t(item.sectionKey)}
                         </td>
                       </tr>
                     )}
@@ -230,7 +232,7 @@ export default function ModelDetailPage() {
                           item.indent ? "pl-8 text-gray-500 italic" : ""
                         } ${item.bold ? "font-semibold text-gray-900" : "text-gray-700"}`}
                       >
-                        {item.label}
+                        {t(item.labelKey)}
                       </td>
                       {periods.map((p) => (
                         <td
@@ -259,15 +261,15 @@ export default function ModelDetailPage() {
           <div className="mt-8">
             <div className="flex items-center gap-2 mb-4">
               <TrendingUp size={18} className="text-[#002C55]" />
-              <h2 className="text-lg font-semibold text-gray-900">Egenkapitalbrygge</h2>
+              <h2 className="text-lg font-semibold text-gray-900">{t("modelDetail.equityBridge")}</h2>
             </div>
             <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
               <table className="ecit-table">
                 <thead>
                   <tr>
-                    <th className="text-left sticky left-0 bg-[#002C55] min-w-[220px]">
-                      Verdsettelse & Egenkapital
-                    </th>
+                     <th className="text-left sticky left-0 bg-[#002C55] min-w-[220px]">
+                       {t("modelDetail.valuationAndEquity")}
+                     </th>
                     {periods.map((p) => (
                       <th
                         key={p.id}
@@ -289,13 +291,13 @@ export default function ModelDetailPage() {
 
                     return (
                       <>
-                        {item.section && (
-                          <tr key={`eq-section-${item.section}`}>
+                        {item.sectionKey && (
+                          <tr key={`eq-section-${item.sectionKey}`}>
                             <td
                               colSpan={periods.length + 1}
                               className="px-4 py-2 text-xs font-bold text-[#002C55] uppercase tracking-wider !bg-[#F4EDDC] border-t border-gray-200"
                             >
-                              {item.section}
+                              {t(item.sectionKey)}
                             </td>
                           </tr>
                         )}
@@ -308,7 +310,7 @@ export default function ModelDetailPage() {
                               item.indent ? "pl-8 text-gray-500 italic" : ""
                             } ${item.bold ? "font-semibold text-gray-900" : "text-gray-700"}`}
                           >
-                            {item.label}
+                            {t(item.labelKey)}
                           </td>
                           {periods.map((p) => (
                             <td
@@ -335,7 +337,7 @@ export default function ModelDetailPage() {
           <div className="mt-8">
             <div className="flex items-center gap-2 mb-4">
               <Settings size={18} className="text-[#002C55]" />
-              <h2 className="text-lg font-semibold text-gray-900">Modellparametere</h2>
+              <h2 className="text-lg font-semibold text-gray-900">{t("modelDetail.modelParameters")}</h2>
             </div>
             <div className="bg-white rounded-xl border border-gray-200 p-5">
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -365,7 +367,7 @@ export default function ModelDetailPage() {
                   return (
                     <div key={key} className="p-3 bg-gray-50 rounded-lg">
                       <p className="text-xs text-gray-500 mb-1">
-                        {parameterLabels[key] || key.replace(/_/g, " ")}
+                        {parameterLabelKeys[key] ? t(parameterLabelKeys[key]) : key.replace(/_/g, " ")}
                       </p>
                       <p className="text-sm font-medium text-gray-900">{displayValue}</p>
                     </div>

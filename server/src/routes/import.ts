@@ -179,7 +179,7 @@ router.post(
       }
     } catch (err) {
       console.error("Import error:", err);
-      res.status(500).json({ error: "Import failed", details: String(err) });
+      res.status(500).json({ error: "Import failed" });
     }
   }
 );
@@ -304,7 +304,7 @@ router.post(
       }
     } catch (err) {
       console.error("CSV import error:", err);
-      res.status(500).json({ error: "CSV import failed", details: String(err) });
+      res.status(500).json({ error: "CSV import failed" });
     }
   }
 );
@@ -560,7 +560,7 @@ router.post(
       console.error("Excel import error:", err);
       res
         .status(500)
-        .json({ error: "Excel import failed", details: String(err) });
+        .json({ error: "Excel import failed" });
     }
   }
 );

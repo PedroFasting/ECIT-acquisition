@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import api from "../services/api";
 import type {
   Company,
@@ -7,6 +8,7 @@ import type {
   FinancialPeriod,
   AcquisitionScenario,
 } from "../types";
+import { fmt, pct, cagr } from "../components/scenario/helpers";
 import {
   ArrowLeft,
   TrendingUp,
@@ -20,38 +22,6 @@ import {
   Activity,
   Building2,
 } from "lucide-react";
-
-// ── Helpers ──────────────────────────────────────────────────────────────
-
-function fmt(val: number | null | undefined, decimals = 1): string {
-  if (val === null || val === undefined) return "-";
-  const num = typeof val === "string" ? parseFloat(val) : val;
-  if (isNaN(num)) return "-";
-  if (num < 0)
-    return `(${Math.abs(num).toLocaleString("nb-NO", {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    })})`;
-  return num.toLocaleString("nb-NO", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
-}
-
-function pct(val: number | null | undefined): string {
-  if (val === null || val === undefined) return "-";
-  const num = typeof val === "string" ? parseFloat(val) : val;
-  if (isNaN(num)) return "-";
-  return `${(num * 100).toLocaleString("nb-NO", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  })}%`;
-}
-
-function cagr(start: number, end: number, years: number): number | null {
-  if (!start || !end || years <= 0) return null;
-  return Math.pow(end / start, 1 / years) - 1;
-}
 
 // ── Key Metric Card ──────────────────────────────────────────────────────
 
@@ -97,6 +67,7 @@ function RevenueMixBar({
 }: {
   periods: FinancialPeriod[];
 }) {
+  const { t } = useTranslation();
   // Use last period with data
   const latestWithData = [...periods]
     .reverse()
@@ -114,9 +85,9 @@ function RevenueMixBar({
   if (total === 0) return null;
 
   const segments = [
-    { label: "Managed Services", value: ms, color: "bg-[#002C55]" },
-    { label: "Professional Services", value: ps, color: "bg-[#57A5E4]" },
-    { label: "Other", value: other, color: "bg-[#F4EDDC]" },
+    { label: t("targetOverview.managedServices"), value: ms, color: "bg-[#002C55]" },
+    { label: t("targetOverview.professionalServices"), value: ps, color: "bg-[#57A5E4]" },
+    { label: t("targetOverview.other"), value: other, color: "bg-[#F4EDDC]" },
   ].filter((s) => s.value > 0);
 
   return (
@@ -152,6 +123,7 @@ function RevenueMixBar({
 
 export default function TargetOverviewPage() {
   const { id } = useParams<{ id: string }>();
+  const { t } = useTranslation();
 
   const [company, setCompany] = useState<Company | null>(null);
   const [models, setModels] = useState<FinancialModel[]>([]);
@@ -180,9 +152,9 @@ export default function TargetOverviewPage() {
         setScenarios(
           scens.filter((s) => modelIds.has(s.target_model_id))
         );
-        // Auto-select first model
-        if (mods.length > 0 && !selectedModelId) {
-          setSelectedModelId(mods[0].id);
+        // Auto-select first model (only if none selected yet)
+        if (mods.length > 0) {
+          setSelectedModelId((prev) => prev ?? mods[0].id);
         }
       })
       .catch((err) => setError(err.message))
@@ -235,30 +207,30 @@ export default function TargetOverviewPage() {
     indent?: boolean;
     section?: string;
   }[] = [
-    { key: "revenue_managed_services", label: "Managed Services", format: "number", section: "Revenue" },
-    { key: "revenue_professional_services", label: "Professional Services", format: "number" },
-    { key: "revenue_other", label: "Other", format: "number" },
-    { key: "revenue_total", label: "Total Revenue", format: "number", bold: true },
-    { key: "revenue_growth", label: "Growth %", format: "pct", indent: true },
-    { key: "ebitda_managed_services", label: "EBITDA Managed Services", format: "number", section: "EBITDA" },
-    { key: "margin_managed_services", label: "Margin %", format: "pct", indent: true },
-    { key: "ebitda_professional_services", label: "EBITDA Professional Services", format: "number" },
-    { key: "margin_professional_services", label: "Margin %", format: "pct", indent: true },
-    { key: "ebitda_central_costs", label: "Central Costs", format: "number" },
-    { key: "ebitda_organic", label: "Organic EBITDA (pre-IFRS)", format: "number", bold: true },
-    { key: "ebitda_margin", label: "Margin %", format: "pct", indent: true },
-    { key: "ebitda_ma", label: "EBITDA - M&A", format: "number" },
-    { key: "ebitda_total", label: "Total EBITDA (pre-IFRS)", format: "number", bold: true },
-    { key: "cost_synergies", label: "Cost Synergies", format: "number", section: "Cash Flow" },
-    { key: "ebitda_incl_synergies", label: "EBITDA incl. Synergies", format: "number", bold: true },
-    { key: "capex", label: "Capex", format: "number" },
-    { key: "capex_pct_revenue", label: "% of Revenue", format: "pct", indent: true },
-    { key: "change_nwc", label: "Change in NWC", format: "number" },
-    { key: "other_cash_flow_items", label: "Other Cash Flow Items", format: "number" },
-    { key: "operating_fcf", label: "Operating FCF", format: "number", bold: true },
-    { key: "minority_interest", label: "Minority Interest", format: "number" },
-    { key: "operating_fcf_excl_minorities", label: "Operating FCF (excl. minorities)", format: "number", bold: true },
-    { key: "cash_conversion", label: "Cash Conversion %", format: "pct", indent: true },
+    { key: "revenue_managed_services", label: t("targetOverview.lineItems.managedServices"), format: "number", section: t("common.revenue") },
+    { key: "revenue_professional_services", label: t("targetOverview.lineItems.professionalServices"), format: "number" },
+    { key: "revenue_other", label: t("targetOverview.lineItems.other"), format: "number" },
+    { key: "revenue_total", label: t("targetOverview.lineItems.totalRevenue"), format: "number", bold: true },
+    { key: "revenue_growth", label: t("targetOverview.lineItems.growthPct"), format: "pct", indent: true },
+    { key: "ebitda_managed_services", label: t("targetOverview.lineItems.ebitdaManagedServices"), format: "number", section: t("common.ebitda") },
+    { key: "margin_managed_services", label: t("targetOverview.lineItems.marginPct"), format: "pct", indent: true },
+    { key: "ebitda_professional_services", label: t("targetOverview.lineItems.ebitdaProfessionalServices"), format: "number" },
+    { key: "margin_professional_services", label: t("targetOverview.lineItems.marginPct"), format: "pct", indent: true },
+    { key: "ebitda_central_costs", label: t("targetOverview.lineItems.centralCosts"), format: "number" },
+    { key: "ebitda_organic", label: t("targetOverview.lineItems.organicEbitda"), format: "number", bold: true },
+    { key: "ebitda_margin", label: t("targetOverview.lineItems.marginPct"), format: "pct", indent: true },
+    { key: "ebitda_ma", label: t("targetOverview.lineItems.ebitdaMA"), format: "number" },
+    { key: "ebitda_total", label: t("targetOverview.lineItems.totalEbitda"), format: "number", bold: true },
+    { key: "cost_synergies", label: t("targetOverview.lineItems.costSynergies"), format: "number", section: t("targets.cashflow") },
+    { key: "ebitda_incl_synergies", label: t("targetOverview.lineItems.ebitdaInclSynergies"), format: "number", bold: true },
+    { key: "capex", label: t("targetOverview.lineItems.capex"), format: "number" },
+    { key: "capex_pct_revenue", label: t("targetOverview.lineItems.pctOfRevenue"), format: "pct", indent: true },
+    { key: "change_nwc", label: t("targetOverview.lineItems.changeNwc"), format: "number" },
+    { key: "other_cash_flow_items", label: t("targetOverview.lineItems.otherCashFlow"), format: "number" },
+    { key: "operating_fcf", label: t("targetOverview.lineItems.operatingFcf"), format: "number", bold: true },
+    { key: "minority_interest", label: t("targetOverview.lineItems.minorityInterest"), format: "number" },
+    { key: "operating_fcf_excl_minorities", label: t("targetOverview.lineItems.operatingFcfExclMinorities"), format: "number", bold: true },
+    { key: "cash_conversion", label: t("targetOverview.lineItems.cashConversionPct"), format: "pct", indent: true },
   ];
 
   // Equity bridge items
@@ -270,19 +242,19 @@ export default function TargetOverviewPage() {
     indent?: boolean;
     section?: string;
   }[] = [
-    { key: "enterprise_value", label: "Enterprise Value (EV)", format: "number", bold: true, section: "Valuation" },
-    { key: "nibd", label: "NIBD", format: "number" },
-    { key: "option_debt", label: "Option Debt", format: "number" },
-    { key: "adjustments", label: "Adjustments", format: "number" },
-    { key: "equity_value", label: "Equity Value (EQV)", format: "number", bold: true, section: "Equity Bridge" },
-    { key: "preferred_equity", label: "Preferred Equity", format: "number" },
-    { key: "per_share_pre", label: "Per Share (pre-dilution)", format: "number", indent: true },
-    { key: "mip_amount", label: "MIP", format: "number" },
-    { key: "tso_amount", label: "TSO", format: "number" },
-    { key: "warrants_amount", label: "Warrants", format: "number" },
-    { key: "eqv_post_dilution", label: "EQV (post MIP, TSO, Warrants)", format: "number", bold: true },
-    { key: "per_share_post", label: "Per Share (post-dilution)", format: "number", indent: true },
-    { key: "share_count", label: "Share Count", format: "number", section: "Shares" },
+    { key: "enterprise_value", label: t("targetOverview.equityItems.enterpriseValue"), format: "number", bold: true, section: t("targets.valuation") },
+    { key: "nibd", label: t("targetOverview.equityItems.nibd"), format: "number" },
+    { key: "option_debt", label: t("targetOverview.equityItems.optionDebt"), format: "number" },
+    { key: "adjustments", label: t("targetOverview.equityItems.adjustments"), format: "number" },
+    { key: "equity_value", label: t("targetOverview.equityItems.equityValue"), format: "number", bold: true, section: t("targetOverview.equityBridge") },
+    { key: "preferred_equity", label: t("targetOverview.equityItems.preferredEquity"), format: "number" },
+    { key: "per_share_pre", label: t("targetOverview.equityItems.perSharePre"), format: "number", indent: true },
+    { key: "mip_amount", label: t("targetOverview.equityItems.mip"), format: "number" },
+    { key: "tso_amount", label: t("targetOverview.equityItems.tso"), format: "number" },
+    { key: "warrants_amount", label: t("targetOverview.equityItems.warrants"), format: "number" },
+    { key: "eqv_post_dilution", label: t("targetOverview.equityItems.eqvPostDilution"), format: "number", bold: true },
+    { key: "per_share_post", label: t("targetOverview.equityItems.perSharePost"), format: "number", indent: true },
+    { key: "share_count", label: t("targetOverview.equityItems.shareCount"), format: "number", section: t("modelDetail.sections.shares") },
   ];
 
   const equityKeys = equityItems.map((i) => i.key);
@@ -305,7 +277,7 @@ export default function TargetOverviewPage() {
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center h-full">
-        <div className="text-gray-400">Loading target overview...</div>
+        <div className="text-gray-400">{t("targetOverview.loading")}</div>
       </div>
     );
   }
@@ -313,7 +285,7 @@ export default function TargetOverviewPage() {
   if (!company) {
     return (
       <div className="p-8">
-        <p className="text-red-600">Company not found. {error}</p>
+        <p className="text-red-600">{t("targetOverview.companyNotFound")} {error}</p>
       </div>
     );
   }
@@ -327,7 +299,7 @@ export default function TargetOverviewPage() {
           className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4"
         >
           <ArrowLeft size={14} />
-          Back to Targets
+          {t("targetOverview.backToTargets")}
         </Link>
         <div className="flex items-center justify-between">
           <div>
@@ -390,21 +362,21 @@ export default function TargetOverviewPage() {
       )}
 
       {periods.length === 0 ? (
-        <div className="bg-white rounded-xl border border-dashed border-gray-300 p-12 text-center text-gray-400">
-          <p className="text-lg mb-2">No financial data</p>
-          <p className="text-sm">
-            Import data via the{" "}
-            <Link to={`/companies/${company.id}`} className="text-[#57A5E4] underline">
-              company page
-            </Link>
-          </p>
-        </div>
+         <div className="bg-white rounded-xl border border-dashed border-gray-300 p-12 text-center text-gray-400">
+           <p className="text-lg mb-2">{t("targetOverview.noFinancialData")}</p>
+           <p className="text-sm">
+             {t("targetOverview.importDataVia")}{" "}
+             <Link to={`/companies/${company.id}`} className="text-[#57A5E4] underline">
+               {t("targetOverview.companyPage")}
+             </Link>
+           </p>
+         </div>
       ) : (
         <>
           {/* ── Key Metrics Cards ─────────────────────────────────── */}
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">
             <MetricCard
-              label="Revenue (latest)"
+              label={t("targetOverview.revenueLatest")}
               value={fmt(latestPeriod?.revenue_total)}
               subtitle={latestPeriod?.period_label}
               icon={DollarSign}
@@ -412,15 +384,15 @@ export default function TargetOverviewPage() {
               bg="bg-blue-50"
             />
             <MetricCard
-              label="EBITDA (latest)"
+              label={t("targetOverview.ebitdaLatest")}
               value={fmt(latestPeriod?.ebitda_total)}
-              subtitle={`Margin ${pct(latestPeriod?.ebitda_margin)}`}
+              subtitle={t("targetOverview.marginLabel", { value: pct(latestPeriod?.ebitda_margin) })}
               icon={BarChart3}
               color="text-emerald-600"
               bg="bg-emerald-50"
             />
             <MetricCard
-              label="EBITDA Margin"
+              label={t("targetOverview.ebitdaMargin")}
               value={pct(latestPeriod?.ebitda_margin)}
               subtitle={latestPeriod?.period_label}
               icon={Activity}
@@ -428,7 +400,7 @@ export default function TargetOverviewPage() {
               bg="bg-amber-50"
             />
             <MetricCard
-              label="NIBD"
+              label={t("targetOverview.nibd")}
               value={fmt(latestPeriod?.nibd)}
               subtitle={latestPeriod?.period_label}
               icon={Layers}
@@ -436,7 +408,7 @@ export default function TargetOverviewPage() {
               bg="bg-red-50"
             />
             <MetricCard
-              label="Revenue CAGR"
+              label={t("targetOverview.revenueCagr")}
               value={revenueCagr != null ? pct(revenueCagr) : "-"}
               subtitle={
                 firstPeriod && latestPeriod
@@ -448,7 +420,7 @@ export default function TargetOverviewPage() {
               bg="bg-sky-50"
             />
             <MetricCard
-              label="EBITDA CAGR"
+              label={t("targetOverview.ebitdaCagr")}
               value={ebitdaCagr != null ? pct(ebitdaCagr) : "-"}
               subtitle={
                 firstPeriod && latestPeriod
@@ -466,7 +438,7 @@ export default function TargetOverviewPage() {
             <div className="flex items-center gap-2 mb-3">
               <PieChart size={16} className="text-[#002C55]" />
               <h2 className="text-sm font-semibold text-gray-900">
-                Revenue Mix ({latestPeriod?.period_label})
+                {t("targetOverview.revenueMix", { period: latestPeriod?.period_label })}
               </h2>
             </div>
             <RevenueMixBar periods={periods} />
@@ -477,16 +449,16 @@ export default function TargetOverviewPage() {
             <div className="flex items-center gap-2 mb-3">
               <BarChart3 size={16} className="text-emerald-600" />
               <h2 className="text-sm font-semibold text-gray-900">
-                EBITDA & Margin Trend
+                {t("targetOverview.ebitdaMarginTrend")}
               </h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    <th className="text-left py-2 px-3 text-xs text-gray-500 font-medium">
-                      Period
-                    </th>
+                     <th className="text-left py-2 px-3 text-xs text-gray-500 font-medium">
+                       {t("targetOverview.period")}
+                     </th>
                     {periods.map((p) => (
                       <th
                         key={p.id}
@@ -499,9 +471,9 @@ export default function TargetOverviewPage() {
                 </thead>
                 <tbody>
                   <tr className="border-b border-gray-100">
-                    <td className="py-2 px-3 text-gray-700 font-medium">
-                      Revenue
-                    </td>
+                     <td className="py-2 px-3 text-gray-700 font-medium">
+                       {t("targetOverview.revenue")}
+                     </td>
                     {periods.map((p) => (
                       <td
                         key={p.id}
@@ -512,9 +484,9 @@ export default function TargetOverviewPage() {
                     ))}
                   </tr>
                   <tr className="border-b border-gray-100">
-                    <td className="py-2 px-3 text-gray-700 font-medium">
-                      EBITDA
-                    </td>
+                     <td className="py-2 px-3 text-gray-700 font-medium">
+                       {t("targetOverview.ebitda")}
+                     </td>
                     {periods.map((p) => (
                       <td
                         key={p.id}
@@ -525,9 +497,9 @@ export default function TargetOverviewPage() {
                     ))}
                   </tr>
                   <tr className="border-b border-gray-100">
-                    <td className="py-2 px-3 text-gray-500 italic pl-6">
-                      Margin
-                    </td>
+                     <td className="py-2 px-3 text-gray-500 italic pl-6">
+                       {t("targetOverview.margin")}
+                     </td>
                     {periods.map((p) => (
                       <td
                         key={p.id}
@@ -570,17 +542,17 @@ export default function TargetOverviewPage() {
             <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
               <div className="flex items-center gap-2 mb-3">
                 <TrendingDown size={16} className="text-red-500" />
-                <h2 className="text-sm font-semibold text-gray-900">
-                  NIBD Trajectory
-                </h2>
+                 <h2 className="text-sm font-semibold text-gray-900">
+                   {t("targetOverview.nibdTrajectory")}
+                 </h2>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-200">
-                      <th className="text-left py-2 px-3 text-xs text-gray-500 font-medium">
-                        Period
-                      </th>
+                       <th className="text-left py-2 px-3 text-xs text-gray-500 font-medium">
+                         {t("targetOverview.period")}
+                       </th>
                       {nibdData.map((d) => (
                         <th
                           key={d.label}
@@ -593,9 +565,9 @@ export default function TargetOverviewPage() {
                   </thead>
                   <tbody>
                     <tr className="border-b border-gray-100">
-                      <td className="py-2 px-3 text-gray-700 font-medium">
-                        NIBD
-                      </td>
+                       <td className="py-2 px-3 text-gray-700 font-medium">
+                         {t("targetOverview.nibd")}
+                       </td>
                       {nibdData.map((d) => (
                         <td
                           key={d.label}
@@ -610,9 +582,9 @@ export default function TargetOverviewPage() {
                     {/* Leverage if EBITDA available */}
                     {periods.some((p) => p.ebitda_total != null && p.nibd != null) && (
                       <tr>
-                        <td className="py-2 px-3 text-gray-500 italic pl-6">
-                          Leverage (NIBD/EBITDA)
-                        </td>
+                         <td className="py-2 px-3 text-gray-500 italic pl-6">
+                           {t("targetOverview.leverage")}
+                         </td>
                         {periods
                           .filter((p) => p.nibd != null)
                           .map((p) => {
@@ -713,17 +685,17 @@ export default function TargetOverviewPage() {
             <div className="mb-6">
               <div className="flex items-center gap-2 mb-3">
                 <TrendingUp size={16} className="text-[#002C55]" />
-                <h2 className="text-sm font-semibold text-gray-900">
-                  Equity Bridge
-                </h2>
+                 <h2 className="text-sm font-semibold text-gray-900">
+                   {t("targetOverview.equityBridge")}
+                 </h2>
               </div>
               <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
                 <table className="ecit-table">
                   <thead>
                     <tr>
-                      <th className="text-left sticky left-0 bg-[#002C55] min-w-[220px]">
-                        Valuation & Equity
-                      </th>
+                       <th className="text-left sticky left-0 bg-[#002C55] min-w-[220px]">
+                         {t("targetOverview.valuationAndEquity")}
+                       </th>
                       {periods.map((p) => (
                         <th key={p.id} className="num min-w-[90px]">
                           {p.period_label}
@@ -779,9 +751,9 @@ export default function TargetOverviewPage() {
             <div className="bg-white rounded-xl border border-gray-200 p-5">
               <div className="flex items-center gap-2 mb-3">
                 <GitMerge size={16} className="text-emerald-600" />
-                <h2 className="text-sm font-semibold text-gray-900">
-                  Linked Scenarios ({scenarios.length})
-                </h2>
+                 <h2 className="text-sm font-semibold text-gray-900">
+                   {t("targetOverview.linkedScenarios", { count: scenarios.length })}
+                 </h2>
               </div>
               <div className="space-y-2">
                 {scenarios.map((s) => (
@@ -807,11 +779,11 @@ export default function TargetOverviewPage() {
                           : "bg-amber-100 text-amber-700"
                       }`}
                     >
-                      {s.status === "active"
-                        ? "Active"
-                        : s.status === "draft"
-                        ? "Draft"
-                        : "Archived"}
+                     {s.status === "active"
+                       ? t("targetOverview.active")
+                       : s.status === "draft"
+                       ? t("targetOverview.draft")
+                       : t("targetOverview.archived")}
                     </span>
                   </Link>
                 ))}

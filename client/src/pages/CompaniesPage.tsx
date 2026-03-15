@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import api from "../services/api";
 import type { Company } from "../types";
 import { Building2, Plus, Trash2, Target, Crown } from "lucide-react";
+import { getErrorMessage } from "../utils/errors";
 
 export default function CompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -17,13 +19,14 @@ export default function CompaniesPage() {
     currency: "NOKm",
   });
   const [error, setError] = useState("");
+  const { t } = useTranslation();
 
   const fetchCompanies = async () => {
     try {
       const data = await api.getCompanies();
       setCompanies(data);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -47,18 +50,18 @@ export default function CompaniesPage() {
         currency: "NOKm",
       });
       fetchCompanies();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(getErrorMessage(err));
     }
   };
 
   const handleDelete = async (id: number, name: string) => {
-    if (!confirm(`Slett ${name}? Alle modeller og data fjernes.`)) return;
+    if (!confirm(t("companies.confirmDelete", { name }))) return;
     try {
       await api.deleteCompany(id);
       fetchCompanies();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(getErrorMessage(err));
     }
   };
 
@@ -68,7 +71,7 @@ export default function CompaniesPage() {
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center h-full">
-        <div className="text-gray-400">Laster selskaper...</div>
+        <div className="text-gray-400">{t("common.loading")}</div>
       </div>
     );
   }
@@ -77,9 +80,9 @@ export default function CompaniesPage() {
     <div className="p-8 max-w-6xl">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Selskaper</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t("companies.title")}</h1>
           <p className="text-gray-500 mt-1">
-            Administrer ECIT (oppkjøper) og target-selskaper
+            {t("companies.subtitle")}
           </p>
         </div>
         <button
@@ -87,7 +90,7 @@ export default function CompaniesPage() {
           className="flex items-center gap-2 px-4 py-2.5 bg-[#03223F] text-white rounded-lg hover:bg-[#002C55] transition-colors text-sm font-medium"
         >
           <Plus size={16} />
-          Nytt selskap
+          {t("companies.newCompany")}
         </button>
       </div>
 
@@ -100,11 +103,11 @@ export default function CompaniesPage() {
       {/* Create form */}
       {showForm && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
-          <h2 className="text-lg font-semibold mb-4">Legg til selskap</h2>
+          <h2 className="text-lg font-semibold mb-4">{t("companies.addCompany")}</h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Selskapsnavn
+                {t("companies.companyName")}
               </label>
               <input
                 type="text"
@@ -113,12 +116,12 @@ export default function CompaniesPage() {
                   setFormData({ ...formData, name: e.target.value })
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#002C55] outline-none"
-                placeholder="f.eks. Selskapsnavn AS"
+                placeholder={t("companies.companyNamePlaceholder")}
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Type
+                {t("common.type")}
               </label>
               <select
                 value={formData.company_type}
@@ -130,13 +133,13 @@ export default function CompaniesPage() {
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#002C55] outline-none"
               >
-                <option value="acquirer">Oppkjøper</option>
-                <option value="target">Target-selskap</option>
+                <option value="acquirer">{t("companies.acquirerType")}</option>
+                <option value="target">{t("companies.targetType")}</option>
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Land
+                {t("common.country")}
               </label>
               <input
                 type="text"
@@ -145,12 +148,12 @@ export default function CompaniesPage() {
                   setFormData({ ...formData, country: e.target.value })
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#002C55] outline-none"
-                placeholder="Norge"
+                placeholder={t("companies.countryPlaceholder")}
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Sektor
+                {t("common.sector")}
               </label>
               <input
                 type="text"
@@ -159,12 +162,12 @@ export default function CompaniesPage() {
                   setFormData({ ...formData, sector: e.target.value })
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#002C55] outline-none"
-                placeholder="IT & BPO"
+                placeholder={t("companies.sectorPlaceholder")}
               />
             </div>
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Beskrivelse
+                {t("common.description")}
               </label>
               <input
                 type="text"
@@ -173,7 +176,7 @@ export default function CompaniesPage() {
                   setFormData({ ...formData, description: e.target.value })
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#002C55] outline-none"
-                placeholder="Kort beskrivelse"
+                placeholder={t("companies.descriptionPlaceholder")}
               />
             </div>
           </div>
@@ -182,13 +185,13 @@ export default function CompaniesPage() {
               onClick={handleCreate}
               className="px-4 py-2 bg-[#03223F] text-white rounded-lg text-sm font-medium hover:bg-[#002C55]"
             >
-              Opprett
+              {t("common.create")}
             </button>
             <button
               onClick={() => setShowForm(false)}
               className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200"
             >
-              Avbryt
+              {t("common.cancel")}
             </button>
           </div>
         </div>
@@ -198,11 +201,11 @@ export default function CompaniesPage() {
       <section className="mb-8">
         <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
           <Crown size={20} className="text-[#002C55]" />
-          Oppkjøper
+          {t("companies.acquirerSection")}
         </h2>
         {acquirers.length === 0 ? (
           <div className="bg-white rounded-xl border border-dashed border-gray-300 p-8 text-center text-gray-400">
-            Ingen oppkjøper registrert. Legg til ECIT som oppkjøper.
+            {t("companies.noAcquirer")}
           </div>
         ) : (
           <div className="grid gap-4">
@@ -221,11 +224,11 @@ export default function CompaniesPage() {
       <section>
         <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
           <Target size={20} className="text-[#57A5E4]" />
-          Target-selskaper
+          {t("companies.targetSection")}
         </h2>
         {targets.length === 0 ? (
           <div className="bg-white rounded-xl border border-dashed border-gray-300 p-8 text-center text-gray-400">
-            Ingen target-selskaper registrert ennå.
+            {t("companies.noTargets")}
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
@@ -250,6 +253,8 @@ function CompanyCard({
   company: Company;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between">
@@ -275,8 +280,7 @@ function CompanyCard({
               {company.sector && <span>{company.sector}</span>}
               <span>{company.currency}</span>
               <span>
-                {company.model_count || 0} modell
-                {(company.model_count || 0) !== 1 ? "er" : ""}
+                {company.model_count || 0} {t("common.models")}
               </span>
             </div>
           </div>
@@ -284,7 +288,7 @@ function CompanyCard({
         <button
           onClick={onDelete}
           className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
-          title="Slett"
+          title={t("common.delete")}
         >
           <Trash2 size={16} />
         </button>

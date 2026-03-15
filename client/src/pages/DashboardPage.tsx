@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import api from "../services/api";
 import type { Company, AcquisitionScenario } from "../types";
 import { Building2, FileSpreadsheet, GitMerge, ArrowRight, Trash2 } from "lucide-react";
@@ -8,9 +9,12 @@ export default function DashboardPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [scenarios, setScenarios] = useState<AcquisitionScenario[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const { t } = useTranslation();
 
   const loadData = async () => {
     try {
+      setError("");
       const [comps, scens] = await Promise.all([
         api.getCompanies(),
         api.getScenarios(),
@@ -19,6 +23,7 @@ export default function DashboardPage() {
       setScenarios(scens);
     } catch (err) {
       console.error(err);
+      setError(err instanceof Error ? err.message : t("errors.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -29,19 +34,20 @@ export default function DashboardPage() {
   }, []);
 
   const handleDeleteScenario = async (id: number, name: string) => {
-    if (!confirm(`Slett scenario "${name}"? Dette kan ikke angres.`)) return;
+    if (!confirm(t("dashboard.confirmDeleteScenario", { name }))) return;
     try {
       await api.deleteScenario(id);
       setScenarios((prev) => prev.filter((s) => s.id !== id));
     } catch (err) {
       console.error(err);
+      setError(err instanceof Error ? err.message : t("errors.deleteFailed"));
     }
   };
 
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center h-full">
-        <div className="text-gray-400">Laster dashboard...</div>
+        <div className="text-gray-400">{t("common.loading")}</div>
       </div>
     );
   }
@@ -56,38 +62,46 @@ export default function DashboardPage() {
   return (
     <div className="p-8 max-w-6xl">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Oversikt</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t("dashboard.title")}</h1>
         <p className="text-gray-500 mt-1">
-          Oversikt over selskaper, modeller og oppkjøpsscenarier
+          {t("dashboard.subtitle")}
         </p>
       </div>
+
+      {/* Error banner */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => { setError(""); loadData(); }} className="text-xs font-medium text-red-600 hover:underline ml-4">{t("common.retry") || "Retry"}</button>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4 mb-8">
         {[
           {
-            label: "Oppkjøpere",
+            label: t("dashboard.acquirers"),
             value: acquirers.length,
             icon: Building2,
             color: "text-[#002C55]",
             bg: "bg-blue-50",
           },
           {
-            label: "Target-selskaper",
+            label: t("dashboard.targetCompanies"),
             value: targets.length,
             icon: Building2,
             color: "text-[#57A5E4]",
             bg: "bg-sky-50",
           },
           {
-            label: "Modeller",
+            label: t("dashboard.models"),
             value: totalModels,
             icon: FileSpreadsheet,
             color: "text-blue-600",
             bg: "bg-blue-50",
           },
           {
-            label: "Scenarier",
+            label: t("dashboard.scenarios"),
             value: scenarios.length,
             icon: GitMerge,
             color: "text-emerald-600",
@@ -115,32 +129,32 @@ export default function DashboardPage() {
       {companies.length === 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-8 mb-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            Kom i gang
+            {t("dashboard.getStarted")}
           </h2>
           <div className="space-y-4">
             {[
               {
                 step: 1,
-                title: "Opprett ECIT som oppkjøper",
-                desc: "Legg til ECIT med type 'Oppkjøper'",
+                title: t("dashboard.step1Title"),
+                desc: t("dashboard.step1Desc"),
                 link: "/companies",
               },
               {
                 step: 2,
-                title: "Legg til target-selskaper",
-                desc: "Registrer selskaper du vurderer a kjope",
+                title: t("dashboard.step2Title"),
+                desc: t("dashboard.step2Desc"),
                 link: "/companies",
               },
               {
                 step: 3,
-                title: "Opprett finansielle modeller",
-                desc: "Lag modeller (Management case, Sellside, Post DD) og importer data",
+                title: t("dashboard.step3Title"),
+                desc: t("dashboard.step3Desc"),
                 link: "/companies",
               },
               {
                 step: 4,
-                title: "Opprett oppkjøpsscenarier",
-                desc: "Kombiner modeller og analyser pro forma",
+                title: t("dashboard.step4Title"),
+                desc: t("dashboard.step4Desc"),
                 link: "/scenarios",
               },
             ].map((item) => (
@@ -168,13 +182,13 @@ export default function DashboardPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">
-              Siste scenarier
+              {t("dashboard.recentScenarios")}
             </h2>
             <Link
               to="/scenarios"
               className="text-sm text-[#002C55] hover:underline"
             >
-              Se alle
+              {t("dashboard.viewAll")}
             </Link>
           </div>
           <div className="space-y-3">
@@ -203,13 +217,13 @@ export default function DashboardPage() {
                         : "bg-amber-100 text-amber-700"
                     }`}
                   >
-                    {s.status === "active" ? "Aktiv" : s.status === "draft" ? "Utkast" : "Arkivert"}
+                    {s.status === "active" ? t("dashboard.active") : s.status === "draft" ? t("dashboard.draft") : t("dashboard.archived")}
                   </span>
                 </Link>
                 <button
                   onClick={() => handleDeleteScenario(s.id, s.name)}
                   className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
-                  title="Slett scenario"
+                  title={t("dashboard.deleteScenario")}
                 >
                   <Trash2 size={14} />
                 </button>
@@ -224,13 +238,13 @@ export default function DashboardPage() {
         <div className="mt-6 bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">
-              Selskaper
+              {t("dashboard.companies")}
             </h2>
             <Link
               to="/companies"
               className="text-sm text-[#002C55] hover:underline"
             >
-              Administrer
+              {t("dashboard.manage")}
             </Link>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
@@ -251,8 +265,8 @@ export default function DashboardPage() {
                 <div className="flex-1">
                   <p className="font-medium text-gray-900 text-sm">{c.name}</p>
                   <p className="text-xs text-gray-400">
-                    {c.company_type === "acquirer" ? "Oppkjøper" : "Target"} |{" "}
-                    {c.model_count || 0} modeller
+                    {c.company_type === "acquirer" ? t("common.acquirer") : t("common.target")} |{" "}
+                    {c.model_count || 0} {t("common.models")}
                   </p>
                 </div>
               </Link>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import api from "../services/api";
 import type {
   Company,
@@ -29,8 +30,10 @@ import SynergiesEditor from "../components/scenario/SynergiesEditor";
 import ShareTracker from "../components/scenario/ShareTracker";
 import DebtScheduleTable from "../components/scenario/DebtScheduleTable";
 import SensitivityHeatmap from "../components/scenario/SensitivityHeatmap";
+import { getErrorMessage } from "../utils/errors";
 
 export default function ScenariosPage() {
+  const { t } = useTranslation();
   // Data state
   const [acquirerModels, setAcquirerModels] = useState<
     (FinancialModel & { company_name?: string })[]
@@ -74,10 +77,10 @@ export default function ScenariosPage() {
   const toggleSection = (key: string) =>
     setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
 
-  const showSuccess = (msg: string) => {
+  const showSuccess = useCallback((msg: string) => {
     setSuccessMsg(msg);
     setTimeout(() => setSuccessMsg(""), 3000);
-  };
+  }, []);
 
   // ─── Excel export (uses current scenario) ─────────────────
   const [exporting, setExporting] = useState(false);
@@ -89,9 +92,9 @@ export default function ScenariosPage() {
     setError("");
     try {
       await api.exportExcel(scenarioId, compareResult?.scenario?.name);
-      showSuccess("Excel-fil lastet ned");
-    } catch (err: any) {
-      setError(err.message);
+      showSuccess(t("scenarios.excelExported"));
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setExporting(false);
     }
@@ -133,8 +136,8 @@ export default function ScenariosPage() {
         } else if (acqModels.length > 0) {
           setSelectedAcquirerId(acqModels[0].id);
         }
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err) {
+        setError(getErrorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -154,8 +157,8 @@ export default function ScenariosPage() {
         selectedTargetId ?? undefined
       );
       setCompareResult(result);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setComparing(false);
     }
@@ -194,9 +197,9 @@ export default function ScenariosPage() {
           ? { ...prev, scenario: { ...prev.scenario, deal_parameters: params } }
           : prev
       );
-      showSuccess("IRR/MoM beregnet og lagret");
+      showSuccess(t("scenarios.irrCalculated"));
     },
-    []
+    [showSuccess, t]
   );
 
   // ─── Save handlers (use auto-created scenario) ────────────
@@ -210,9 +213,9 @@ export default function ScenariosPage() {
     try {
       await api.updateScenario(scenarioId, { sources, uses } as any);
       await fetchComparison();
-      showSuccess("Sources & Uses lagret");
-    } catch (err: any) {
-      setError(err.message);
+      showSuccess(t("scenarios.suSaved"));
+    } catch (err) {
+      setError(getErrorMessage(err));
     }
   };
 
@@ -221,6 +224,7 @@ export default function ScenariosPage() {
     preferred_equity: number | null;
     preferred_equity_rate: number | null;
     net_debt: number | null;
+    deal_parameters?: Record<string, unknown>;
   }) => {
     const scenarioId = compareResult?.scenario?.id;
     if (!scenarioId) return;
@@ -228,9 +232,9 @@ export default function ScenariosPage() {
     try {
       await api.updateScenario(scenarioId, fields as any);
       await fetchComparison();
-      showSuccess("Kapitalstruktur lagret");
-    } catch (err: any) {
-      setError(err.message);
+      showSuccess(t("scenarios.capitalSaved"));
+    } catch (err) {
+      setError(getErrorMessage(err));
     }
   };
 
@@ -241,9 +245,9 @@ export default function ScenariosPage() {
     try {
       await api.updateScenario(scenarioId, { cost_synergies_timeline: timeline } as any);
       await fetchComparison();
-      showSuccess("Synergier lagret");
-    } catch (err: any) {
-      setError(err.message);
+      showSuccess(t("scenarios.synergiesSaved"));
+    } catch (err) {
+      setError(getErrorMessage(err));
     }
   };
 
@@ -321,7 +325,7 @@ export default function ScenariosPage() {
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center h-full">
-        <div className="text-gray-400">Laster modeller...</div>
+        <div className="text-gray-400">{t("scenarios.loadingModels")}</div>
       </div>
     );
   }
@@ -330,12 +334,12 @@ export default function ScenariosPage() {
   if (acquirerModels.length === 0) {
     return (
       <div className="p-8 max-w-6xl">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">Scenarier</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">{t("scenarios.title")}</h1>
         <div className="bg-white rounded-xl border border-dashed border-gray-300 p-12 text-center text-gray-400">
           <GitMerge size={32} className="mx-auto mb-3 opacity-40" />
-          <p className="text-lg mb-2">Ingen ECIT-modeller funnet</p>
+          <p className="text-lg mb-2">{t("scenarios.noEcitModels")}</p>
           <p className="text-sm">
-            Importer finansdata for ECIT under Selskaper for a komme i gang.
+            {t("scenarios.noEcitModelsDesc")}
           </p>
         </div>
       </div>
@@ -345,7 +349,7 @@ export default function ScenariosPage() {
   // ─── Group target models by company ───────────────────────
   const targetsByCompany = new Map<string, typeof targetModels>();
   for (const m of targetModels) {
-    const key = m.company_name || "Ukjent";
+    const key = m.company_name || t("scenarios.unknown");
     if (!targetsByCompany.has(key)) targetsByCompany.set(key, []);
     targetsByCompany.get(key)!.push(m);
   }
@@ -355,10 +359,9 @@ export default function ScenariosPage() {
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Scenarioanalyse</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t("scenarios.title")}</h1>
           <p className="text-gray-500 mt-1">
-            Velg ECIT-modell som utgangspunkt, deretter en target-modell for
-            kombinert analyse
+            {t("scenarios.subtitle")}
           </p>
         </div>
         {compareResult?.scenario && compareResult.scenario.id > 0 && (
@@ -369,7 +372,7 @@ export default function ScenariosPage() {
               className="flex items-center gap-2 px-4 py-2.5 bg-[#1B6B3A] text-white rounded-lg hover:bg-[#155a2f] transition-colors text-sm font-medium disabled:opacity-50 shadow-sm"
             >
               <Download size={16} className={exporting ? "animate-bounce" : ""} />
-              {exporting ? "Eksporterer..." : "Excel Export"}
+              {exporting ? t("common.exporting") : t("scenarios.excelExport")}
             </button>
           </div>
         )}
@@ -392,7 +395,7 @@ export default function ScenariosPage() {
           {/* ECIT model selector */}
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              ECIT-modell (utgangspunkt)
+              {t("scenarios.ecitModel")}
             </label>
             <div className="flex gap-2">
               {acquirerModels.map((m) => (
@@ -411,7 +414,7 @@ export default function ScenariosPage() {
             </div>
             {compareResult?.acquirer_model && (
               <p className="text-xs text-gray-400 mt-2">
-                {acquirerPeriods.length} perioder
+                {acquirerPeriods.length} {t("common.periods")}
                 {acquirerPeriods.length > 0 && (
                   <>
                     {" "}
@@ -426,7 +429,7 @@ export default function ScenariosPage() {
           {/* Target model selector */}
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              Target-modell (oppkjopskandidat)
+              {t("scenarios.targetModel")}
             </label>
             <div className="relative">
               <select
@@ -438,7 +441,7 @@ export default function ScenariosPage() {
                 }
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-sm font-medium bg-white focus:ring-2 focus:ring-[#002C55] focus:border-[#002C55] outline-none appearance-none pr-10 transition-colors"
               >
-                <option value="">Velg target-modell...</option>
+                <option value="">{t("scenarios.selectTarget")}</option>
                 {Array.from(targetsByCompany.entries()).map(
                   ([companyName, models]) => (
                     <optgroup key={companyName} label={companyName}>
@@ -459,7 +462,7 @@ export default function ScenariosPage() {
             {compareResult?.target_model && (
               <p className="text-xs text-gray-400 mt-2">
                 {compareResult.target_model.company_name} &mdash;{" "}
-                {targetPeriods.length} perioder
+                {targetPeriods.length} {t("common.periods")}
               </p>
             )}
           </div>
@@ -469,7 +472,7 @@ export default function ScenariosPage() {
       {/* ─── Loading indicator for comparison ────────────── */}
       {comparing && !compareResult && (
         <div className="flex items-center justify-center py-12">
-          <div className="text-gray-400 text-sm">Laster analyse...</div>
+          <div className="text-gray-400 text-sm">{t("scenarios.loadingAnalysis")}</div>
         </div>
       )}
 
@@ -501,8 +504,8 @@ export default function ScenariosPage() {
           <div className="bg-white rounded-xl border border-gray-200 mb-8">
             <SectionHeader
               sectionKey="charts"
-              title="Finansiell utvikling"
-              subtitle="EBITDA og omsetning over tid"
+              title={t("scenarios.financialDevelopment")}
+              subtitle={t("scenarios.financialDevelopmentSub")}
               expanded={expandedSections.charts}
               onToggle={toggleSection}
             />
@@ -628,10 +631,9 @@ export default function ScenariosPage() {
           {!selectedTargetId && (
             <div className="bg-white rounded-xl border border-dashed border-gray-300 p-12 text-center text-gray-400 mb-8">
               <GitMerge size={32} className="mx-auto mb-3 opacity-40" />
-              <p className="text-lg mb-2">Velg en target-modell</p>
+              <p className="text-lg mb-2">{t("scenarios.selectTargetPrompt")}</p>
               <p className="text-sm">
-                Velg en oppkjopskandidat ovenfor for a se kombinert pro forma,
-                EBITDA-analyse og mer.
+                {t("scenarios.selectTargetPromptDesc")}
               </p>
             </div>
           )}

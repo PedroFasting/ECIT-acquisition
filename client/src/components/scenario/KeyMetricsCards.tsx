@@ -1,6 +1,7 @@
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import type { AcquisitionScenario, FinancialPeriod, ProFormaPeriod } from "../../types";
 import { formatNum, formatPct, toNum, getEquityFromSources } from "./helpers";
+import { useTranslation } from "react-i18next";
 
 interface KeyMetricsCardsProps {
   scenario: AcquisitionScenario;
@@ -44,6 +45,7 @@ export default function KeyMetricsCards({
   targetPeriods,
   pfPeriods,
 }: KeyMetricsCardsProps) {
+  const { t } = useTranslation();
   // Reference year = last year with acquirer data
   const refLabel =
     acquirerPeriods.length > 0
@@ -113,7 +115,7 @@ export default function KeyMetricsCards({
 
   const cards: MetricCard[] = [
     {
-      label: `${scenario.acquirer_company_name || "Oppkjoper"} EBITDA`,
+      label: `${scenario.acquirer_company_name || t("common.acquirer")} EBITDA`,
       curVal: acqCur ? formatNum(acqCur.ebitda_total) : "-",
       refVal: acqRef ? formatNum(acqRef.ebitda_total) : "-",
       curNum: acqCur ? toNum(acqCur.ebitda_total) : 0,
@@ -127,7 +129,7 @@ export default function KeyMetricsCards({
       refNum: tgtRef ? toNum(tgtRef.ebitda_total) : 0,
     },
     {
-      label: "Kombinert PF EBITDA",
+      label: t("metrics.combinedPfEbitda"),
       curVal: pfCur ? formatNum(toNum(pfCur.total_ebitda_incl_synergies)) : "-",
       refVal: pfRef ? formatNum(toNum(pfRef.total_ebitda_incl_synergies)) : "-",
       curNum: pfCur ? toNum(pfCur.total_ebitda_incl_synergies) : 0,
@@ -138,7 +140,7 @@ export default function KeyMetricsCards({
   // Implied acquisition multiple (only if deal params exist)
   if (impliedMultiple !== null) {
     cards.push({
-      label: "Implied oppkjopsmultippel",
+      label: t("metrics.impliedMultiple"),
       curVal: `${nbFmt1.format(impliedMultiple)}x`,
       small: true,
       highlight: "border-amber-300",
@@ -158,9 +160,9 @@ export default function KeyMetricsCards({
   // Share count + dilution (only if share data exists)
   if (entryShares > 0) {
     cards.push({
-      label: "Aksjer (entry \u2192 exit)",
+      label: t("metrics.sharesEntryExit"),
       curVal: `${formatNum(entryShares, 1)}m \u2192 ${formatNum(exitShares, 1)}m`,
-      refVal: dilutionPct > 0 ? `Utvanning: ${formatPct(dilutionPct)}` : undefined,
+      refVal: dilutionPct > 0 ? `${t("metrics.dilution")} ${formatPct(dilutionPct)}` : undefined,
       small: true,
       highlight: dilutionPct > 0.1 ? "border-red-300" : "border-green-300",
     });

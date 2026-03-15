@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import api from "../services/api";
 import type { Company, FinancialModel } from "../types";
 import { FileSpreadsheet, Building2 } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export default function ModelsOverviewPage() {
+  const { t } = useTranslation();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [modelsByCompany, setModelsByCompany] = useState<
     Record<number, FinancialModel[]>
@@ -37,7 +39,7 @@ export default function ModelsOverviewPage() {
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center h-full">
-        <div className="text-gray-400">Laster modeller...</div>
+        <div className="text-gray-400">{t("modelsOverview.loadingModels")}</div>
       </div>
     );
   }
@@ -48,19 +50,18 @@ export default function ModelsOverviewPage() {
     <div className="p-8 max-w-6xl">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">
-          Alle modeller
+          {t("modelsOverview.title")}
         </h1>
         <p className="text-gray-500 mt-1">
-          {totalModels} finansielle modeller pa tvers av {companies.length}{" "}
-          selskaper
+          {t("modelsOverview.subtitle", { total: totalModels, companies: companies.length })}
         </p>
       </div>
 
       {companies.length === 0 ? (
         <div className="bg-white rounded-xl border border-dashed border-gray-300 p-12 text-center text-gray-400">
-          <p className="mb-2">Ingen selskaper registrert</p>
+          <p className="mb-2">{t("modelsOverview.noCompanies")}</p>
           <Link to="/companies" className="text-[#002C55] hover:underline">
-            Opprett et selskap først
+            {t("modelsOverview.createCompanyFirst")}
           </Link>
         </div>
       ) : (
@@ -94,19 +95,19 @@ export default function ModelsOverviewPage() {
                     }`}
                   >
                     {company.company_type === "acquirer"
-                      ? "Oppkjøper"
-                      : "Target"}
+                      ? t("common.acquirer")
+                      : t("common.target")}
                   </span>
                 </div>
 
                 {models.length === 0 ? (
                   <div className="bg-white rounded-lg border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400">
-                    Ingen modeller -{" "}
+                    {t("modelsOverview.noModels")}{" "}
                     <Link
                       to={`/companies/${company.id}`}
                       className="text-[#002C55] hover:underline"
                     >
-                      opprett en
+                      {t("modelsOverview.createOne")}
                     </Link>
                   </div>
                 ) : (
@@ -129,7 +130,7 @@ export default function ModelsOverviewPage() {
                               {m.name}
                             </h3>
                             <p className="text-xs text-gray-400 mt-0.5">
-                              {m.model_type} | {m.period_count || 0} perioder
+                              {m.model_type} | {m.period_count || 0} {t("common.periods")}
                             </p>
                             {m.first_period && m.last_period && (
                               <p className="text-xs text-gray-400">

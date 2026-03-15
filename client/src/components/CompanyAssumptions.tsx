@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import api from "../services/api";
+import { getErrorMessage } from "../utils/errors";
 import type { CompanyAssumptions as CompanyAssumptionsType } from "../types";
 import { Settings, Save, RefreshCw, CheckCircle, AlertTriangle, Info } from "lucide-react";
 
@@ -20,54 +22,59 @@ const fmtPct = (v: number | null | undefined): string => {
 
 interface FieldDef {
   key: keyof CompanyAssumptionsType;
-  label: string;
+  labelKey: string;
   unit: string;
   decimals?: number;
   isPct?: boolean;
-  tooltip?: string;
+  tooltipKey?: string;
 }
 
-const FIELD_GROUPS: { title: string; fields: FieldDef[] }[] = [
+interface FieldGroupDef {
+  titleKey: string;
+  fields: FieldDef[];
+}
+
+const FIELD_GROUPS: FieldGroupDef[] = [
   {
-    title: "Aksjer",
+    titleKey: "assumptions.groups.shares",
     fields: [
-      { key: "shares_at_completion", label: "Aksjer ved inngang", unit: "mill.", decimals: 2, tooltip: "Antall utestående aksjer ved transaksjonsdato" },
-      { key: "shares_at_year_end", label: "Aksjer ved utgang", unit: "mill.", decimals: 2, tooltip: "Antall aksjer ved exit (siste periode)" },
+      { key: "shares_at_completion", labelKey: "assumptions.fields.sharesAtCompletion", unit: "mill.", decimals: 2, tooltipKey: "assumptions.tooltips.sharesAtCompletion" },
+      { key: "shares_at_year_end", labelKey: "assumptions.fields.sharesAtYearEnd", unit: "mill.", decimals: 2, tooltipKey: "assumptions.tooltips.sharesAtYearEnd" },
     ],
   },
   {
-    title: "Preferansekapital",
+    titleKey: "assumptions.groups.preferredCapital",
     fields: [
-      { key: "preferred_equity", label: "Preferansekapital", unit: "NOKm", decimals: 1, tooltip: "Total preferansekapital (inngående)" },
-      { key: "preferred_equity_rate", label: "PIK-rente", unit: "%", isPct: true, tooltip: "Payment-in-kind rente på preferansekapital (f.eks. 0.095 = 9,5%)" },
+      { key: "preferred_equity", labelKey: "assumptions.fields.preferredEquity", unit: "NOKm", decimals: 1, tooltipKey: "assumptions.tooltips.preferredEquity" },
+      { key: "preferred_equity_rate", labelKey: "assumptions.fields.pikRate", unit: "%", isPct: true, tooltipKey: "assumptions.tooltips.pikRate" },
     ],
   },
   {
-    title: "MIP (Management Incentive Programme)",
+    titleKey: "assumptions.groups.mip",
     fields: [
-      { key: "mip_share_pct", label: "MIP-andel", unit: "%", isPct: true, tooltip: "MIP pool som % av EQV (f.eks. 0.0559 = 5,59%)" },
+      { key: "mip_share_pct", labelKey: "assumptions.fields.mipShare", unit: "%", isPct: true, tooltipKey: "assumptions.tooltips.mipShare" },
     ],
   },
   {
-    title: "TSO-warrants",
+    titleKey: "assumptions.groups.tsoWarrants",
     fields: [
-      { key: "tso_warrants_count", label: "Antall TSO-warrants", unit: "mill.", decimals: 2, tooltip: "Antall TSO warrant-enheter (i millioner)" },
-      { key: "tso_warrants_strike", label: "Strike-pris TSO", unit: "NOK", decimals: 2, tooltip: "Strike-pris per TSO-warrant" },
+      { key: "tso_warrants_count", labelKey: "assumptions.fields.tsoCount", unit: "mill.", decimals: 2, tooltipKey: "assumptions.tooltips.tsoCount" },
+      { key: "tso_warrants_strike", labelKey: "assumptions.fields.tsoStrike", unit: "NOK", decimals: 2, tooltipKey: "assumptions.tooltips.tsoStrike" },
     ],
   },
   {
-    title: "Eksisterende warrants",
+    titleKey: "assumptions.groups.existingWarrants",
     fields: [
-      { key: "existing_warrants_count", label: "Antall warrants", unit: "mill.", decimals: 2, tooltip: "Antall eksisterende warrant-enheter (i millioner)" },
-      { key: "existing_warrants_strike", label: "Strike-pris", unit: "NOK", decimals: 2, tooltip: "Strike-pris per eksisterende warrant" },
+      { key: "existing_warrants_count", labelKey: "assumptions.fields.existingCount", unit: "mill.", decimals: 2, tooltipKey: "assumptions.tooltips.existingCount" },
+      { key: "existing_warrants_strike", labelKey: "assumptions.fields.existingStrike", unit: "NOK", decimals: 2, tooltipKey: "assumptions.tooltips.existingStrike" },
     ],
   },
   {
-    title: "Kapitalstruktur",
+    titleKey: "assumptions.groups.capitalStructure",
     fields: [
-      { key: "nibd", label: "NIBD (inngående)", unit: "NOKm", decimals: 1, tooltip: "Netto rentebærende gjeld ved inngang" },
-      { key: "enterprise_value", label: "Enterprise Value", unit: "NOKm", decimals: 1, tooltip: "EV ved inngang" },
-      { key: "equity_value", label: "Equity Value", unit: "NOKm", decimals: 1, tooltip: "Egenkapitalverdi ved inngang" },
+      { key: "nibd", labelKey: "assumptions.fields.nibd", unit: "NOKm", decimals: 1, tooltipKey: "assumptions.tooltips.nibd" },
+      { key: "enterprise_value", labelKey: "assumptions.fields.enterpriseValue", unit: "NOKm", decimals: 1, tooltipKey: "assumptions.tooltips.enterpriseValue" },
+      { key: "equity_value", labelKey: "assumptions.fields.equityValue", unit: "NOKm", decimals: 1, tooltipKey: "assumptions.tooltips.equityValue" },
     ],
   },
 ];
@@ -84,6 +91,7 @@ export default function CompanyAssumptions({ companyId }: Props) {
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [dirty, setDirty] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const { t } = useTranslation();
 
   const fetchAssumptions = useCallback(async () => {
     setLoading(true);
@@ -113,8 +121,8 @@ export default function CompanyAssumptions({ companyId }: Props) {
       }
       setEditValues(vals);
       setDirty(false);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -163,8 +171,8 @@ export default function CompanyAssumptions({ companyId }: Props) {
 
       // Refresh to get the canonical values back from server
       await fetchAssumptions();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -197,7 +205,7 @@ export default function CompanyAssumptions({ companyId }: Props) {
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
         <div className="flex items-center gap-2 text-gray-400 text-sm">
           <div className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
-          Laster forutsetninger...
+          {t("assumptions.loading")}
         </div>
       </div>
     );
@@ -220,11 +228,11 @@ export default function CompanyAssumptions({ companyId }: Props) {
           </div>
           <div className="text-left">
             <h2 className="text-base font-semibold text-gray-900">
-              Forutsetninger
+              {t("assumptions.title")}
             </h2>
             <p className="text-xs text-gray-400 mt-0.5">
-              Kilde: {sourceModel?.name} ({sourceModel?.model_type})
-              {modelCount > 1 && ` — synkroniseres til alle ${modelCount} modeller`}
+              {t("assumptions.source", { name: sourceModel?.name, type: sourceModel?.model_type })}
+              {modelCount > 1 && ` ${t("assumptions.syncToModels", { count: modelCount })}`}
             </p>
           </div>
         </div>
@@ -256,20 +264,20 @@ export default function CompanyAssumptions({ companyId }: Props) {
           {/* Field groups */}
           <div className="mt-4 space-y-6">
             {FIELD_GROUPS.map((group) => (
-              <div key={group.title}>
+              <div key={group.titleKey}>
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                  {group.title}
+                  {t(group.titleKey)}
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3">
                   {group.fields.map((f) => (
                     <div key={f.key}>
                       <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1">
-                        {f.label}
-                        {f.tooltip && (
+                        {t(f.labelKey)}
+                        {f.tooltipKey && (
                           <span className="relative group">
                             <Info size={12} className="text-gray-400 cursor-help" />
                             <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                              {f.tooltip}
+                              {t(f.tooltipKey)}
                             </span>
                           </span>
                         )}
@@ -309,7 +317,7 @@ export default function CompanyAssumptions({ companyId }: Props) {
               ) : (
                 <Save size={14} />
               )}
-              {saving ? "Lagrer..." : "Lagre forutsetninger"}
+              {saving ? t("assumptions.saving") : t("assumptions.saveAssumptions")}
             </button>
 
             {dirty && (
@@ -318,13 +326,13 @@ export default function CompanyAssumptions({ companyId }: Props) {
                 className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
               >
                 <RefreshCw size={14} />
-                Tilbakestill
+                {t("assumptions.reset")}
               </button>
             )}
 
             {dirty && (
               <span className="text-xs text-amber-600 ml-2">
-                Ulagrede endringer
+                {t("assumptions.unsavedChanges")}
               </span>
             )}
           </div>

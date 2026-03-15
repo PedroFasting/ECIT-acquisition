@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import api from "../services/api";
 import type { Company, FinancialModel, ExcelImportResult } from "../types";
 import {
@@ -14,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import CompanyAssumptions from "../components/CompanyAssumptions";
+import { getErrorMessage } from "../utils/errors";
 
 export default function CompanyDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +23,7 @@ export default function CompanyDetailPage() {
   const [models, setModels] = useState<FinancialModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const { t } = useTranslation();
 
   // New model form
   const [showModelForm, setShowModelForm] = useState(false);
@@ -49,8 +52,8 @@ export default function CompanyDetailPage() {
       ]);
       setCompany(companyData);
       setModels(modelsData);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -73,18 +76,18 @@ export default function CompanyDetailPage() {
       setShowModelForm(false);
       setModelForm({ name: "", description: "", model_type: "base" });
       fetchData();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(getErrorMessage(err));
     }
   };
 
   const handleDeleteModel = async (modelId: number, name: string) => {
-    if (!confirm(`Slett modellen "${name}"? Alle finansdata fjernes.`)) return;
+    if (!confirm(t("companyDetail.confirmDeleteModel", { name }))) return;
     try {
       await api.deleteModel(modelId);
       fetchData();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(getErrorMessage(err));
     }
   };
 
@@ -93,7 +96,7 @@ export default function CompanyDetailPage() {
     file: File
   ) => {
     setImportingModelId(modelId);
-    setImportStatus("Importerer...");
+    setImportStatus(t("companyDetail.importing"));
     try {
       let result;
       if (file.name.endsWith(".csv")) {
@@ -101,14 +104,14 @@ export default function CompanyDetailPage() {
       } else {
         result = await api.importJsonFile(modelId, file);
       }
-      setImportStatus(`Importert ${result.count} perioder`);
+      setImportStatus(t("companyDetail.imported", { count: result.count }));
       fetchData();
       setTimeout(() => {
         setImportStatus("");
         setImportingModelId(null);
       }, 3000);
-    } catch (err: any) {
-      setImportStatus(`Feil: ${err.message}`);
+    } catch (err) {
+      setImportStatus(t("companyDetail.importError", { message: getErrorMessage(err) }));
       setTimeout(() => {
         setImportStatus("");
         setImportingModelId(null);
@@ -122,13 +125,13 @@ export default function CompanyDetailPage() {
     // Validate file type
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (ext !== "xlsx" && ext !== "xls") {
-      setExcelError("Ugyldig filtype. Kun .xlsx-filer er støttet.");
+      setExcelError(t("companyDetail.invalidFileType"));
       return;
     }
 
     // Validate file size (10 MB limit)
     if (file.size > 10 * 1024 * 1024) {
-      setExcelError("Filen er for stor. Maks 10 MB.");
+      setExcelError(t("companyDetail.fileTooLarge"));
       return;
     }
 
@@ -140,12 +143,12 @@ export default function CompanyDetailPage() {
       const result = await api.importExcelFile(Number(id), file);
       setExcelResult(result);
       fetchData(); // Refresh model list
-    } catch (err: any) {
-      setExcelError(err.message || "Excel-import feilet");
+    } catch (err) {
+      setExcelError(getErrorMessage(err) || t("companyDetail.importFailed"));
     } finally {
       setExcelUploading(false);
     }
-  }, [id]);
+  }, [id, t]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -173,7 +176,7 @@ export default function CompanyDetailPage() {
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center h-full">
-        <div className="text-gray-400">Laster...</div>
+        <div className="text-gray-400">{t("common.loading")}</div>
       </div>
     );
   }
@@ -181,20 +184,12 @@ export default function CompanyDetailPage() {
   if (!company) {
     return (
       <div className="p-8">
-        <p className="text-red-600">Selskap ikke funnet</p>
+        <p className="text-red-600">{t("companyDetail.companyNotFound")}</p>
       </div>
     );
   }
 
-  const modelTypeLabels: Record<string, string> = {
-    base: "Basis",
-    management: "Management case",
-    sellside: "Sellside case",
-    post_dd: "Post DD case",
-    upside: "Oppside",
-    downside: "Nedside",
-    custom: "Egendefinert",
-  };
+  const modelTypeKeys = ["base", "management", "sellside", "post_dd", "upside", "downside", "custom"] as const;
 
   return (
     <div className="p-8 max-w-6xl">
@@ -205,7 +200,7 @@ export default function CompanyDetailPage() {
           className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4"
         >
           <ArrowLeft size={14} />
-          Tilbake til selskaper
+          {t("companyDetail.backToCompanies")}
         </Link>
         <div className="flex items-center justify-between">
           <div>
@@ -220,7 +215,7 @@ export default function CompanyDetailPage() {
                     : "bg-sky-100 text-sky-800"
                 }`}
               >
-                {company.company_type === "acquirer" ? "Oppkjøper" : "Target"}
+                {company.company_type === "acquirer" ? t("common.acquirer") : t("common.target")}
               </span>
             </div>
             {company.description && (
@@ -237,7 +232,7 @@ export default function CompanyDetailPage() {
             className="flex items-center gap-2 px-4 py-2.5 bg-[#03223F] text-white rounded-lg hover:bg-[#002C55] transition-colors text-sm font-medium"
           >
             <Plus size={16} />
-            Ny modell
+            {t("companyDetail.newModel")}
           </button>
         </div>
       </div>
@@ -266,12 +261,12 @@ export default function CompanyDetailPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-gray-700">
-                {excelUploading ? "Importerer Excel-fil..." : "Last opp Excel-fil (.xlsx)"}
+                {excelUploading ? t("companyDetail.uploadExcelActive") : t("companyDetail.uploadExcel")}
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                Dra og slipp, eller{" "}
+                {t("companyDetail.dragAndDrop")}{" "}
                 <label className="text-[#57A5E4] hover:text-[#002C55] cursor-pointer underline">
-                  velg fil
+                  {t("companyDetail.selectFile")}
                   <input
                     type="file"
                     accept=".xlsx,.xls"
@@ -285,7 +280,7 @@ export default function CompanyDetailPage() {
                 </label>
               </p>
               <p className="text-xs text-gray-400 mt-0.5">
-                Modeller og perioder opprettes automatisk fra Excel-filen
+                {t("companyDetail.autoCreateModels")}
               </p>
             </div>
           </div>
@@ -294,7 +289,7 @@ export default function CompanyDetailPage() {
             <div className="absolute inset-0 flex items-center justify-center bg-white/60 rounded-xl">
               <div className="flex items-center gap-2 text-sm text-[#002C55] font-medium">
                 <div className="w-4 h-4 border-2 border-[#002C55] border-t-transparent rounded-full animate-spin" />
-                Leser Excel-fil...
+                {t("companyDetail.readingExcel")}
               </div>
             </div>
           )}
@@ -319,14 +314,14 @@ export default function CompanyDetailPage() {
                 <CheckCircle size={18} className="text-green-600 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="text-sm font-medium text-green-800">
-                    Import fullført
+                    {t("companyDetail.importComplete")}
                   </p>
                   <p className="text-xs text-green-700 mt-0.5">
-                    {excelResult.models_created > 0 && `${excelResult.models_created} modell(er) opprettet`}
+                    {excelResult.models_created > 0 && t("companyDetail.modelsCreated", { count: excelResult.models_created })}
                     {excelResult.models_created > 0 && excelResult.models_updated > 0 && ", "}
-                    {excelResult.models_updated > 0 && `${excelResult.models_updated} modell(er) oppdatert`}
+                    {excelResult.models_updated > 0 && t("companyDetail.modelsUpdated", { count: excelResult.models_updated })}
                     {" — "}
-                    {excelResult.total_periods} perioder totalt
+                    {t("companyDetail.totalPeriods", { count: excelResult.total_periods })}
                   </p>
 
                   {/* Model details */}
@@ -337,7 +332,7 @@ export default function CompanyDetailPage() {
                           <FileSpreadsheet size={12} />
                           <span className="font-medium">{m.name}</span>
                           <span className="text-green-500">
-                            ({m.periods} perioder, {m.action === "created" ? "ny" : "oppdatert"})
+                            ({m.periods} {t("common.periods")}, {m.action === "created" ? t("companyDetail.new") : t("companyDetail.updated")})
                           </span>
                         </div>
                       ))}
@@ -368,11 +363,11 @@ export default function CompanyDetailPage() {
       {/* New model form */}
       {showModelForm && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
-          <h2 className="text-lg font-semibold mb-4">Ny finansiell modell</h2>
+          <h2 className="text-lg font-semibold mb-4">{t("companyDetail.newFinancialModel")}</h2>
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Modellnavn
+                {t("companyDetail.modelName")}
               </label>
               <input
                 type="text"
@@ -381,12 +376,12 @@ export default function CompanyDetailPage() {
                   setModelForm({ ...modelForm, name: e.target.value })
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#002C55] outline-none"
-                placeholder="f.eks. Management case"
+                placeholder={t("companyDetail.modelNamePlaceholder")}
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Type
+                {t("common.type")}
               </label>
               <select
                 value={modelForm.model_type}
@@ -395,16 +390,16 @@ export default function CompanyDetailPage() {
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#002C55] outline-none"
               >
-                {Object.entries(modelTypeLabels).map(([val, label]) => (
+                {modelTypeKeys.map((val) => (
                   <option key={val} value={val}>
-                    {label}
+                    {t(`companyDetail.modelTypes.${val}`)}
                   </option>
                 ))}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Beskrivelse
+                {t("common.description")}
               </label>
               <input
                 type="text"
@@ -421,13 +416,13 @@ export default function CompanyDetailPage() {
               onClick={handleCreateModel}
               className="px-4 py-2 bg-[#03223F] text-white rounded-lg text-sm font-medium hover:bg-[#002C55]"
             >
-              Opprett modell
+              {t("companyDetail.createModel")}
             </button>
             <button
               onClick={() => setShowModelForm(false)}
               className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200"
             >
-              Avbryt
+              {t("common.cancel")}
             </button>
           </div>
         </div>
@@ -438,12 +433,12 @@ export default function CompanyDetailPage() {
 
       {/* Models list */}
       <h2 className="text-lg font-semibold text-gray-900 mb-4">
-        Finansielle modeller ({models.length})
+        {t("companyDetail.financialModels")} ({models.length})
       </h2>
 
       {models.length === 0 ? (
         <div className="bg-white rounded-xl border border-dashed border-gray-300 p-8 text-center text-gray-400">
-          Ingen modeller ennå. Opprett en modell og importer finansdata.
+          {t("companyDetail.noModels")}
         </div>
       ) : (
         <div className="space-y-4">
@@ -463,7 +458,7 @@ export default function CompanyDetailPage() {
                         {model.name}
                       </h3>
                       <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
-                        {modelTypeLabels[model.model_type] || model.model_type}
+                        {t(`companyDetail.modelTypes.${model.model_type}`, model.model_type)}
                       </span>
                     </div>
                     {model.description && (
@@ -472,7 +467,7 @@ export default function CompanyDetailPage() {
                       </p>
                     )}
                     <div className="flex gap-4 mt-2 text-xs text-gray-400">
-                      <span>{model.period_count || 0} perioder</span>
+                      <span>{model.period_count || 0} {t("common.periods")}</span>
                       {model.first_period && (
                         <span>
                           {new Date(model.first_period).getFullYear()} -{" "}
@@ -487,7 +482,7 @@ export default function CompanyDetailPage() {
                   {/* Import button (JSON/CSV per-model) */}
                   <label className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 cursor-pointer transition-colors">
                     <Upload size={14} />
-                    Importer
+                    {t("common.import")}
                     <input
                       type="file"
                       accept=".json,.csv"
@@ -506,14 +501,14 @@ export default function CompanyDetailPage() {
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-100 transition-colors"
                   >
                     <Eye size={14} />
-                    Vis data
+                    {t("companyDetail.viewData")}
                   </Link>
 
                   {/* Delete */}
                   <button
                     onClick={() => handleDeleteModel(model.id, model.name)}
                     className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
-                    title="Slett modell"
+                    title={t("companyDetail.deleteModel")}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -524,9 +519,9 @@ export default function CompanyDetailPage() {
               {importingModelId === model.id && importStatus && (
                 <div
                   className={`mt-3 px-3 py-2 rounded-lg text-sm ${
-                    importStatus.startsWith("Feil")
+                    importStatus.includes(t("common.error")) || importStatus.includes("Error")
                       ? "bg-red-50 text-red-700"
-                      : importStatus.includes("Importert")
+                      : importStatus.includes(t("common.periods")) || importStatus.includes("period")
                       ? "bg-green-50 text-green-700"
                       : "bg-blue-50 text-blue-700"
                   }`}

@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import api from "../services/api";
 import type { Company, FinancialModel, FinancialPeriod } from "../types";
+import { fmt, pct } from "../components/scenario/helpers";
 import {
   Target,
   Eye,
@@ -12,13 +14,13 @@ import {
   ChevronRight,
   Check,
 } from "lucide-react";
+import { getErrorMessage } from "../utils/errors";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
 interface TargetSummary {
   company: Company;
   models: FinancialModel[];
-  // Latest period metrics from the first (or active) model
   latestRevenue: number | null;
   latestEbitda: number | null;
   latestMargin: number | null;
@@ -27,34 +29,8 @@ interface TargetSummary {
   periodCount: number;
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────
-
-function fmt(val: number | null, decimals = 1): string {
-  if (val === null || val === undefined) return "-";
-  if (isNaN(val)) return "-";
-  if (val < 0)
-    return `(${Math.abs(val).toLocaleString("nb-NO", {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    })})`;
-  return val.toLocaleString("nb-NO", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
-}
-
-function pct(val: number | null): string {
-  if (val === null || val === undefined) return "-";
-  if (isNaN(val)) return "-";
-  return `${(val * 100).toLocaleString("nb-NO", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  })}%`;
-}
-
-// ── Main Component ───────────────────────────────────────────────────────
-
 export default function TargetsListPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [targetSummaries, setTargetSummaries] = useState<TargetSummary[]>([]);
@@ -145,8 +121,8 @@ export default function TargetsListPage() {
       );
 
       setTargetSummaries(summaries);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -176,7 +152,7 @@ export default function TargetsListPage() {
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center h-full">
-        <div className="text-gray-400">Loading targets...</div>
+        <div className="text-gray-400">{t("targets.loading")}</div>
       </div>
     );
   }
@@ -186,9 +162,9 @@ export default function TargetsListPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Targets</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t("targets.title")}</h1>
           <p className="text-gray-500 mt-1">
-            Acquisition target overview and comparison
+            {t("targets.subtitle")}
           </p>
         </div>
         <div className="flex gap-2">
@@ -204,7 +180,7 @@ export default function TargetsListPage() {
             }`}
           >
             <GitCompare size={16} />
-            {compareMode ? "Cancel Compare" : "Compare Targets"}
+            {compareMode ? t("targets.cancelCompare") : t("targets.compareTargets")}
           </button>
           {compareMode && selectedForCompare.length === 2 && (
             <button
@@ -212,7 +188,7 @@ export default function TargetsListPage() {
               className="flex items-center gap-2 px-4 py-2.5 bg-[#03223F] text-white rounded-lg text-sm font-medium hover:bg-[#002C55] transition-colors"
             >
               <ChevronRight size={16} />
-              Compare Selected
+              {t("targets.compareSelected")}
             </button>
           )}
         </div>
@@ -227,7 +203,7 @@ export default function TargetsListPage() {
       {/* Compare mode hint */}
       {compareMode && (
         <div className="bg-sky-50 border border-sky-200 rounded-lg px-4 py-3 mb-6 text-sm text-sky-800">
-          Select 2 targets to compare. Selected:{" "}
+          {t("targets.compareHint")}{" "}
           <strong>{selectedForCompare.length}/2</strong>
         </div>
       )}
@@ -235,11 +211,11 @@ export default function TargetsListPage() {
       {targetSummaries.length === 0 ? (
         <div className="bg-white rounded-xl border border-dashed border-gray-300 p-12 text-center text-gray-400">
           <Target size={32} className="mx-auto mb-3 text-gray-300" />
-          <p className="text-lg mb-2">No targets registered</p>
+          <p className="text-lg mb-2">{t("targets.noTargetsRegistered")}</p>
           <p className="text-sm">
-            Add target companies via the{" "}
+            {t("targets.addViaCompanies")}{" "}
             <Link to="/companies" className="text-[#57A5E4] underline">
-              Companies page
+              {t("targets.companiesPage")}
             </Link>
           </p>
         </div>
@@ -295,8 +271,7 @@ export default function TargetsListPage() {
                             )}
                             <span className="text-gray-300">|</span>
                             <span>
-                              {ts.models.length} model
-                              {ts.models.length !== 1 ? "s" : ""}
+                              {ts.models.length} {ts.models.length !== 1 ? t("common.models") : t("common.model")}
                             </span>
                             {ts.periodRange && (
                               <>
@@ -321,7 +296,7 @@ export default function TargetsListPage() {
                         className="flex items-center gap-1.5 px-4 py-2 bg-[#03223F] text-white rounded-lg text-sm font-medium hover:bg-[#002C55] transition-colors shrink-0"
                       >
                         <Eye size={14} />
-                        View Details
+                        {t("targets.viewDetails")}
                       </Link>
                     )}
                   </div>
@@ -331,19 +306,19 @@ export default function TargetsListPage() {
                     ts.latestEbitda != null) && (
                     <div className="mt-4 ml-12 grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div className="bg-gray-50 rounded-lg px-3 py-2">
-                        <p className="text-xs text-gray-500">Revenue</p>
+                        <p className="text-xs text-gray-500">{t("common.revenue")}</p>
                         <p className="text-sm font-semibold text-gray-900 tabular-nums">
                           {fmt(ts.latestRevenue)}
                         </p>
                       </div>
                       <div className="bg-gray-50 rounded-lg px-3 py-2">
-                        <p className="text-xs text-gray-500">EBITDA</p>
+                        <p className="text-xs text-gray-500">{t("common.ebitda")}</p>
                         <p className="text-sm font-semibold text-gray-900 tabular-nums">
                           {fmt(ts.latestEbitda)}
                         </p>
                       </div>
                       <div className="bg-gray-50 rounded-lg px-3 py-2">
-                        <p className="text-xs text-gray-500">EBITDA Margin</p>
+                        <p className="text-xs text-gray-500">{t("targets.ebitdaMargin")}</p>
                         <p className="text-sm font-semibold text-gray-900 tabular-nums">
                           {pct(ts.latestMargin)}
                         </p>

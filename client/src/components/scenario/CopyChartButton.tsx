@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { toPng } from "html-to-image";
 import { Copy, Check, Download } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface CopyChartButtonProps {
   children: ReactNode;
@@ -18,6 +19,7 @@ export default function CopyChartButton({
   const chartRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
+  const { t } = useTranslation();
 
   const capture = async (): Promise<Blob | null> => {
     if (!chartRef.current) return null;
@@ -75,7 +77,7 @@ export default function CopyChartButton({
         <button
           onClick={handleCopy}
           disabled={busy}
-          title="Kopier til utklippstavle"
+          title={t("common.copyToClipboard")}
           className="p-1.5 rounded-md bg-white/90 border border-gray-200 shadow-sm
                      hover:bg-gray-50 text-gray-500 hover:text-gray-700
                      disabled:opacity-50 cursor-pointer transition-colors"
@@ -89,7 +91,7 @@ export default function CopyChartButton({
         <button
           onClick={handleDownload}
           disabled={busy}
-          title="Last ned som PNG"
+          title={t("common.downloadPng")}
           className="p-1.5 rounded-md bg-white/90 border border-gray-200 shadow-sm
                      hover:bg-gray-50 text-gray-500 hover:text-gray-700
                      disabled:opacity-50 cursor-pointer transition-colors"

@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import api from "../services/api";
 import type { Company, FinancialModel, FinancialPeriod } from "../types";
+import { fmt, pct, cagr } from "../components/scenario/helpers";
 import {
   ArrowLeft,
   Building2,
@@ -14,38 +16,7 @@ import {
   Activity,
   Trophy,
 } from "lucide-react";
-
-// ── Helpers ──────────────────────────────────────────────────────────────
-
-function fmt(val: number | null | undefined, decimals = 1): string {
-  if (val === null || val === undefined) return "-";
-  const num = typeof val === "string" ? parseFloat(val) : val;
-  if (isNaN(num)) return "-";
-  if (num < 0)
-    return `(${Math.abs(num).toLocaleString("nb-NO", {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    })})`;
-  return num.toLocaleString("nb-NO", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
-}
-
-function pct(val: number | null | undefined): string {
-  if (val === null || val === undefined) return "-";
-  const num = typeof val === "string" ? parseFloat(val) : val;
-  if (isNaN(num)) return "-";
-  return `${(num * 100).toLocaleString("nb-NO", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  })}%`;
-}
-
-function cagr(start: number, end: number, years: number): number | null {
-  if (!start || !end || years <= 0 || start <= 0) return null;
-  return Math.pow(end / start, 1 / years) - 1;
-}
+import { getErrorMessage } from "../utils/errors";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -154,6 +125,7 @@ function ComparisonRow({
 
 export default function TargetComparePage() {
   const [searchParams] = useSearchParams();
+  const { t } = useTranslation();
   const companyIdA = Number(searchParams.get("a"));
   const companyIdB = Number(searchParams.get("b"));
 
@@ -168,7 +140,7 @@ export default function TargetComparePage() {
 
   useEffect(() => {
     if (!companyIdA || !companyIdB) {
-      setError("Select two targets to compare.");
+      setError(t("targetCompare.selectTwoTargets"));
       setLoading(false);
       return;
     }
@@ -208,8 +180,8 @@ export default function TargetComparePage() {
 
       if (firstModelA) setModelIdA(firstModelA.id);
       if (firstModelB) setModelIdB(firstModelB.id);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -225,8 +197,8 @@ export default function TargetComparePage() {
           ? { ...prev, selectedModel: detail, periods: detail.periods || [] }
           : prev
       );
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(getErrorMessage(err));
     }
   }
 
@@ -240,8 +212,8 @@ export default function TargetComparePage() {
           ? { ...prev, selectedModel: detail, periods: detail.periods || [] }
           : prev
       );
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(getErrorMessage(err));
     }
   }
 
@@ -317,7 +289,7 @@ export default function TargetComparePage() {
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center h-full">
-        <div className="text-gray-400">Loading comparison...</div>
+        <div className="text-gray-400">{t("targetCompare.loading")}</div>
       </div>
     );
   }
@@ -330,7 +302,7 @@ export default function TargetComparePage() {
           className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4"
         >
           <ArrowLeft size={14} />
-          Back to Targets
+          {t("targetCompare.backToTargets")}
         </Link>
         <p className="text-red-600">{error}</p>
       </div>
@@ -346,12 +318,12 @@ export default function TargetComparePage() {
           className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4"
         >
           <ArrowLeft size={14} />
-          Back to Targets
+          {t("targetCompare.backToTargets")}
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Target Comparison</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t("targetCompare.title")}</h1>
         <p className="text-gray-500 mt-1">
-          Side-by-side analysis of{" "}
-          <strong>{targetA?.company.name}</strong> vs{" "}
+          {t("targetCompare.sideByAnalysis")}{" "}
+          <strong>{targetA?.company.name}</strong> {t("targetCompare.vs")}{" "}
           <strong>{targetB?.company.name}</strong>
         </p>
       </div>
@@ -400,7 +372,7 @@ export default function TargetComparePage() {
                 to={`/targets/${target?.company.id}`}
                 className="text-xs text-[#57A5E4] hover:underline"
               >
-                Full details
+                {t("targetCompare.fullDetails")}
               </Link>
             </div>
             {models.length > 1 && (
@@ -431,9 +403,9 @@ export default function TargetComparePage() {
         <table className="w-full">
           <thead>
             <tr className="bg-[#002C55] text-white">
-              <th className="text-left px-4 py-3 text-xs font-semibold w-1/3">
-                Key Metric
-              </th>
+               <th className="text-left px-4 py-3 text-xs font-semibold w-1/3">
+                 {t("targetCompare.keyMetric")}
+               </th>
               <th className="text-right px-4 py-3 text-xs font-semibold w-1/3">
                 {targetA?.company.name}
               </th>
@@ -443,58 +415,58 @@ export default function TargetComparePage() {
             </tr>
           </thead>
           <tbody>
-            <ComparisonRow
-              label="Revenue (latest)"
-              valueA={latestA?.revenue_total}
-              valueB={latestB?.revenue_total}
-              highlight="higher"
-              bold
-              section="Scale"
-            />
-            <ComparisonRow
-              label="EBITDA (latest)"
-              valueA={latestA?.ebitda_total}
-              valueB={latestB?.ebitda_total}
-              highlight="higher"
-              bold
-            />
-            <ComparisonRow
-              label="EBITDA Margin"
-              valueA={latestA?.ebitda_margin}
-              valueB={latestB?.ebitda_margin}
-              format="pct"
-              highlight="higher"
-              section="Profitability"
-            />
-            <ComparisonRow
-              label="Revenue CAGR"
-              valueA={revCagrA}
-              valueB={revCagrB}
-              format="pct"
-              highlight="higher"
-              section="Growth"
-            />
-            <ComparisonRow
-              label="EBITDA CAGR"
-              valueA={ebitdaCagrA}
-              valueB={ebitdaCagrB}
-              format="pct"
-              highlight="higher"
-            />
-            <ComparisonRow
-              label="NIBD (latest)"
-              valueA={latestA?.nibd}
-              valueB={latestB?.nibd}
-              highlight="none"
-              section="Balance Sheet"
-            />
+             <ComparisonRow
+               label={t("targetCompare.revenueLatest")}
+               valueA={latestA?.revenue_total}
+               valueB={latestB?.revenue_total}
+               highlight="higher"
+               bold
+               section={t("targetCompare.scale")}
+             />
+             <ComparisonRow
+               label={t("targetCompare.ebitdaLatest")}
+               valueA={latestA?.ebitda_total}
+               valueB={latestB?.ebitda_total}
+               highlight="higher"
+               bold
+             />
+             <ComparisonRow
+               label={t("targetCompare.ebitdaMargin")}
+               valueA={latestA?.ebitda_margin}
+               valueB={latestB?.ebitda_margin}
+               format="pct"
+               highlight="higher"
+               section={t("targetCompare.profitability")}
+             />
+             <ComparisonRow
+               label={t("targetCompare.revenueCagr")}
+               valueA={revCagrA}
+               valueB={revCagrB}
+               format="pct"
+               highlight="higher"
+               section={t("targetCompare.growth")}
+             />
+             <ComparisonRow
+               label={t("targetCompare.ebitdaCagr")}
+               valueA={ebitdaCagrA}
+               valueB={ebitdaCagrB}
+               format="pct"
+               highlight="higher"
+             />
+             <ComparisonRow
+               label={t("targetCompare.nibdLatest")}
+               valueA={latestA?.nibd}
+               valueB={latestB?.nibd}
+               highlight="none"
+               section={t("targetCompare.balanceSheet")}
+             />
             {latestA?.ebitda_total &&
               latestA?.nibd &&
               latestB?.ebitda_total &&
               latestB?.nibd && (
-                <ComparisonRow
-                  label="Leverage (NIBD/EBITDA)"
-                  valueA={
+                 <ComparisonRow
+                   label={t("targetCompare.leverage")}
+                   valueA={
                     Number(latestA.ebitda_total) !== 0
                       ? Number(latestA.nibd) / Number(latestA.ebitda_total)
                       : null
@@ -507,20 +479,20 @@ export default function TargetComparePage() {
                   highlight="lower"
                 />
               )}
-            <ComparisonRow
-              label="Operating FCF"
-              valueA={latestA?.operating_fcf}
-              valueB={latestB?.operating_fcf}
-              highlight="higher"
-              section="Cash Flow"
-            />
-            <ComparisonRow
-              label="Cash Conversion"
-              valueA={latestA?.cash_conversion}
-              valueB={latestB?.cash_conversion}
-              format="pct"
-              highlight="higher"
-            />
+             <ComparisonRow
+               label={t("targetCompare.operatingFcf")}
+               valueA={latestA?.operating_fcf}
+               valueB={latestB?.operating_fcf}
+               highlight="higher"
+               section={t("targetCompare.cashFlow")}
+             />
+             <ComparisonRow
+               label={t("targetCompare.cashConversion")}
+               valueA={latestA?.cash_conversion}
+               valueB={latestB?.cash_conversion}
+               format="pct"
+               highlight="higher"
+             />
           </tbody>
         </table>
       </div>
@@ -528,9 +500,9 @@ export default function TargetComparePage() {
       {/* ── Revenue Mix Comparison ────────────────────────────── */}
       {(mixA || mixB) && (
         <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
-          <h2 className="text-sm font-semibold text-gray-900 mb-4">
-            Revenue Mix Comparison
-          </h2>
+           <h2 className="text-sm font-semibold text-gray-900 mb-4">
+             {t("targetCompare.revenueMixComparison")}
+           </h2>
           <div className="grid grid-cols-2 gap-6">
             {[
               { mix: mixA, name: targetA?.company.name },
@@ -543,23 +515,23 @@ export default function TargetComparePage() {
                 {mix ? (
                   <>
                     <div className="flex h-6 rounded-lg overflow-hidden border border-gray-200">
-                      {[
-                        {
-                          pct: mix.ms_pct,
-                          color: "bg-[#002C55]",
-                          label: "MS",
-                        },
-                        {
-                          pct: mix.ps_pct,
-                          color: "bg-[#57A5E4]",
-                          label: "PS",
-                        },
-                        {
-                          pct: mix.other_pct,
-                          color: "bg-[#F4EDDC]",
-                          label: "Other",
-                        },
-                      ]
+                     {[
+                         {
+                           pct: mix.ms_pct,
+                           color: "bg-[#002C55]",
+                           label: t("targetCompare.ms"),
+                         },
+                         {
+                           pct: mix.ps_pct,
+                           color: "bg-[#57A5E4]",
+                           label: t("targetCompare.ps"),
+                         },
+                         {
+                           pct: mix.other_pct,
+                           color: "bg-[#F4EDDC]",
+                           label: t("targetCompare.other"),
+                         },
+                       ]
                         .filter((s) => s.pct > 0)
                         .map((s) => (
                           <div
@@ -573,22 +545,22 @@ export default function TargetComparePage() {
                           </div>
                         ))}
                     </div>
-                    <div className="flex gap-3 mt-1.5">
-                      <span className="text-[10px] text-gray-400">
-                        MS: {fmt(mix.ms)}
-                      </span>
-                      <span className="text-[10px] text-gray-400">
-                        PS: {fmt(mix.ps)}
-                      </span>
-                      {mix.other > 0 && (
-                        <span className="text-[10px] text-gray-400">
-                          Other: {fmt(mix.other)}
-                        </span>
-                      )}
+                     <div className="flex gap-3 mt-1.5">
+                       <span className="text-[10px] text-gray-400">
+                         {t("targetCompare.ms")}: {fmt(mix.ms)}
+                       </span>
+                       <span className="text-[10px] text-gray-400">
+                         {t("targetCompare.ps")}: {fmt(mix.ps)}
+                       </span>
+                       {mix.other > 0 && (
+                         <span className="text-[10px] text-gray-400">
+                           {t("targetCompare.other")}: {fmt(mix.other)}
+                         </span>
+                       )}
                     </div>
                   </>
                 ) : (
-                  <p className="text-xs text-gray-400">No data</p>
+                   <p className="text-xs text-gray-400">{t("targetCompare.noData")}</p>
                 )}
               </div>
             ))}
@@ -599,9 +571,9 @@ export default function TargetComparePage() {
       {/* ── Period-by-Period Side-by-Side ──────────────────────── */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
         <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-          <h2 className="text-sm font-semibold text-gray-900">
-            Period-by-Period: Revenue & EBITDA
-          </h2>
+           <h2 className="text-sm font-semibold text-gray-900">
+             {t("targetCompare.periodByPeriod")}
+           </h2>
         </div>
 
         {/* Build aligned periods */}
@@ -620,9 +592,9 @@ export default function TargetComparePage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-[#002C55] text-white">
-                    <th className="text-left px-3 py-2 text-xs font-semibold min-w-[140px]">
-                      Metric
-                    </th>
+                     <th className="text-left px-3 py-2 text-xs font-semibold min-w-[140px]">
+                       {t("targetCompare.metric")}
+                     </th>
                     {sortedLabels.map((label) => (
                       <th
                         key={label}
@@ -648,27 +620,27 @@ export default function TargetComparePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {[
-                    {
-                      label: "Revenue",
-                      key: "revenue_total" as keyof FinancialPeriod,
-                      bold: true,
-                    },
-                    {
-                      label: "EBITDA",
-                      key: "ebitda_total" as keyof FinancialPeriod,
-                      bold: true,
-                    },
-                    {
-                      label: "EBITDA Margin",
-                      key: "ebitda_margin" as keyof FinancialPeriod,
-                      isPct: true,
-                    },
-                    {
-                      label: "NIBD",
-                      key: "nibd" as keyof FinancialPeriod,
-                    },
-                  ].map((row) => (
+                   {[
+                     {
+                       label: t("targetCompare.revenue"),
+                       key: "revenue_total" as keyof FinancialPeriod,
+                       bold: true,
+                     },
+                     {
+                       label: t("targetCompare.ebitda"),
+                       key: "ebitda_total" as keyof FinancialPeriod,
+                       bold: true,
+                     },
+                     {
+                       label: t("targetCompare.ebitdaMargin"),
+                       key: "ebitda_margin" as keyof FinancialPeriod,
+                       isPct: true,
+                     },
+                     {
+                       label: t("targetCompare.nibd"),
+                       key: "nibd" as keyof FinancialPeriod,
+                     },
+                   ].map((row) => (
                     <tr
                       key={row.key}
                       className="border-b border-gray-100"

@@ -249,9 +249,9 @@ INSERT INTO users (email, password_hash, name, role) VALUES
 ON CONFLICT DO NOTHING;
 
 -- Create indexes for common queries
-CREATE INDEX idx_financial_periods_model ON financial_periods(model_id);
-CREATE INDEX idx_financial_periods_date ON financial_periods(period_date);
-CREATE INDEX idx_deal_returns_scenario ON deal_returns(scenario_id);
-CREATE INDEX idx_pro_forma_scenario ON pro_forma_periods(scenario_id);
-CREATE INDEX idx_companies_type ON companies(company_type);
-CREATE INDEX idx_models_company ON financial_models(company_id);
+CREATE INDEX IF NOT EXISTS idx_financial_periods_model ON financial_periods(model_id);
+CREATE INDEX IF NOT EXISTS idx_financial_periods_date ON financial_periods(period_date);
+CREATE INDEX IF NOT EXISTS idx_deal_returns_scenario ON deal_returns(scenario_id);
+CREATE INDEX IF NOT EXISTS idx_pro_forma_scenario ON pro_forma_periods(scenario_id);
+CREATE INDEX IF NOT EXISTS idx_companies_type ON companies(company_type);
+CREATE INDEX IF NOT EXISTS idx_models_company ON financial_models(company_id);

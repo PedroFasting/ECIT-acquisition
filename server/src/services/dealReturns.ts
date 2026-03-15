@@ -6,7 +6,7 @@
  *   - Entry: EV paid
  *   - Annual FCF: EBITDA - D&A_proxy_tax - capex - change_nwc
  *   - Exit: exit_EBITDA × exit_multiple
- *   - Tax: applied to (EBITDA - capex_proxy) as EBT proxy, never on negative EBT
+ *   - Tax: applied to (EBITDA - D&A_proxy) as EBT proxy, never on negative EBT
  *   - IRR on cash flow vector [-EV, FCF1, ..., FCFn + exitEV]
  *
  * Level 2 "Full Equity IRR" (Leveraged equity-based):
@@ -38,8 +38,10 @@ export interface DealParameters {
   // Entry EV for the acquirer (standalone) — for standalone IRR
   acquirer_entry_ev?: number;
 
-  // Fallback capex/NWC when period-level data is missing (NOKm per year)
+  // Fallback NWC investment when period-level change_nwc is missing (NOKm per year)
   nwc_investment?: number;
+  // Fallback capex as % of revenue when period-level capex is missing (decimal, default 0.03 = 3%)
+  capex_pct_revenue?: number;
 
   // D&A as % of revenue, used to proxy EBT = EBITDA - D&A (default 5%)
   da_pct_revenue?: number;
@@ -266,6 +268,7 @@ function computeLevel1Return(
   const taxRate = params.tax_rate ?? 0.22;
   const daPctRevenue = params.da_pct_revenue ?? 0.05;
   const fallbackNwc = params.nwc_investment ?? 0;
+  const capexPctRevenue = params.capex_pct_revenue ?? 0.03;
 
   const fcfs: number[] = [];
   for (let i = 0; i < periods.length; i++) {
@@ -279,12 +282,12 @@ function computeLevel1Return(
 
     const ebitda = p.ebitda;
 
-    // Use actual capex/NWC from period data if available, otherwise fallback
-    const capex = p.capex ?? -Math.abs(fallbackNwc);
-    const changeNwc = p.change_nwc ?? 0;
+    // Use actual capex from period data if available, otherwise proxy as % of revenue
+    const revenue = p.revenue ?? 0;
+    const capex = p.capex ?? -(revenue > 0 ? revenue * capexPctRevenue : Math.abs(ebitda) * capexPctRevenue);
+    const changeNwc = p.change_nwc ?? -Math.abs(fallbackNwc);
 
     // Tax on EBT proxy: EBT ≈ EBITDA - D&A (D&A proxied as % of revenue)
-    const revenue = p.revenue ?? 0;
     const daProxy = revenue > 0 ? revenue * daPctRevenue : Math.abs(ebitda) * daPctRevenue;
     const ebtProxy = ebitda - daProxy;
     // Only tax positive EBT
@@ -329,6 +332,7 @@ function computeLevel2Return(
   const taxRate = params.tax_rate ?? 0.22;
   const daPctRevenue = params.da_pct_revenue ?? 0.05;
   const fallbackNwc = params.nwc_investment ?? 0;
+  const capexPctRevenue = params.capex_pct_revenue ?? 0.03;
 
   const ordinaryEquity = params.ordinary_equity ?? 0;
   const rolloverEquity = params.rollover_equity ?? 0;
@@ -340,7 +344,7 @@ function computeLevel2Return(
   const preferredRate = params.preferred_equity_rate ?? 0;
   const interestRate = params.interest_rate ?? 0.05;
   const debtAmort = params.debt_amortisation ?? 0;
-  const cashSweepPct = params.cash_sweep_pct ?? 0; // 0-1, fraction of excess FCF to sweep
+  const cashSweepPct = params.cash_sweep_pct ?? 1.0; // 0-1, fraction of excess FCF to sweep (default: 100% — all excess FCF goes to debt repayment)
 
   // Track debt and preferred equity balances over time
   let debtBalance = netDebtEntry;
@@ -364,12 +368,12 @@ function computeLevel2Return(
     } else {
       const ebitda = p.ebitda;
 
-      // Capex / NWC
-      const capex = p.capex ?? -Math.abs(fallbackNwc);
-      const changeNwc = p.change_nwc ?? 0;
+      // Capex / NWC — use actual period data, otherwise proxy capex as % of revenue
+      const revenue = p.revenue ?? 0;
+      const capex = p.capex ?? -(revenue > 0 ? revenue * capexPctRevenue : Math.abs(ebitda) * capexPctRevenue);
+      const changeNwc = p.change_nwc ?? -Math.abs(fallbackNwc);
 
       // Tax on EBT proxy
-      const revenue = p.revenue ?? 0;
       const daProxy = revenue > 0 ? revenue * daPctRevenue : Math.abs(ebitda) * daPctRevenue;
       const ebtProxy = ebitda - daProxy;
       const tax = ebtProxy > 0 ? -ebtProxy * taxRate : 0;

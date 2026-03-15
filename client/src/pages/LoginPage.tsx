@@ -1,6 +1,8 @@
 import { useState, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useTranslation } from "react-i18next";
+import { getErrorMessage } from "../utils/errors";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -12,6 +14,7 @@ export default function LoginPage() {
 
   const { login, register } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -25,8 +28,8 @@ export default function LoginPage() {
         await login(email, password);
       }
       navigate("/");
-    } catch (err: any) {
-      setError(err.message || "Noe gikk galt");
+    } catch (err) {
+      setError(getErrorMessage(err) || t("common.somethingWentWrong"));
     } finally {
       setLoading(false);
     }
@@ -37,10 +40,10 @@ export default function LoginPage() {
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-[#03223F]">
-            ECIT Acquisition
+            {t("login.title")}
           </h1>
           <p className="text-gray-500 mt-2">
-            Selskapsanalyse ved oppkjøp
+            {t("login.subtitle")}
           </p>
         </div>
 
@@ -48,7 +51,7 @@ export default function LoginPage() {
           {isRegister && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Navn
+                {t("login.name")}
               </label>
               <input
                 type="text"
@@ -62,7 +65,7 @@ export default function LoginPage() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              E-post
+              {t("login.email")}
             </label>
             <input
               type="email"
@@ -76,7 +79,7 @@ export default function LoginPage() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Passord
+              {t("login.password")}
             </label>
             <input
               type="password"
@@ -99,15 +102,15 @@ export default function LoginPage() {
             className="w-full py-2.5 bg-[#03223F] text-white rounded-lg font-medium hover:bg-[#002C55] transition-colors disabled:opacity-50"
           >
             {loading
-              ? "Venter..."
+              ? t("login.loading")
               : isRegister
-              ? "Registrer"
-              : "Logg inn"}
+              ? t("login.register")
+              : t("login.login")}
           </button>
         </form>
 
         <p className="text-center text-sm text-gray-500 mt-6">
-          {isRegister ? "Har du allerede konto?" : "Ingen konto?"}{" "}
+          {isRegister ? t("login.hasAccount") : t("login.noAccount")}{" "}
           <button
             onClick={() => {
               setIsRegister(!isRegister);
@@ -115,7 +118,7 @@ export default function LoginPage() {
             }}
             className="text-[#002C55] font-medium hover:underline"
           >
-            {isRegister ? "Logg inn" : "Registrer deg"}
+            {isRegister ? t("login.loginLink") : t("login.registerLink")}
           </button>
         </p>
       </div>

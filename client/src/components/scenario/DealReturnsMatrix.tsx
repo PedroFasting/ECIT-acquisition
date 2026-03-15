@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Calculator, Settings2, Info, ChevronDown, ChevronUp } from "lucide-react";
+import { getErrorMessage } from "../../utils/errors";
 import type {
   AcquisitionScenario,
   DealParameters,
@@ -101,6 +103,7 @@ export default function DealReturnsMatrix({
   onCalculated,
   onExitMultiplesChange,
 }: DealReturnsMatrixProps) {
+  const { t } = useTranslation();
   const [showParams, setShowParams] = useState(false);
   const [showEquityParams, setShowEquityParams] = useState(false);
   const [calculating, setCalculating] = useState(false);
@@ -187,7 +190,7 @@ export default function DealReturnsMatrix({
         setParams((p) => ({ ...p, acquirer_entry_ev: Math.round(ev) }));
       }
     }
-  }, [acquirerPeriods]);
+  }, [acquirerPeriods, params.acquirer_entry_ev]);
 
   // Detect level based on current params
   const currentLevel: 1 | 2 = (params.ordinary_equity ?? 0) > 0 && (params.net_debt ?? 0) > 0 ? 2 : 1;
@@ -202,8 +205,8 @@ export default function DealReturnsMatrix({
       setLevelLabel(result.level_label);
       setShareSummary(result.share_summary);
       onCalculated(result.calculated_returns, result.deal_parameters, result.share_summary, result.debt_schedule);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setCalculating(false);
     }
@@ -256,7 +259,7 @@ export default function DealReturnsMatrix({
     if (onExitMultiplesChange && params.exit_multiples?.length) {
       onExitMultiplesChange(params.exit_multiples);
     }
-  }, [params.exit_multiples]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [params.exit_multiples, onExitMultiplesChange]);
 
   const inputCls =
     "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-right focus:ring-2 focus:ring-[#002C55] focus:border-[#002C55] outline-none";
@@ -266,8 +269,8 @@ export default function DealReturnsMatrix({
     <div className="bg-white rounded-xl border border-gray-200 mb-8">
       <SectionHeader
         sectionKey="returns"
-        title="Deal Returns (IRR / MoM)"
-        subtitle="Avkastningsanalyse ved ulike exit-multipler"
+        title={t("returns.title")}
+        subtitle={t("returns.subtitle")}
         dark
         expanded={expanded}
         onToggle={onToggle}
@@ -281,14 +284,14 @@ export default function DealReturnsMatrix({
                   : "bg-amber-100 text-amber-800"
               }`}>
                 <Info size={10} />
-                {level === 2 ? "Level 2: Equity IRR" : "Level 1: Forenklet"}
+                {level === 2 ? t("returns.level2FullEquity") : t("returns.level1")}
               </span>
             )}
             <button
               onClick={() => setShowParams(!showParams)}
               className="flex items-center gap-1 px-3 py-1 text-xs bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium"
             >
-              <Settings2 size={12} /> Parametere
+              <Settings2 size={12} /> {t("returns.parameters")}
             </button>
             <button
               onClick={handleCalculate}
@@ -296,7 +299,7 @@ export default function DealReturnsMatrix({
               className="flex items-center gap-1 px-3 py-1 text-xs bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-medium"
             >
               <Calculator size={12} />{" "}
-              {calculating ? "Beregner..." : "Beregn"}
+              {calculating ? t("returns.calculating") : t("returns.calculate")}
             </button>
           </div>
         }
@@ -316,7 +319,7 @@ export default function DealReturnsMatrix({
               {/* Level indicator */}
               <div className="flex items-center justify-between mb-4">
                 <h4 className="text-sm font-semibold text-gray-900">
-                  Deal-parametere
+                  {t("returns.dealParameters")}
                 </h4>
                 <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium ${
                   currentLevel === 2
@@ -325,15 +328,15 @@ export default function DealReturnsMatrix({
                 }`}>
                   <Info size={12} />
                   {currentLevel === 2
-                    ? "Level 2: Full Equity IRR (leveraged) aktivert"
-                    : "Level 1: Forenklet (EV-basert, unlevered)"}
+                    ? t("returns.level2Enabled")
+                    : t("returns.level1Enabled")}
                 </div>
               </div>
 
               {/* Core parameters (always shown) */}
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 <div>
-                  <label className={labelCls}>Price paid (target EV, NOKm)</label>
+                  <label className={labelCls}>{t("returns.pricePaidLabel")}</label>
                   <input
                     type="number"
                     value={params.price_paid || ""}
@@ -341,12 +344,12 @@ export default function DealReturnsMatrix({
                       updateParam("price_paid", Number(e.target.value))
                     }
                     className={inputCls}
-                    placeholder="f.eks. 2253"
+                    placeholder={t("returns.egPlaceholder", { value: "2253" })}
                   />
                 </div>
                 <div>
                   <label className={labelCls}>
-                    Acquirer entry EV (NOKm)
+                    {t("returns.acquirerEntryEVLabel")}
                   </label>
                   <input
                     type="number"
@@ -355,12 +358,12 @@ export default function DealReturnsMatrix({
                       updateParam("acquirer_entry_ev", Number(e.target.value))
                     }
                     className={inputCls}
-                    placeholder="f.eks. 6660"
+                    placeholder={t("returns.egPlaceholder", { value: "6660" })}
                   />
                 </div>
                 <div>
                   <label className={labelCls}>
-                    Fallback capex/NWC (NOKm/ar)
+                    {t("returns.fallbackCapex")}
                   </label>
                   <input
                     type="number"
@@ -369,12 +372,12 @@ export default function DealReturnsMatrix({
                       updateParam("nwc_investment", Number(e.target.value))
                     }
                     className={inputCls}
-                    placeholder="f.eks. 20"
+                    placeholder={t("returns.egPlaceholder", { value: "20" })}
                   />
-                  <span className="text-[10px] text-gray-400">Brukes kun nar periodedata mangler</span>
+                  <span className="text-[10px] text-gray-400">{t("returns.fallbackCapexHint")}</span>
                 </div>
                 <div>
-                  <label className={labelCls}>Skattesats (%)</label>
+                  <label className={labelCls}>{t("returns.taxRateLabel")}</label>
                   <input
                     type="number"
                     step="0.1"
@@ -387,11 +390,11 @@ export default function DealReturnsMatrix({
                       updateParam("tax_rate", Number(e.target.value) / 100)
                     }
                     className={inputCls}
-                    placeholder="f.eks. 22"
+                    placeholder={t("returns.egPlaceholder", { value: "22" })}
                   />
                 </div>
                 <div>
-                  <label className={labelCls}>D&A (% av revenue)</label>
+                  <label className={labelCls}>{t("returns.daLabel")}</label>
                   <input
                     type="number"
                     step="0.1"
@@ -404,12 +407,12 @@ export default function DealReturnsMatrix({
                       updateParam("da_pct_revenue", Number(e.target.value) / 100)
                     }
                     className={inputCls}
-                    placeholder="f.eks. 5"
+                    placeholder={t("returns.egPlaceholder", { value: "5" })}
                   />
-                  <span className="text-[10px] text-gray-400">Proxy for EBT-beregning</span>
+                  <span className="text-[10px] text-gray-400">{t("returns.daHint")}</span>
                 </div>
                 <div>
-                  <label className={labelCls}>Exit-multipler (kommasep.)</label>
+                  <label className={labelCls}>{t("returns.exitMultiplesLabel")}</label>
                   <input
                     type="text"
                     value={exitMultiplesText}
@@ -449,22 +452,21 @@ export default function DealReturnsMatrix({
                   className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900 mb-3"
                 >
                   {showEquityParams ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  Kapitalstruktur (aktiverer Level 2: Full Equity IRR)
+                  {t("returns.capitalStructureToggle")}
                   {currentLevel === 2 && (
                     <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
-                      Aktiv
+                      {t("returns.capitalStructureActive")}
                     </span>
                   )}
                 </button>
                 <p className="text-xs text-gray-400 mb-3">
-                  Fyll inn ordinaer egenkapital og netto gjeld for a aktivere leveraged equity IRR.
-                  Lar felter sta tomme for forenklet EV-basert beregning.
+                  {t("returns.capitalStructureHint")}
                 </p>
 
                 {showEquityParams && (
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     <div>
-                      <label className={labelCls}>Ordinaer egenkapital (NOKm)</label>
+                      <label className={labelCls}>{t("returns.ordinaryEquityLabel")}</label>
                       <input
                         type="number"
                         value={params.ordinary_equity || ""}
@@ -472,11 +474,11 @@ export default function DealReturnsMatrix({
                           updateParam("ordinary_equity", Number(e.target.value) || undefined)
                         }
                         className={inputCls}
-                        placeholder="f.eks. 3000"
+                        placeholder={t("returns.egPlaceholder", { value: "3000" })}
                       />
                     </div>
                     <div>
-                      <label className={labelCls}>Preferred equity (NOKm)</label>
+                      <label className={labelCls}>{t("returns.preferredEquityLabel")}</label>
                       <input
                         type="number"
                         value={params.preferred_equity || ""}
@@ -484,11 +486,11 @@ export default function DealReturnsMatrix({
                           updateParam("preferred_equity", Number(e.target.value) || undefined)
                         }
                         className={inputCls}
-                        placeholder="f.eks. 500"
+                        placeholder={t("returns.egPlaceholder", { value: "500" })}
                       />
                     </div>
                     <div>
-                      <label className={labelCls}>Pref. equity PIK-rente (%)</label>
+                      <label className={labelCls}>{t("returns.prefPikRateLabel")}</label>
                       <input
                         type="number"
                         step="0.1"
@@ -501,11 +503,11 @@ export default function DealReturnsMatrix({
                           updateParam("preferred_equity_rate", Number(e.target.value) / 100 || undefined)
                         }
                         className={inputCls}
-                        placeholder="f.eks. 8"
+                        placeholder={t("returns.egPlaceholder", { value: "8" })}
                       />
                     </div>
                     <div>
-                      <label className={labelCls}>Netto gjeld (NOKm)</label>
+                      <label className={labelCls}>{t("returns.netDebtLabel")}</label>
                       <input
                         type="number"
                         value={params.net_debt || ""}
@@ -513,11 +515,11 @@ export default function DealReturnsMatrix({
                           updateParam("net_debt", Number(e.target.value) || undefined)
                         }
                         className={inputCls}
-                        placeholder="f.eks. 2000"
+                        placeholder={t("returns.egPlaceholder", { value: "2000" })}
                       />
                     </div>
                     <div>
-                      <label className={labelCls}>Gjeldsrente (%)</label>
+                      <label className={labelCls}>{t("returns.debtInterestLabel")}</label>
                       <input
                         type="number"
                         step="0.1"
@@ -530,11 +532,11 @@ export default function DealReturnsMatrix({
                           updateParam("interest_rate", Number(e.target.value) / 100 || undefined)
                         }
                         className={inputCls}
-                        placeholder="f.eks. 5"
+                        placeholder={t("returns.egPlaceholder", { value: "5" })}
                       />
                     </div>
                     <div>
-                      <label className={labelCls}>Arlig gjeldsavdrag (NOKm)</label>
+                      <label className={labelCls}>{t("returns.annualRepaymentLabel")}</label>
                       <input
                         type="number"
                         value={params.debt_amortisation || ""}
@@ -542,11 +544,11 @@ export default function DealReturnsMatrix({
                           updateParam("debt_amortisation", Number(e.target.value) || undefined)
                         }
                         className={inputCls}
-                        placeholder="f.eks. 100"
+                        placeholder={t("returns.egPlaceholder", { value: "100" })}
                       />
                     </div>
                     <div>
-                      <label className={labelCls}>Cash sweep (%)</label>
+                      <label className={labelCls}>{t("returns.cashSweepLabel")}</label>
                       <input
                         type="number"
                         step="5"
@@ -561,12 +563,12 @@ export default function DealReturnsMatrix({
                           updateParam("cash_sweep_pct", Number(e.target.value) / 100 || undefined)
                         }
                         className={inputCls}
-                        placeholder="f.eks. 75"
+                        placeholder={t("returns.egPlaceholder", { value: "75" })}
                       />
-                      <span className="text-[10px] text-gray-400">Andel overskudds-FCF til nedbetaling</span>
+                      <span className="text-[10px] text-gray-400">{t("returns.cashSweepHint")}</span>
                     </div>
                     <div>
-                      <label className={labelCls}>Rollover egenkapital (NOKm)</label>
+                      <label className={labelCls}>{t("returns.rolloverEquityLabel")}</label>
                       <input
                         type="number"
                         value={params.rollover_equity || ""}
@@ -574,7 +576,7 @@ export default function DealReturnsMatrix({
                           updateParam("rollover_equity", Number(e.target.value) || undefined)
                         }
                         className={inputCls}
-                        placeholder="f.eks. 200"
+                        placeholder={t("returns.egPlaceholder", { value: "200" })}
                       />
                     </div>
                   </div>
@@ -589,8 +591,8 @@ export default function DealReturnsMatrix({
                 >
                   <Calculator size={14} />
                   {calculating
-                    ? "Beregner..."
-                    : `Beregn IRR / MoM (Level ${currentLevel})`}
+                    ? t("returns.calculating")
+                    : t("returns.calculateIrrMom", { level: currentLevel })}
                 </button>
               </div>
             </div>
@@ -600,21 +602,16 @@ export default function DealReturnsMatrix({
           {!calculatedReturns && (
             <div className="text-center py-8 text-gray-400">
               <Calculator size={32} className="mx-auto mb-3 opacity-40" />
-              <p className="text-lg mb-2">Ingen beregninger enna</p>
-              <p className="text-sm mb-4">
-                Angi deal-parametere (minst <strong>Price paid</strong> og{" "}
-                <strong>Acquirer entry EV</strong>) og trykk{" "}
-                <strong>Beregn</strong>.
-              </p>
+              <p className="text-lg mb-2">{t("returns.noResultsTitle")}</p>
+              <p className="text-sm mb-4" dangerouslySetInnerHTML={{ __html: t("returns.noResultsDesc") }} />
               <p className="text-xs text-gray-300 mb-4">
-                Level 1 (forenklet): Tilgjengelig med EBITDA og pris.
-                Level 2 (full equity IRR): Fyll inn kapitalstruktur.
+                {t("returns.noResultsLevelHint")}
               </p>
               <button
                 onClick={() => setShowParams(true)}
                 className="text-[#002C55] hover:underline text-sm font-medium"
               >
-                Vis parametere
+                {t("returns.showParametersBtn")}
               </button>
             </div>
           )}
@@ -630,26 +627,26 @@ export default function DealReturnsMatrix({
               }`}>
                 <Info size={14} />
                 <span className="font-semibold">
-                  {level === 2 ? "Level 2: Full Equity IRR" : "Level 1: Forenklet (EV-basert)"}
+                  {level === 2 ? t("returns.level2FullEquity") : t("returns.level1Simplified")}
                 </span>
                 <span className="text-gray-500">
                   {level === 2
-                    ? "— Leveraged equity-basert IRR med gjeldsplan og preferred equity PIK"
-                    : "— Unlevered EV-basert avkastning. Fyll inn kapitalstruktur for Level 2."}
+                    ? `— ${t("returns.level2Description")}`
+                    : `— ${t("returns.level1Description")}`}
                 </span>
               </div>
 
               {/* Main IRR/MoM table */}
               <div>
                 <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                  Deal returns ({level === 2 ? "Equity IRR" : "IRR"} / MoM)
+                  {t("returns.dealReturnsTitle", { type: level === 2 ? "Equity IRR" : "IRR" })}
                 </h4>
                 <div className="overflow-x-auto">
                   <table className="ecit-table w-full">
                     <thead>
                       <tr>
                         <th className="text-left min-w-[200px]">
-                          NTM exit multiple:
+                          {t("returns.ntmExitMultiple")}
                         </th>
                         {exitMultiples.map((m) => (
                           <th key={m} className="num min-w-[90px]">
@@ -663,9 +660,9 @@ export default function DealReturnsMatrix({
                         const data = matrixByCaseAndMult[caseName] || {};
                         const label =
                           caseName === "Standalone"
-                            ? `${acquirerName} standalone`
+                            ? t("returns.standaloneLabel", { name: acquirerName })
                             : caseName === "Kombinert"
-                            ? `${acquirerName} + ${targetName}`
+                            ? t("returns.combinedLabel", { acquirer: acquirerName, target: targetName })
                             : caseName;
 
                         return (
@@ -680,10 +677,10 @@ export default function DealReturnsMatrix({
                             <td className="font-semibold text-gray-900">
                               <div>{label}</div>
                               {caseName === "Standalone" && level === 2 && (
-                                <div className="text-[10px] text-gray-400 font-normal">EV-basert (Level 1)</div>
+                                <div className="text-[10px] text-gray-400 font-normal">{t("returns.evBasedLevel1")}</div>
                               )}
                               {caseName === "Kombinert" && level === 2 && (
-                                <div className="text-[10px] text-blue-500 font-normal">Equity IRR (Level 2)</div>
+                                <div className="text-[10px] text-blue-500 font-normal">{t("returns.equityIrrLevel2")}</div>
                               )}
                             </td>
                             {exitMultiples.map((mult) => {
@@ -714,10 +711,10 @@ export default function DealReturnsMatrix({
               {hasPerShareData && combinedCase && (
                 <div>
                   <h4 className="text-sm font-semibold text-gray-900 mb-1">
-                    Per-aksje avkastning (etter utvanning)
+                    {t("returns.perShareReturnsTitle")}
                   </h4>
                   <p className="text-xs text-gray-500 mb-3">
-                    Avkastning per eksisterende aksje etter utvanning fra MIP, warrants og rollover
+                    {t("returns.perShareReturnsDesc")}
                     {shareSummary && shareSummary.dilution_value_pct != null && shareSummary.dilution_value_pct > 0 && (
                       <span className={`ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
                         shareSummary.dilution_value_pct > 0.15
@@ -726,23 +723,25 @@ export default function DealReturnsMatrix({
                           ? "bg-amber-100 text-amber-700"
                           : "bg-green-100 text-green-700"
                       }`}>
-                        {nbFmt1.format(shareSummary.dilution_value_pct * 100)} % verdi-utvanning
+                        {t("returns.valueDilutionBadge", { pct: nbFmt1.format(shareSummary.dilution_value_pct * 100) })}
                       </span>
                     )}
                     {shareSummary && !(shareSummary.dilution_value_pct != null && shareSummary.dilution_value_pct > 0) && (
                       <span className="text-gray-400">
-                        {" "}&mdash; {nbFmt1.format(shareSummary.entry_shares)}m aksjer ved inngang,{" "}
-                        {nbFmt1.format(shareSummary.total_exit_shares)}m ved exit
-                        ({nbFmt1.format(shareSummary.dilution_pct * 100)}% utvanning)
+                        {" "}&mdash; {t("returns.sharesEntryExitDetail", {
+                          entry: nbFmt1.format(shareSummary.entry_shares),
+                          exit: nbFmt1.format(shareSummary.total_exit_shares),
+                          pct: nbFmt1.format(shareSummary.dilution_pct * 100),
+                        })}
                       </span>
                     )}
                   </p>
-                  <div className="overflow-x-auto">
+                   <div className="overflow-x-auto">
                     <table className="ecit-table w-full">
                       <thead>
                         <tr>
                           <th className="text-left min-w-[200px]">
-                            NTM exit multiple:
+                            {t("returns.ntmExitMultiple")}
                           </th>
                           {exitMultiples.map((m) => (
                             <th key={m} className="num min-w-[90px]">
@@ -753,11 +752,11 @@ export default function DealReturnsMatrix({
                       </thead>
                       <tbody>
                         {/* Per-share IRR/MoM row */}
-                        <tr className="!bg-[#EDE8F5]">
+                         <tr className="!bg-[#EDE8F5]">
                           <td className="font-semibold text-gray-900">
-                            <div>Per aksje (kombinert)</div>
+                            <div>{t("returns.perShareCombined")}</div>
                             <div className="text-[10px] text-purple-600 font-normal">
-                              IRR / MoM per eksisterende aksje
+                              {t("returns.perShareIrrMomDetail")}
                             </div>
                           </td>
                           {exitMultiples.map((mult) => {
@@ -780,9 +779,9 @@ export default function DealReturnsMatrix({
                         {/* Per-share value row (NOK per share) */}
                         <tr>
                           <td className="text-gray-700 font-medium">
-                            <div>Verdi per aksje (NOK)</div>
+                            <div>{t("returns.valuePerShare")}</div>
                             <div className="text-[10px] text-gray-400 font-normal">
-                              Inngang → exit
+                              {t("returns.entryToExit")}
                             </div>
                           </td>
                           {exitMultiples.map((mult) => {
@@ -806,7 +805,7 @@ export default function DealReturnsMatrix({
                         {/* Total equity vs per-share IRR delta */}
                         <tr>
                           <td className="text-gray-700 font-medium">
-                            IRR-differanse (total vs per-aksje)
+                            {t("returns.irrDiffTotalVsPerShare")}
                           </td>
                           {exitMultiples.map((mult) => {
                             const cell = matrixByCaseAndMult[combinedCase]?.[mult];
@@ -837,34 +836,38 @@ export default function DealReturnsMatrix({
                     <div className="mt-3 bg-purple-50 border border-purple-200 rounded-lg px-4 py-3 text-sm text-purple-900">
                       {shareSummary.oe_implied && (
                         <div className="text-xs text-purple-600 font-medium mb-2">
-                          Aksjetall justert for OE: {shareSummary.db_entry_shares
-                            ? `${nbFmt1.format(shareSummary.db_entry_shares)}m (DB) → ${nbFmt1.format(shareSummary.entry_shares)}m (OE / NOK ${nbFmt1.format(shareSummary.entry_price_per_share)}/aksje)`
-                            : `${nbFmt1.format(shareSummary.entry_shares)}m (OE-implied)`}
+                          {shareSummary.db_entry_shares
+                            ? t("returns.shareCountAdjusted", {
+                                from: nbFmt1.format(shareSummary.db_entry_shares),
+                                to: nbFmt1.format(shareSummary.entry_shares),
+                                price: nbFmt1.format(shareSummary.entry_price_per_share),
+                              })
+                            : t("returns.shareCountImplied", { count: nbFmt1.format(shareSummary.entry_shares) })}
                         </div>
                       )}
                       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-x-6 gap-y-1 text-xs">
                         <div>
-                          <span className="font-medium">Aksjer ved inngang:</span>{" "}
+                          <span className="font-medium">{t("returns.sharesAtEntry")}</span>{" "}
                           {nbFmt1.format(shareSummary.entry_shares)}m
                         </div>
                         <div>
-                          <span className="font-medium">Aksjer ved exit (basis):</span>{" "}
+                          <span className="font-medium">{t("returns.sharesAtExitBase")}</span>{" "}
                           {nbFmt1.format(shareSummary.exit_shares_base)}m
                         </div>
                         <div>
-                          <span className="font-medium">Rollover-aksjer:</span>{" "}
+                          <span className="font-medium">{t("returns.rolloverSharesLabel")}</span>{" "}
                           {nbFmt1.format(shareSummary.rollover_shares)}m
                         </div>
                         <div>
-                          <span className="font-medium">Totalt ved exit:</span>{" "}
+                          <span className="font-medium">{t("returns.totalAtExit")}</span>{" "}
                           {nbFmt1.format(shareSummary.total_exit_shares)}m
                         </div>
                         <div>
-                          <span className="font-medium">Utvanning (aksjer):</span>{" "}
+                          <span className="font-medium">{t("returns.dilutionShares")}</span>{" "}
                           {nbFmt1.format(shareSummary.dilution_pct * 100)}%
                         </div>
                         <div>
-                          <span className="font-medium">FMV per aksje (inngang):</span>{" "}
+                          <span className="font-medium">{t("returns.fmvPerShareEntry")}</span>{" "}
                           NOK {nbFmt1.format(shareSummary.entry_price_per_share)}
                         </div>
                       </div>
@@ -873,44 +876,44 @@ export default function DealReturnsMatrix({
                       {(shareSummary.exit_eqv_gross ?? 0) > 0 && (
                         <div className="mt-3 pt-3 border-t border-purple-200">
                           <div className="text-xs font-semibold text-purple-800 mb-2">
-                            Verdi-utvanning ved exit (median multippel)
+                            {t("returns.valueDilutionAtExit")}
                           </div>
                           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-x-4 gap-y-1 text-xs">
                             <div>
-                              <span className="font-medium">Exit EQV:</span>{" "}
+                              <span className="font-medium">{t("returns.exitEqvLabel")}</span>{" "}
                               {nbFmt1.format(shareSummary.exit_eqv_gross!)} NOKm
                             </div>
                             {(shareSummary.exit_preferred_equity ?? 0) > 0 && (
                               <div className="text-amber-700">
-                                <span className="font-medium">&minus; Pref:</span>{" "}
+                                <span className="font-medium">&minus; {t("returns.prefLabel")}</span>{" "}
                                 ({nbFmt1.format(shareSummary.exit_preferred_equity!)})
                               </div>
                             )}
                             {(shareSummary.exit_mip_amount ?? 0) > 0 && (
                               <div className="text-red-700">
-                                <span className="font-medium">&minus; MIP:</span>{" "}
+                                <span className="font-medium">&minus; {t("returns.mipLabel")}</span>{" "}
                                 ({nbFmt1.format(shareSummary.exit_mip_amount!)})
                               </div>
                             )}
                             {(shareSummary.exit_tso_amount ?? 0) > 0 && (
                               <div className="text-red-700">
-                                <span className="font-medium">&minus; TSO:</span>{" "}
+                                <span className="font-medium">&minus; {t("returns.tsoLabel")}</span>{" "}
                                 ({nbFmt1.format(shareSummary.exit_tso_amount!)})
                               </div>
                             )}
                             {(shareSummary.exit_warrants_amount ?? 0) > 0 && (
                               <div className="text-orange-700">
-                                <span className="font-medium">&minus; Warrants:</span>{" "}
+                                <span className="font-medium">&minus; {t("returns.warrantsLabel")}</span>{" "}
                                 ({nbFmt1.format(shareSummary.exit_warrants_amount!)})
                               </div>
                             )}
                             <div className="font-bold text-blue-800">
-                              <span className="font-medium">= Ord. EK:</span>{" "}
+                              <span className="font-medium">= {t("returns.ordEkLabel")}</span>{" "}
                               {nbFmt1.format(shareSummary.exit_eqv_post_dilution ?? 0)} NOKm
                             </div>
                             {(shareSummary.exit_per_share_post ?? 0) > 0 && (
                               <div className="font-bold text-blue-800">
-                                <span className="font-medium">Per aksje:</span>{" "}
+                                <span className="font-medium">{t("returns.perShareLabel")}</span>{" "}
                                 NOK {nbFmt1.format(shareSummary.exit_per_share_post!)}
                               </div>
                             )}
@@ -926,13 +929,12 @@ export default function DealReturnsMatrix({
               {standaloneCase && combinedCase && (
                 <div>
                   <h4 className="text-sm font-semibold text-gray-900 mb-1">
-                    Accretion (Delta vs standalone)
+                    {t("returns.accretionTitle")}
                   </h4>
                   <p className="text-xs text-gray-500 mb-3">
-                    Viser hvor mye IRR/MoM forbedres ved a kjope {targetName}{" "}
-                    vs. {acquirerName} standalone
+                    {t("returns.accretionDesc", { target: targetName, acquirer: acquirerName })}
                     {level === 2 && (
-                      <span className="text-gray-400"> (NB: standalone er Level 1, kombinert er Level 2)</span>
+                      <span className="text-gray-400"> {t("returns.accretionLevelNote")}</span>
                     )}
                   </p>
                   <div className="overflow-x-auto">
@@ -940,7 +942,7 @@ export default function DealReturnsMatrix({
                       <thead>
                         <tr>
                           <th className="text-left min-w-[200px]">
-                            NTM exit multiple:
+                            {t("returns.ntmExitMultiple")}
                           </th>
                           {exitMultiples.map((m) => (
                             <th key={m} className="num min-w-[90px]">
@@ -953,7 +955,7 @@ export default function DealReturnsMatrix({
                         {/* Standalone ref row */}
                         <tr>
                           <td className="text-gray-700 font-medium">
-                            Standalone ref.
+                            {t("returns.standaloneRef")}
                           </td>
                           {exitMultiples.map((mult) => {
                             const s =
@@ -1032,12 +1034,16 @@ export default function DealReturnsMatrix({
                     const sign = irrDelta >= 0 ? "+" : "";
                     const accretive = irrDelta >= 0 ? "accretive" : "dilutive";
                     return (
-                      <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-900">
-                        <strong>Eksempel:</strong> Ved exit {refMult}x er oppkjop av{" "}
-                        {targetName} <strong>{accretive}</strong> ({sign}
-                        {nbFmt1.format(irrDelta * 100)}% IRR) sammenlignet med{" "}
-                        {acquirerName} standalone ved {refMult}x.
-                      </div>
+                      <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-900"
+                        dangerouslySetInnerHTML={{ __html: t("returns.workedExample", {
+                          mult: refMult,
+                          target: targetName,
+                          accretive: t(`returns.${accretive}`),
+                          sign,
+                          delta: nbFmt1.format(irrDelta * 100),
+                          acquirer: acquirerName,
+                        }) }}
+                      />
                     );
                   })()}
                 </div>
@@ -1046,45 +1052,45 @@ export default function DealReturnsMatrix({
               {/* Summary info */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-gray-500 border-t border-gray-100 pt-4">
                 <div>
-                  <span className="font-medium">Price paid:</span>{" "}
+                  <span className="font-medium">{t("returns.summaryPricePaid")}</span>{" "}
                   {nbFmt1.format(params.price_paid)} NOKm
                 </div>
                 <div>
-                  <span className="font-medium">Acquirer EV:</span>{" "}
+                  <span className="font-medium">{t("returns.summaryAcquirerEV")}</span>{" "}
                   {nbFmt1.format(params.acquirer_entry_ev || 0)} NOKm
                 </div>
                 <div>
-                  <span className="font-medium">Skattesats:</span>{" "}
+                  <span className="font-medium">{t("returns.summaryTaxRate")}</span>{" "}
                   {nbFmt1.format((params.tax_rate || 0) * 100)}%
                 </div>
                 {level === 2 && (
                   <>
                     <div>
-                      <span className="font-medium">Ordinaer EK:</span>{" "}
+                      <span className="font-medium">{t("returns.summaryOrdinaryEK")}</span>{" "}
                       {nbFmt1.format(params.ordinary_equity || 0)} NOKm
                     </div>
                     <div>
-                      <span className="font-medium">Netto gjeld:</span>{" "}
+                      <span className="font-medium">{t("returns.summaryNetDebt")}</span>{" "}
                       {nbFmt1.format(params.net_debt || 0)} NOKm
                     </div>
                     {(params.preferred_equity ?? 0) > 0 && (
                       <div>
-                        <span className="font-medium">Pref. equity:</span>{" "}
+                        <span className="font-medium">{t("returns.summaryPrefEquity")}</span>{" "}
                         {nbFmt1.format(params.preferred_equity || 0)} NOKm @ {nbFmt1.format((params.preferred_equity_rate || 0) * 100)}%
                       </div>
                     )}
                     {(params.cash_sweep_pct ?? 0) > 0 && (
                       <div>
-                        <span className="font-medium">Cash sweep:</span>{" "}
-                        {nbFmt1.format((params.cash_sweep_pct || 0) * 100)}% av overskudds-FCF
+                        <span className="font-medium">{t("returns.summaryCashSweep")}</span>{" "}
+                        {nbFmt1.format((params.cash_sweep_pct || 0) * 100)}% {t("returns.ofExcessFcf")}
                       </div>
                     )}
                   </>
                 )}
                 {level === 1 && (
                   <div>
-                    <span className="font-medium">D&A proxy:</span>{" "}
-                    {nbFmt1.format((params.da_pct_revenue || 0) * 100)}% av revenue
+                    <span className="font-medium">{t("returns.summaryDAProxy")}</span>{" "}
+                    {nbFmt1.format((params.da_pct_revenue || 0) * 100)}% {t("returns.ofRevenue")}
                   </div>
                 )}
               </div>

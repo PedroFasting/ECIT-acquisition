@@ -587,7 +587,8 @@ router.post(
   async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
-      const { deal_parameters: dp } = req.body as { deal_parameters: DealParameters };
+      const body = req.body || {};
+      const dp = body.deal_parameters as DealParameters | undefined;
 
       if (!dp || !dp.price_paid) {
         res.status(400).json({ error: "deal_parameters with price_paid is required" });
@@ -709,8 +710,8 @@ router.post(
         pfData.push({
           ebitda: acqEbitda + tgtEbitda + synergy,
           revenue: (parseFloat(ap.revenue_total) || 0) + (tp ? parseFloat(tp.revenue_total) || 0 : 0),
-          capex: (ap.capex != null ? parseFloat(ap.capex) : 0) + (tp?.capex != null ? parseFloat(tp.capex) : 0) || undefined,
-          change_nwc: (ap.change_nwc != null ? parseFloat(ap.change_nwc) : 0) + (tp?.change_nwc != null ? parseFloat(tp.change_nwc) : 0) || undefined,
+          capex: (ap.capex != null || tp?.capex != null) ? (ap.capex != null ? parseFloat(ap.capex) : 0) + (tp?.capex != null ? parseFloat(tp.capex) : 0) : undefined,
+          change_nwc: (ap.change_nwc != null || tp?.change_nwc != null) ? (ap.change_nwc != null ? parseFloat(ap.change_nwc) : 0) + (tp?.change_nwc != null ? parseFloat(tp.change_nwc) : 0) : undefined,
           nibd_fcf: pfNibdFcf,
         });
       }
@@ -909,8 +910,8 @@ router.post(
           pfData.push({
             ebitda: acqEbitda + tgtEbitda + synergy,
             revenue: (parseFloat(ap.revenue_total) || 0) + (tp ? parseFloat(tp.revenue_total) || 0 : 0),
-            capex: (ap.capex != null ? parseFloat(ap.capex) : 0) + (tp?.capex != null ? parseFloat(tp.capex) : 0) || undefined,
-            change_nwc: (ap.change_nwc != null ? parseFloat(ap.change_nwc) : 0) + (tp?.change_nwc != null ? parseFloat(tp.change_nwc) : 0) || undefined,
+            capex: (ap.capex != null || tp?.capex != null) ? (ap.capex != null ? parseFloat(ap.capex) : 0) + (tp?.capex != null ? parseFloat(tp.capex) : 0) : undefined,
+            change_nwc: (ap.change_nwc != null || tp?.change_nwc != null) ? (ap.change_nwc != null ? parseFloat(ap.change_nwc) : 0) + (tp?.change_nwc != null ? parseFloat(tp.change_nwc) : 0) : undefined,
             nibd_fcf: pfNibdFcf,
           });
         }
@@ -1361,8 +1362,8 @@ router.get(
           return {
             ebitda: (parseFloat(ap.ebitda_total) || 0) + (tp ? parseFloat(tp.ebitda_total) || 0 : 0) + synergy,
             revenue: (parseFloat(ap.revenue_total) || 0) + (tp ? parseFloat(tp.revenue_total) || 0 : 0),
-            capex: (ap.capex != null ? parseFloat(ap.capex) : 0) + (tp?.capex != null ? parseFloat(tp.capex) : 0) || undefined,
-            change_nwc: (ap.change_nwc != null ? parseFloat(ap.change_nwc) : 0) + (tp?.change_nwc != null ? parseFloat(tp.change_nwc) : 0) || undefined,
+            capex: (ap.capex != null || tp?.capex != null) ? (ap.capex != null ? parseFloat(ap.capex) : 0) + (tp?.capex != null ? parseFloat(tp.capex) : 0) : undefined,
+            change_nwc: (ap.change_nwc != null || tp?.change_nwc != null) ? (ap.change_nwc != null ? parseFloat(ap.change_nwc) : 0) + (tp?.change_nwc != null ? parseFloat(tp.change_nwc) : 0) : undefined,
           };
         });
       }

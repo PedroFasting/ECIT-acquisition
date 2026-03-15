@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import api from "../services/api";
 import type {
   AcquisitionScenario,
@@ -26,9 +27,11 @@ import SynergiesEditor from "../components/scenario/SynergiesEditor";
 import ShareTracker from "../components/scenario/ShareTracker";
 import DebtScheduleTable from "../components/scenario/DebtScheduleTable";
 import SensitivityHeatmap from "../components/scenario/SensitivityHeatmap";
+import { getErrorMessage } from "../utils/errors";
 
 export default function ScenarioDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { t } = useTranslation();
   const [scenario, setScenario] = useState<AcquisitionScenario | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -63,8 +66,8 @@ export default function ScenarioDetailPage() {
     try {
       const data = await api.getScenario(Number(id));
       setScenario(data);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -76,10 +79,10 @@ export default function ScenarioDetailPage() {
 
   // ─── Actions ──────────────────────────────────────────────
 
-  const showSuccess = (msg: string) => {
+  const showSuccess = useCallback((msg: string) => {
     setSuccessMsg(msg);
     setTimeout(() => setSuccessMsg(""), 3000);
-  };
+  }, []);
 
   const handleGenerateProForma = async () => {
     if (!id) return;
@@ -88,9 +91,9 @@ export default function ScenarioDetailPage() {
     try {
       await api.generateProForma(Number(id));
       await fetchScenario();
-      showSuccess("Pro forma generert");
-    } catch (err: any) {
-      setError(err.message);
+      showSuccess(t("scenarioDetail.generated"));
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setGenerating(false);
     }
@@ -102,9 +105,9 @@ export default function ScenarioDetailPage() {
     setError("");
     try {
       await api.exportExcel(Number(id), scenario?.name);
-      showSuccess("Excel-fil lastet ned");
-    } catch (err: any) {
-      setError(err.message);
+      showSuccess(t("scenarios.excelExported"));
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setExporting(false);
     }
@@ -128,14 +131,12 @@ export default function ScenarioDetailPage() {
       setDebtSchedule(debtSched ?? null);
       setShareSummary(ss ?? null);
       // Sync params back to local scenario state
-      if (scenario) {
-        setScenario((prev) =>
-          prev ? { ...prev, deal_parameters: params } : prev
-        );
-      }
-      showSuccess("Deal returns beregnet");
+      setScenario((prev) =>
+        prev ? { ...prev, deal_parameters: params } : prev
+      );
+      showSuccess(t("scenarios.irrCalculated"));
     },
-    [scenario]
+    [showSuccess, t]
   );
 
   // Sync calculated returns from compare result if scenario has deal_parameters
@@ -151,9 +152,9 @@ export default function ScenarioDetailPage() {
     try {
       await api.updateScenario(Number(id), { sources, uses } as any);
       await fetchScenario();
-      showSuccess("Sources & uses lagret");
-    } catch (err: any) {
-      setError(err.message);
+      showSuccess(t("scenarios.suSaved"));
+    } catch (err) {
+      setError(getErrorMessage(err));
     }
   };
 
@@ -162,15 +163,16 @@ export default function ScenarioDetailPage() {
     preferred_equity: number | null;
     preferred_equity_rate: number | null;
     net_debt: number | null;
+    deal_parameters?: Record<string, unknown>;
   }) => {
     if (!id) return;
     setError("");
     try {
       await api.updateScenario(Number(id), fields as any);
       await fetchScenario();
-      showSuccess("Kapitalstruktur lagret");
-    } catch (err: any) {
-      setError(err.message);
+      showSuccess(t("scenarios.capitalSaved"));
+    } catch (err) {
+      setError(getErrorMessage(err));
     }
   };
 
@@ -180,9 +182,9 @@ export default function ScenarioDetailPage() {
     try {
       await api.updateScenario(Number(id), { cost_synergies_timeline: timeline } as any);
       await fetchScenario();
-      showSuccess("Synergier lagret");
-    } catch (err: any) {
-      setError(err.message);
+      showSuccess(t("scenarios.synergiesSaved"));
+    } catch (err) {
+      setError(getErrorMessage(err));
     }
   };
 
@@ -191,7 +193,7 @@ export default function ScenarioDetailPage() {
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center h-full">
-        <div className="text-gray-400">Laster scenario...</div>
+        <div className="text-gray-400">{t("scenarios.loadingAnalysis")}</div>
       </div>
     );
   }
@@ -199,7 +201,7 @@ export default function ScenarioDetailPage() {
   if (!scenario) {
     return (
       <div className="p-8">
-        <p className="text-red-600">Scenario ikke funnet. {error}</p>
+        <p className="text-red-600">{t("scenarioDetail.notFound")} {error}</p>
       </div>
     );
   }
@@ -221,7 +223,7 @@ export default function ScenarioDetailPage() {
           className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4"
         >
           <ArrowLeft size={14} />
-          Tilbake til scenarier
+          {t("scenarioDetail.backToScenarios")}
         </Link>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
@@ -233,7 +235,7 @@ export default function ScenarioDetailPage() {
             <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-400">
               {scenario.acquisition_date && (
                 <span>
-                   Oppkjøp:{" "}
+                   {t("scenarioDetail.acquisitionDate")}:{" "}
                   {new Date(scenario.acquisition_date).toLocaleDateString("nb-NO")}
                 </span>
               )}
@@ -244,10 +246,10 @@ export default function ScenarioDetailPage() {
                 </span>
               )}
               {scenario.enterprise_value && (
-                <span>EV: {formatNum(scenario.enterprise_value)} NOKm</span>
+                <span>EV: {formatNum(scenario.enterprise_value)} {t("common.nokm")}</span>
               )}
               {scenario.share_price && (
-                <span>Pris: NOK {scenario.share_price}/aksje</span>
+                <span>{t("scenarioDetail.price")}: {t("common.nok")} {scenario.share_price}/{t("common.share")}</span>
               )}
             </div>
           </div>
@@ -258,7 +260,7 @@ export default function ScenarioDetailPage() {
               className="flex items-center gap-2 px-4 py-2.5 bg-[#1B6B3A] text-white rounded-lg hover:bg-[#155a2f] transition-colors text-sm font-medium disabled:opacity-50 shadow-sm"
             >
               <Download size={16} className={exporting ? "animate-bounce" : ""} />
-              {exporting ? "Eksporterer..." : "Excel Export"}
+              {exporting ? t("common.exporting") : t("scenarios.excelExport")}
             </button>
             <button
               onClick={handleGenerateProForma}
@@ -266,7 +268,7 @@ export default function ScenarioDetailPage() {
               className="flex items-center gap-2 px-4 py-2.5 bg-[#03223F] text-white rounded-lg hover:bg-[#002C55] transition-colors text-sm font-medium disabled:opacity-50 shadow-sm"
             >
               <RefreshCw size={16} className={generating ? "animate-spin" : ""} />
-              {generating ? "Genererer..." : "Generer Pro Forma"}
+              {generating ? t("common.calculating") : t("scenarioDetail.generateProForma")}
             </button>
           </div>
         </div>
@@ -305,8 +307,8 @@ export default function ScenarioDetailPage() {
       <div className="bg-white rounded-xl border border-gray-200 mb-8">
         <SectionHeader
           sectionKey="charts"
-          title="Finansiell utvikling"
-          subtitle="EBITDA og omsetning over tid"
+          title={t("scenarios.financialDevelopment")}
+          subtitle={t("scenarios.financialDevelopmentSub")}
           expanded={expandedSections.charts}
           onToggle={toggleSection}
         />
@@ -425,21 +427,21 @@ export default function ScenarioDetailPage() {
       {/* Empty state warnings */}
       {pfPeriods.length === 0 && acquirerPeriods.length > 0 && targetPeriods.length > 0 && (
         <div className="bg-white rounded-xl border border-dashed border-gray-300 p-12 text-center text-gray-400 mb-8">
-          <p className="text-lg mb-2">Klar til å generere pro forma</p>
+          <p className="text-lg mb-2">{t("scenarioDetail.readyToGenerate")}</p>
           <p className="text-sm mb-4">
-            Begge modeller har data. Klikk "Generer Pro Forma" for å slå sammen.
+            {t("scenarioDetail.bothModelsHaveData")}
           </p>
         </div>
       )}
 
       {acquirerPeriods.length === 0 && (
         <div className="bg-amber-50 text-amber-800 px-4 py-3 rounded-lg text-sm mb-4">
-           Oppkjøper-modellen har ingen data. Importer finansdata først.
+           {t("scenarioDetail.acquirerNoData")}
         </div>
       )}
       {targetPeriods.length === 0 && (
         <div className="bg-amber-50 text-amber-800 px-4 py-3 rounded-lg text-sm mb-4">
-           Target-modellen har ingen data. Importer finansdata først.
+           {t("scenarioDetail.targetNoData")}
         </div>
       )}
     </div>

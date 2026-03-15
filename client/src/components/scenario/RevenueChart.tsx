@@ -11,6 +11,7 @@ import {
 import type { FinancialPeriod, ProFormaPeriod } from "../../types";
 import { toNum, formatTooltip } from "./helpers";
 import CopyChartButton from "./CopyChartButton";
+import { useTranslation } from "react-i18next";
 
 interface RevenueChartProps {
   acquirerPeriods: FinancialPeriod[];
@@ -28,6 +29,7 @@ export default function RevenueChart({
   targetName,
 }: RevenueChartProps) {
   const hasPf = pfPeriods.length > 0;
+  const { t } = useTranslation();
 
   const chartData = acquirerPeriods.map((ap) => {
     const dateKey = ap.period_date.split("T")[0];
@@ -50,7 +52,7 @@ export default function RevenueChart({
     <CopyChartButton fileName="revenue">
       <div>
         <h4 className="text-sm font-semibold text-gray-900 mb-4">
-          {hasPf ? "Revenue-sammensetning PF (NOKm)" : "Revenue-sammenligning (NOKm)"}
+          {hasPf ? t("charts.revenueComposition") : t("charts.revenueComparison")}
         </h4>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chartData}>

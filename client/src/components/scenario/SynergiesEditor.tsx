@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Save, TrendingUp, RotateCcw } from "lucide-react";
 import type { AcquisitionScenario, FinancialPeriod, ProFormaPeriod } from "../../types";
 import SectionHeader from "./SectionHeader";
+import { useTranslation } from "react-i18next";
 
 // ── Norwegian number helpers ──────────────────────────────────────
 
@@ -41,11 +42,15 @@ export default function SynergiesEditor({
   onToggle,
   onSave,
 }: SynergiesEditorProps) {
+  const { t } = useTranslation();
   // Extract years from acquirer periods (these drive the projection timeline)
-  const years = acquirerPeriods.map((p) => {
-    const d = new Date(p.period_date);
-    return d.getFullYear().toString();
-  });
+  const years = useMemo(
+    () => acquirerPeriods.map((p) => {
+      const d = new Date(p.period_date);
+      return d.getFullYear().toString();
+    }),
+    [acquirerPeriods]
+  );
 
   // Initialize timeline from scenario's saved values
   const [timeline, setTimeline] = useState<Record<string, number>>(() => {
@@ -59,6 +64,7 @@ export default function SynergiesEditor({
 
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const rampInputRef = useRef<HTMLInputElement>(null);
 
   // Re-sync when scenario changes (different ID or external save)
   useEffect(() => {
@@ -69,7 +75,7 @@ export default function SynergiesEditor({
     }
     setTimeline(updated);
     setDirty(false);
-  }, [scenario.id, scenario.cost_synergies_timeline]);
+  }, [scenario.id, scenario.cost_synergies_timeline, years]);
 
   const updateYear = (year: string, value: number) => {
     setTimeline((prev) => ({ ...prev, [year]: value }));
@@ -135,18 +141,18 @@ export default function SynergiesEditor({
     <div className="bg-white rounded-xl border border-gray-200 mb-8">
       <SectionHeader
         sectionKey="synergies"
-        title="Kostnadssynergier"
-        subtitle={`Arlig synergi-estimat for ${acquirerName} + ${targetName}`}
+        title={t("synergies.title")}
+        subtitle={`${t("synergies.title")} — ${acquirerName} + ${targetName}`}
         expanded={expanded}
         onToggle={onToggle}
         actions={
           dirty ? (
             <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
-              Ulagret
+              {t("synergies.unsaved")}
             </span>
           ) : totalSynergies > 0 ? (
             <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
-              {nbFmt1.format(totalSynergies)} NOKm totalt
+              {t("synergies.totalBadge", { amount: nbFmt1.format(totalSynergies) })}
             </span>
           ) : null
         }
@@ -156,18 +162,18 @@ export default function SynergiesEditor({
         <div className="p-6">
           {/* Description */}
           <p className="text-xs text-gray-500 mb-4">
-            Angi forventede kostnadssynergier per ar (NOKm). Synergiene legges til pro forma EBITDA
-            og pavirker combined IRR/MoM i Deal Returns.
+            {t("synergies.placeholder")}
           </p>
 
           {/* Ramp tool */}
           <div className="flex items-center gap-3 mb-5">
             <label className="text-xs font-medium text-gray-600 whitespace-nowrap">
-              Hurtigramp (full run-rate NOKm):
+              {t("synergies.quickRamp")}:
             </label>
             <input
               type="number"
-              placeholder="f.eks. 40"
+              ref={rampInputRef}
+              placeholder={t("synergies.rampPlaceholder")}
               className="w-28 px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-right focus:ring-2 focus:ring-[#002C55] focus:border-[#002C55] outline-none"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
@@ -178,15 +184,12 @@ export default function SynergiesEditor({
             />
             <button
               onClick={() => {
-                const input = document.querySelector<HTMLInputElement>(
-                  'input[placeholder="f.eks. 40"]'
-                );
-                const val = Number(input?.value || 0);
+                const val = Number(rampInputRef.current?.value || 0);
                 if (val > 0) handleApplyRamp(val);
               }}
               className="flex items-center gap-1 px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
             >
-              <TrendingUp size={12} /> Fordel lineaert
+              <TrendingUp size={12} /> {t("synergies.distributeLinear")}
             </button>
           </div>
 
@@ -201,16 +204,16 @@ export default function SynergiesEditor({
                       {y}
                     </th>
                   ))}
-                  <th className="num min-w-[100px] bg-gray-50">Totalt</th>
+                  <th className="num min-w-[100px] bg-gray-50">{t("common.total")}</th>
                 </tr>
               </thead>
               <tbody>
                 {/* Input row */}
                 <tr className="!bg-amber-50/50">
                   <td className="font-semibold text-gray-900">
-                    <div>Kostnadssynergier (NOKm)</div>
+                    <div>{t("synergies.title")} ({t("common.nokm")})</div>
                     <div className="text-[10px] text-gray-400 font-normal">
-                      Redifiger direkte
+                      {t("synergies.editDirectly")}
                     </div>
                   </td>
                   {years.map((year) => (
@@ -236,7 +239,7 @@ export default function SynergiesEditor({
                 {/* Synergies as % of target EBITDA */}
                 <tr>
                   <td className="text-gray-600 text-xs">
-                    % av {targetName} EBITDA
+                    {t("synergies.pctOfTargetEbitda", { name: targetName })}
                   </td>
                   {years.map((year) => {
                     const data = ebitdaByYear[year];
@@ -261,7 +264,7 @@ export default function SynergiesEditor({
 
                 {/* PF EBITDA excl synergies */}
                 <tr>
-                  <td className="text-gray-600 text-xs">PF EBITDA ekskl. synergier</td>
+                  <td className="text-gray-600 text-xs">{t("synergies.pfEbitdaExcl")}</td>
                   {years.map((year) => {
                     const data = ebitdaByYear[year];
                     return (
@@ -276,7 +279,7 @@ export default function SynergiesEditor({
                 {/* PF EBITDA incl synergies */}
                 <tr className="!bg-green-50/50">
                   <td className="font-semibold text-gray-900 text-xs">
-                    PF EBITDA inkl. synergier
+                    {t("synergies.pfEbitdaIncl")}
                   </td>
                   {years.map((year) => {
                     const data = ebitdaByYear[year];
@@ -291,7 +294,7 @@ export default function SynergiesEditor({
 
                 {/* EBITDA uplift % */}
                 <tr>
-                  <td className="text-gray-600 text-xs">EBITDA-loft fra synergier</td>
+                  <td className="text-gray-600 text-xs">{t("synergies.ebitdaLift")}</td>
                   {years.map((year) => {
                     const data = ebitdaByYear[year];
                     const uplift = data?.excl > 0
@@ -312,7 +315,7 @@ export default function SynergiesEditor({
           {/* Action buttons */}
           <div className="flex items-center justify-between mt-4">
             <div className="text-xs text-gray-400">
-              Synergier pavirker kombinert EBITDA i Pro Forma, Equity Bridge og Deal Returns.
+              {t("synergies.impactNote")}
             </div>
             <div className="flex items-center gap-2">
               {dirty && (
@@ -320,7 +323,7 @@ export default function SynergiesEditor({
                   onClick={handleReset}
                   className="flex items-center gap-1 px-3 py-2 text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg font-medium transition-colors"
                 >
-                  <RotateCcw size={12} /> Tilbakestill
+                  <RotateCcw size={12} /> {t("synergies.reset")}
                 </button>
               )}
               <button
@@ -329,7 +332,7 @@ export default function SynergiesEditor({
                 className="flex items-center gap-1 px-4 py-2 text-xs bg-[#03223F] hover:bg-[#002C55] disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
               >
                 <Save size={12} />
-                {saving ? "Lagrer..." : "Lagre synergier"}
+                {saving ? t("synergies.saving") : t("synergies.saveSynergies")}
               </button>
             </div>
           </div>

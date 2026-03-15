@@ -1,4 +1,5 @@
 import React from "react";
+import i18next from "i18next";
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -34,7 +35,7 @@ export default class ErrorBoundary extends React.Component<
         <div className="p-8 max-w-4xl">
           <div className="bg-red-50 border border-red-200 rounded-xl p-6">
             <h2 className="text-lg font-bold text-red-800 mb-2">
-              Runtime Error
+              {i18next.t("errors.runtimeError")}
             </h2>
             <p className="text-red-700 text-sm mb-4">
               {this.state.error?.message}
@@ -45,7 +46,7 @@ export default class ErrorBoundary extends React.Component<
             {this.state.errorInfo && (
               <details className="mt-4">
                 <summary className="text-sm text-red-600 cursor-pointer">
-                  Component Stack
+                  {i18next.t("errors.componentStack")}
                 </summary>
                 <pre className="bg-red-100 rounded-lg p-4 text-xs text-red-900 overflow-auto max-h-[300px] whitespace-pre-wrap mt-2">
                   {this.state.errorInfo.componentStack}
@@ -58,7 +59,7 @@ export default class ErrorBoundary extends React.Component<
               }
               className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700"
             >
-              Prøv igjen
+              {i18next.t("errors.tryAgain")}
             </button>
           </div>
         </div>

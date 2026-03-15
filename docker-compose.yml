@@ -11,6 +11,12 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./server/src/models/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecit -d ecit_acquisition"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
   server:
     build: ./server
@@ -19,10 +25,11 @@ services:
       - "3001:3001"
     environment:
       DATABASE_URL: postgresql://ecit:ecit_dev_2026@db:5432/ecit_acquisition
-      JWT_SECRET: dev-secret-change-in-production
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-do-not-use-in-prod}
       NODE_ENV: development
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     volumes:
       - ./server/src:/app/src
 

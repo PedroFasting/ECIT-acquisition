@@ -1,5 +1,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { Grid3x3, Calculator, Info } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { getErrorMessage } from "../../utils/errors";
 import type {
   AcquisitionScenario,
   DealParameters,
@@ -61,7 +63,7 @@ function heatmapColor(val: number | null, metric: SensitivityMetric): string {
 
 interface AxisOption {
   param: string;
-  label: string;
+  labelKey: string;
   unit: string;
   isPercent: boolean;  // input is decimal (0.05), display as %
   isMultiple: boolean; // display with "x" suffix
@@ -71,7 +73,7 @@ interface AxisOption {
 const AXIS_OPTIONS: AxisOption[] = [
   {
     param: "exit_multiple",
-    label: "Exit-multippel",
+    labelKey: "sensitivity.axisOptions.exitMultiple",
     unit: "x",
     isPercent: false,
     isMultiple: true,
@@ -79,7 +81,7 @@ const AXIS_OPTIONS: AxisOption[] = [
   },
   {
     param: "price_paid",
-    label: "Entry-pris (target EV)",
+    labelKey: "sensitivity.axisOptions.entryPrice",
     unit: "NOKm",
     isPercent: false,
     isMultiple: false,
@@ -87,7 +89,7 @@ const AXIS_OPTIONS: AxisOption[] = [
   },
   {
     param: "interest_rate",
-    label: "Gjeldsrente",
+    labelKey: "sensitivity.axisOptions.debtInterest",
     unit: "%",
     isPercent: true,
     isMultiple: false,
@@ -95,7 +97,7 @@ const AXIS_OPTIONS: AxisOption[] = [
   },
   {
     param: "ordinary_equity",
-    label: "Ordinaer egenkapital",
+    labelKey: "sensitivity.axisOptions.ordinaryEquity",
     unit: "NOKm",
     isPercent: false,
     isMultiple: false,
@@ -103,7 +105,7 @@ const AXIS_OPTIONS: AxisOption[] = [
   },
   {
     param: "net_debt",
-    label: "Netto gjeld",
+    labelKey: "sensitivity.axisOptions.netDebt",
     unit: "NOKm",
     isPercent: false,
     isMultiple: false,
@@ -111,7 +113,7 @@ const AXIS_OPTIONS: AxisOption[] = [
   },
   {
     param: "cash_sweep_pct",
-    label: "Cash sweep",
+    labelKey: "sensitivity.axisOptions.cashSweep",
     unit: "%",
     isPercent: true,
     isMultiple: false,
@@ -119,7 +121,7 @@ const AXIS_OPTIONS: AxisOption[] = [
   },
   {
     param: "preferred_equity_rate",
-    label: "PIK-rente (pref. equity)",
+    labelKey: "sensitivity.axisOptions.pikRate",
     unit: "%",
     isPercent: true,
     isMultiple: false,
@@ -127,7 +129,7 @@ const AXIS_OPTIONS: AxisOption[] = [
   },
   {
     param: "tax_rate",
-    label: "Skattesats",
+    labelKey: "sensitivity.axisOptions.taxRate",
     unit: "%",
     isPercent: true,
     isMultiple: false,
@@ -135,7 +137,7 @@ const AXIS_OPTIONS: AxisOption[] = [
   },
   {
     param: "acquirer_entry_ev",
-    label: "Acquirer entry EV",
+    labelKey: "sensitivity.axisOptions.acquirerEntryEV",
     unit: "NOKm",
     isPercent: false,
     isMultiple: false,
@@ -143,11 +145,11 @@ const AXIS_OPTIONS: AxisOption[] = [
   },
 ];
 
-const METRIC_OPTIONS: { value: SensitivityMetric; label: string }[] = [
-  { value: "irr", label: "IRR (kombinert)" },
-  { value: "mom", label: "MoM (kombinert)" },
-  { value: "per_share_irr", label: "Per-aksje IRR" },
-  { value: "per_share_mom", label: "Per-aksje MoM" },
+const METRIC_OPTIONS: { value: SensitivityMetric; labelKey: string }[] = [
+  { value: "irr", labelKey: "sensitivity.metricOptions.irrCombined" },
+  { value: "mom", labelKey: "sensitivity.metricOptions.momCombined" },
+  { value: "per_share_irr", labelKey: "sensitivity.metricOptions.perShareIrr" },
+  { value: "per_share_mom", labelKey: "sensitivity.metricOptions.perShareMom" },
 ];
 
 function formatAxisValue(val: number, opt: AxisOption): string {
@@ -174,6 +176,8 @@ export default function SensitivityHeatmap({
   expanded,
   onToggle,
 }: SensitivityHeatmapProps) {
+  const { t } = useTranslation();
+
   // Axis selection state
   const [rowAxisParam, setRowAxisParam] = useState("exit_multiple");
   const [colAxisParam, setColAxisParam] = useState("price_paid");
@@ -227,7 +231,7 @@ export default function SensitivityHeatmap({
   const handleCalculate = useCallback(async () => {
     if (!scenario.id || scenario.id === 0) return;
     if (rowAxisParam === colAxisParam) {
-      setError("Rad- og kolonneakse kan ikke vaere den samme parameteren.");
+      setError(t("sensitivity.sameAxisError"));
       return;
     }
     setCalculating(true);
@@ -241,8 +245,8 @@ export default function SensitivityHeatmap({
         return_case: returnCase,
       });
       setResult(res);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setCalculating(false);
     }
@@ -265,14 +269,16 @@ export default function SensitivityHeatmap({
   const inputCls = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-left focus:ring-2 focus:ring-[#002C55] focus:border-[#002C55] outline-none";
   const labelCls = "block text-xs font-medium text-gray-600 mb-1";
 
-  const metricLabel = METRIC_OPTIONS.find(m => m.value === metric)?.label || "IRR";
+  const metricLabel = METRIC_OPTIONS.find(m => m.value === metric)?.labelKey
+    ? t(METRIC_OPTIONS.find(m => m.value === metric)!.labelKey)
+    : "IRR";
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 mb-8">
       <SectionHeader
         sectionKey="sensitivity"
-        title="Sensitivitetsanalyse"
-        subtitle="Heatmap-matrise med to variable parametere"
+        title={t("sensitivity.title")}
+        subtitle={t("sensitivity.subtitle")}
         dark
         expanded={expanded}
         onToggle={onToggle}
@@ -290,7 +296,7 @@ export default function SensitivityHeatmap({
               className="flex items-center gap-1 px-3 py-1 text-xs bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-medium"
             >
               <Calculator size={12} />
-              {calculating ? "Beregner..." : "Beregn heatmap"}
+              {calculating ? t("sensitivity.calculating") : t("sensitivity.calculateHeatmap")}
             </button>
           </div>
         }
@@ -306,24 +312,24 @@ export default function SensitivityHeatmap({
 
           {/* ── Configuration Panel ──────────────────────── */}
           <div className="bg-gray-50 rounded-xl border border-gray-200 p-5 mb-6">
-            <h4 className="text-sm font-semibold text-gray-900 mb-4">Konfigurasjon</h4>
+            <h4 className="text-sm font-semibold text-gray-900 mb-4">{t("sensitivity.configuration")}</h4>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Row axis */}
               <div className="space-y-2">
-                <label className={labelCls}>Rad-akse (Y)</label>
+                <label className={labelCls}>{t("sensitivity.rowAxis")}</label>
                 <select
                   value={rowAxisParam}
                   onChange={(e) => { setRowAxisParam(e.target.value); setRowRangeStr(""); setResult(null); }}
                   className={selectCls + " w-full"}
                 >
                   {AXIS_OPTIONS.map(opt => (
-                    <option key={opt.param} value={opt.param}>{opt.label} ({opt.unit})</option>
+                    <option key={opt.param} value={opt.param}>{t(opt.labelKey)} ({opt.unit})</option>
                   ))}
                 </select>
                 <div>
                   <label className="text-[10px] text-gray-400">
-                    Egendefinerte verdier (kommaseparert, {rowAxisOpt.isPercent ? "i %" : rowAxisOpt.unit})
+                    {t("sensitivity.customValuesHint", { unit: rowAxisOpt.isPercent ? "%" : rowAxisOpt.unit })}
                   </label>
                   <input
                     type="text"
@@ -337,19 +343,19 @@ export default function SensitivityHeatmap({
 
               {/* Col axis */}
               <div className="space-y-2">
-                <label className={labelCls}>Kolonne-akse (X)</label>
+                <label className={labelCls}>{t("sensitivity.columnAxis")}</label>
                 <select
                   value={colAxisParam}
                   onChange={(e) => { setColAxisParam(e.target.value); setColRangeStr(""); setResult(null); }}
                   className={selectCls + " w-full"}
                 >
                   {AXIS_OPTIONS.map(opt => (
-                    <option key={opt.param} value={opt.param}>{opt.label} ({opt.unit})</option>
+                    <option key={opt.param} value={opt.param}>{t(opt.labelKey)} ({opt.unit})</option>
                   ))}
                 </select>
                 <div>
                   <label className="text-[10px] text-gray-400">
-                    Egendefinerte verdier (kommaseparert, {colAxisOpt.isPercent ? "i %" : colAxisOpt.unit})
+                    {t("sensitivity.customValuesHint", { unit: colAxisOpt.isPercent ? "%" : colAxisOpt.unit })}
                   </label>
                   <input
                     type="text"
@@ -365,26 +371,26 @@ export default function SensitivityHeatmap({
             {/* Metric + case selection */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
               <div>
-                <label className={labelCls}>Metrikk</label>
+                <label className={labelCls}>{t("sensitivity.metric")}</label>
                 <select
                   value={metric}
                   onChange={(e) => { setMetric(e.target.value as SensitivityMetric); setResult(null); }}
                   className={selectCls + " w-full"}
                 >
                   {METRIC_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    <option key={opt.value} value={opt.value}>{t(opt.labelKey)}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className={labelCls}>Case</label>
+                <label className={labelCls}>{t("sensitivity.case")}</label>
                 <select
                   value={returnCase}
                   onChange={(e) => { setReturnCase(e.target.value as "Kombinert" | "Standalone"); setResult(null); }}
                   className={selectCls + " w-full"}
                 >
-                  <option value="Kombinert">Kombinert</option>
-                  <option value="Standalone">Standalone</option>
+                  <option value="Kombinert">{t("sensitivity.combined")}</option>
+                  <option value="Standalone">{t("sensitivity.standalone")}</option>
                 </select>
               </div>
               <div className="md:col-span-2 flex items-end">
@@ -395,8 +401,8 @@ export default function SensitivityHeatmap({
                 >
                   <Grid3x3 size={14} />
                   {calculating
-                    ? "Beregner matrise..."
-                    : `Beregn ${rowValues.length}×${colValues.length} matrise`}
+                    ? t("sensitivity.calculating")
+                    : t("sensitivity.calculateMatrix", { rows: rowValues.length, cols: colValues.length })}
                 </button>
               </div>
             </div>
@@ -404,7 +410,7 @@ export default function SensitivityHeatmap({
             {rowAxisParam === colAxisParam && (
               <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
                 <Info size={12} className="inline mr-1" />
-                Rad- og kolonneakse ma vaere forskjellige parametere.
+                {t("sensitivity.sameAxisError")}
               </div>
             )}
           </div>
@@ -413,11 +419,8 @@ export default function SensitivityHeatmap({
           {!result && !calculating && (
             <div className="text-center py-8 text-gray-400">
               <Grid3x3 size={32} className="mx-auto mb-3 opacity-40" />
-              <p className="text-lg mb-2">Ingen sensitivitetsanalyse enna</p>
-              <p className="text-sm">
-                Velg to akser og trykk <strong>Beregn heatmap</strong> for a
-                se hvordan avkastningen varierer.
-              </p>
+              <p className="text-lg mb-2">{t("sensitivity.emptyStateTitle")}</p>
+              <p className="text-sm" dangerouslySetInnerHTML={{ __html: t("sensitivity.emptyStateDesc") }} />
             </div>
           )}
 
@@ -426,7 +429,11 @@ export default function SensitivityHeatmap({
             <div className="text-center py-12 text-gray-500">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#002C55] mx-auto mb-4" />
               <p className="text-sm">
-                Beregner {rowValues.length}×{colValues.length} = {rowValues.length * colValues.length} kombinasjoner...
+                {t("sensitivity.calculatingCombinations", {
+                  rows: rowValues.length,
+                  cols: colValues.length,
+                  total: rowValues.length * colValues.length,
+                })}
               </p>
             </div>
           )}
@@ -438,10 +445,14 @@ export default function SensitivityHeatmap({
               <div className="flex items-center justify-between">
                 <div>
                   <h4 className="text-sm font-semibold text-gray-900">
-                    {metricLabel} — {rowAxisOpt.label} × {colAxisOpt.label}
+                    {metricLabel} — {t(rowAxisOpt.labelKey)} × {t(colAxisOpt.labelKey)}
                   </h4>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    {result.return_case} case · {result.matrix.length}×{result.matrix[0]?.length || 0} matrise
+                    {t("sensitivity.matrixInfo", {
+                      caseLabel: result.return_case,
+                      rows: result.matrix.length,
+                      cols: result.matrix[0]?.length || 0,
+                    })}
                   </p>
                 </div>
               </div>
@@ -453,8 +464,8 @@ export default function SensitivityHeatmap({
                     <tr>
                       {/* Corner cell with axis labels */}
                       <th className="sticky left-0 z-10 bg-white text-left px-3 py-2 text-[10px] font-semibold text-gray-500 border-b border-r border-gray-200 min-w-[100px]">
-                        <div className="text-gray-400">{colAxisOpt.label} →</div>
-                        <div className="text-gray-600">{rowAxisOpt.label} ↓</div>
+                        <div className="text-gray-400">{t(colAxisOpt.labelKey)} →</div>
+                        <div className="text-gray-600">{t(rowAxisOpt.labelKey)} ↓</div>
                       </th>
                       {result.col_axis.values.map((val, ci) => {
                         const isBase = ci === findBaseIdx(result.col_axis.values, colAxisParam);
@@ -509,7 +520,7 @@ export default function SensitivityHeatmap({
               <div className="flex items-center gap-4 text-[10px] text-gray-500 pt-2 border-t border-gray-100">
                 <div className="flex items-center gap-1">
                   <div className="w-3 h-3 rounded bg-red-100 border border-red-200" />
-                  <span>Lav</span>
+                  <span>{t("sensitivity.low")}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="w-3 h-3 rounded bg-orange-100 border border-orange-200" />
@@ -528,11 +539,11 @@ export default function SensitivityHeatmap({
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="w-3 h-3 rounded bg-green-200 border border-green-300" />
-                  <span>Hoy</span>
+                  <span>{t("sensitivity.high")}</span>
                 </div>
                 <div className="ml-4 flex items-center gap-1">
                   <div className="w-3 h-3 rounded ring-2 ring-blue-500 ring-inset bg-white" />
-                  <span>Basis-case</span>
+                  <span>{t("sensitivity.baseCase")}</span>
                 </div>
               </div>
 
@@ -549,24 +560,24 @@ export default function SensitivityHeatmap({
                 return (
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-xs text-gray-600 bg-gray-50 rounded-lg p-3">
                     <div>
-                      <span className="font-medium text-gray-500">Min:</span>{" "}
+                      <span className="font-medium text-gray-500">{t("sensitivity.min")}:</span>{" "}
                       <span className="font-semibold">{fmtCellValue(min, result.metric)}</span>
                     </div>
                     <div>
-                      <span className="font-medium text-gray-500">Max:</span>{" "}
+                      <span className="font-medium text-gray-500">{t("sensitivity.max")}:</span>{" "}
                       <span className="font-semibold">{fmtCellValue(max, result.metric)}</span>
                     </div>
                     <div>
-                      <span className="font-medium text-gray-500">Gjennomsnitt:</span>{" "}
+                      <span className="font-medium text-gray-500">{t("sensitivity.average")}:</span>{" "}
                       <span className="font-semibold">{fmtCellValue(avg, result.metric)}</span>
                     </div>
                     <div>
-                      <span className="font-medium text-gray-500">Spenn:</span>{" "}
+                      <span className="font-medium text-gray-500">{t("sensitivity.spread")}:</span>{" "}
                       <span className="font-semibold">{fmtCellValue(max - min, result.metric)}</span>
                     </div>
                     {baseVal !== null && baseVal !== undefined && (
                       <div>
-                        <span className="font-medium text-gray-500">Basis-case:</span>{" "}
+                        <span className="font-medium text-gray-500">{t("sensitivity.baseCase")}:</span>{" "}
                         <span className="font-semibold text-blue-700">{fmtCellValue(baseVal, result.metric)}</span>
                       </div>
                     )}

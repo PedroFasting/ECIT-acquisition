@@ -11,6 +11,7 @@ import {
 import type { FinancialPeriod, ProFormaPeriod } from "../../types";
 import { toNum, formatTooltip } from "./helpers";
 import CopyChartButton from "./CopyChartButton";
+import { useTranslation } from "react-i18next";
 
 interface EbitdaChartProps {
   acquirerPeriods: FinancialPeriod[];
@@ -27,6 +28,7 @@ export default function EbitdaChart({
   acquirerName,
   targetName,
 }: EbitdaChartProps) {
+  const { t } = useTranslation();
   const chartData = acquirerPeriods.map((ap) => {
     const dateKey = ap.period_date.split("T")[0];
     const tp = targetPeriods.find((t) => t.period_date.split("T")[0] === dateKey);
@@ -49,7 +51,7 @@ export default function EbitdaChart({
     <CopyChartButton fileName="ebitda-utvikling">
       <div>
         <h4 className="text-sm font-semibold text-gray-900 mb-4">
-          EBITDA-utvikling (NOKm)
+          {t("charts.ebitdaDevelopment")}
         </h4>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={chartData}>
@@ -71,12 +73,12 @@ export default function EbitdaChart({
                 dataKey="combinedExcl"
                 stroke="#a8b5d6"
                 strokeWidth={2}
-                name="Kombinert (ekskl. synergier)"
+                name={t("charts.combinedExcl")}
                 strokeDasharray="3 3"
               />
             )}
             {hasPf && (
-              <Line type="monotone" dataKey="combinedIncl" stroke="#03223F" strokeWidth={3} name="Kombinert PF" />
+              <Line type="monotone" dataKey="combinedIncl" stroke="#03223F" strokeWidth={3} name={t("charts.combinedPf")} />
             )}
           </LineChart>
         </ResponsiveContainer>

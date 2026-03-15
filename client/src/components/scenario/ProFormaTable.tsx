@@ -1,6 +1,7 @@
 import type { ProFormaPeriod, FinancialPeriod } from "../../types";
 import { formatNum, formatPct, toNum } from "./helpers";
 import SectionHeader from "./SectionHeader";
+import { useTranslation } from "react-i18next";
 
 interface ProFormaTableProps {
   pfPeriods: ProFormaPeriod[];
@@ -21,6 +22,7 @@ export default function ProFormaTable({
   expanded,
   onToggle,
 }: ProFormaTableProps) {
+  const { t } = useTranslation();
   if (pfPeriods.length === 0) return null;
 
   // Build lookups by period label
@@ -49,24 +51,24 @@ export default function ProFormaTable({
   const hasTgtOrgGrowth = targetPeriods?.some((p) => toNum(p.organic_growth) > 0) ?? false;
 
   const lineItems: { key: string; label: string; bold?: boolean; pct?: boolean; indent?: boolean; custom?: boolean }[] = [
-    { key: "acquirer_revenue", label: `${acquirerName} omsetning` },
-    ...(hasAcqOrgGrowth ? [{ key: "acquirer_org_growth", label: "Organisk vekst", pct: true, indent: true, custom: true }] : []),
-    { key: "target_revenue", label: `${targetName} omsetning` },
-    ...(hasTgtOrgGrowth ? [{ key: "target_org_growth", label: "Organisk vekst", pct: true, indent: true, custom: true }] : []),
-    { key: "total_revenue", label: "Omsetning", bold: true },
+    { key: "acquirer_revenue", label: `${acquirerName} ${t("proforma.revenue").toLowerCase()}` },
+    ...(hasAcqOrgGrowth ? [{ key: "acquirer_org_growth", label: t("proforma.organicGrowth"), pct: true, indent: true, custom: true }] : []),
+    { key: "target_revenue", label: `${targetName} ${t("proforma.revenue").toLowerCase()}` },
+    ...(hasTgtOrgGrowth ? [{ key: "target_org_growth", label: t("proforma.organicGrowth"), pct: true, indent: true, custom: true }] : []),
+    { key: "total_revenue", label: t("common.revenue"), bold: true },
     { key: "acquirer_ebitda", label: `${acquirerName} EBITDA` },
-    { key: "acquirer_ebitda_margin", label: "% margin", pct: true, indent: true, custom: true },
+    { key: "acquirer_ebitda_margin", label: t("proforma.margin"), pct: true, indent: true, custom: true },
     { key: "target_ebitda", label: `${targetName} EBITDA` },
-    { key: "target_ebitda_margin", label: "% margin", pct: true, indent: true, custom: true },
-    { key: "total_ebitda_excl_synergies", label: "Total EBITDA (ekskl. synergier)", bold: true },
-    { key: "ebitda_margin_excl_synergies", label: "% margin", pct: true, indent: true },
-    { key: "cost_synergies", label: "Kostnadssynergier" },
-    { key: "total_ebitda_incl_synergies", label: "Total EBITDA (inkl. synergier)", bold: true },
-    { key: "ebitda_margin_incl_synergies", label: "% margin", pct: true, indent: true },
-    { key: "total_capex", label: "Totale investeringer" },
-    { key: "total_change_nwc", label: "Total endring i arbeidskapital" },
-    { key: "total_other_cash_flow", label: "Andre kontantstrømposter" },
-    { key: "operating_fcf", label: "Operasjonell FCF", bold: true },
+    { key: "target_ebitda_margin", label: t("proforma.margin"), pct: true, indent: true, custom: true },
+    { key: "total_ebitda_excl_synergies", label: t("proforma.totalEbitdaExcl"), bold: true },
+    { key: "ebitda_margin_excl_synergies", label: t("proforma.margin"), pct: true, indent: true },
+    { key: "cost_synergies", label: t("proforma.costSynergies") },
+    { key: "total_ebitda_incl_synergies", label: t("proforma.totalEbitdaIncl"), bold: true },
+    { key: "ebitda_margin_incl_synergies", label: t("proforma.margin"), pct: true, indent: true },
+    { key: "total_capex", label: t("proforma.totalCapex") },
+    { key: "total_change_nwc", label: t("proforma.totalChangeNwc") },
+    { key: "total_other_cash_flow", label: t("proforma.otherCashFlow") },
+    { key: "operating_fcf", label: t("proforma.operatingFcf"), bold: true },
   ];
 
   function getCellValue(item: typeof lineItems[0], p: ProFormaPeriod): string {
@@ -97,7 +99,7 @@ export default function ProFormaTable({
     <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto mb-8">
       <SectionHeader
         sectionKey="proforma"
-        title="Kombinert Pro Forma finansiell profil"
+        title={t("proforma.title")}
         subtitle="NOKm"
         expanded={expanded}
         onToggle={onToggle}

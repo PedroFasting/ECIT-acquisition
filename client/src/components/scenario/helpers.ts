@@ -10,15 +10,34 @@ export const toNum = (v: any): number => {
   return isNaN(n) ? 0 : n;
 };
 
-/** Format a number with 1 decimal, Norwegian locale. Negatives in parentheses. */
+/** Format a number with N decimals, Norwegian locale. Negatives in parentheses. */
 export const formatNum = (val: any, decimals: 0 | 1 = 1) => {
   if (val === null || val === undefined) return "-";
   const num = typeof val === "string" ? parseFloat(val) : val;
   if (isNaN(num)) return "-";
-  const fmt = decimals === 0 ? nbFmt0 : nbFmt1;
-  if (num < 0) return `(${fmt.format(Math.abs(num))})`;
-  return fmt.format(num);
+  const f = decimals === 0 ? nbFmt0 : nbFmt1;
+  if (num < 0) return `(${f.format(Math.abs(num))})`;
+  return f.format(num);
 };
+
+/**
+ * Format a number with flexible decimal precision. Norwegian locale, negatives in parentheses.
+ * Used by target pages where decimals can be any number.
+ */
+export function fmt(val: number | null | undefined, decimals = 1): string {
+  if (val === null || val === undefined) return "-";
+  const num = typeof val === "string" ? parseFloat(val as any) : val;
+  if (isNaN(num)) return "-";
+  if (num < 0)
+    return `(${Math.abs(num).toLocaleString("nb-NO", {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    })})`;
+  return num.toLocaleString("nb-NO", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
 
 /** Format a decimal ratio (0.158) as percentage "15,8 %" */
 export const formatPct = (val: any) => {
@@ -27,6 +46,32 @@ export const formatPct = (val: any) => {
   if (isNaN(num)) return "-";
   return `${nbFmt1.format(num * 100)} %`;
 };
+
+/** Format a decimal ratio as percentage with %, e.g. 0.158 → "15,8%" */
+export function pct(val: number | null | undefined): string {
+  if (val === null || val === undefined) return "-";
+  const num = typeof val === "string" ? parseFloat(val as any) : val;
+  if (isNaN(num)) return "-";
+  return `${(num * 100).toLocaleString("nb-NO", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  })}%`;
+}
+
+/**
+ * Compound Annual Growth Rate. Handles negative values gracefully.
+ * Returns null for division by zero, sign mismatches, or invalid years.
+ */
+export function cagr(start: number, end: number, years: number): number | null {
+  if (years <= 0 || start === 0) return null;
+  // Sign mismatch (e.g. loss turning to profit) — CAGR is undefined
+  if ((start < 0 && end > 0) || (start > 0 && end < 0)) return null;
+  // Both negative: use absolute values, then negate result
+  if (start < 0 && end < 0) {
+    return -(Math.pow(Math.abs(end) / Math.abs(start), 1 / years) - 1);
+  }
+  return Math.pow(end / start, 1 / years) - 1;
+}
 
 /** Format a percentage delta. Negatives in parentheses. */
 export const formatPctDelta = (val: number | null) => {
