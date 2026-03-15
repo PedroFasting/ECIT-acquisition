@@ -442,6 +442,12 @@
     "taxRateLabel": "Skattesats (%)",
     "daLabel": "D&A (% av revenue)",
     "daHint": "Proxy for EBT-beregning",
+    "targetCapexLabel": "Target capex (% av revenue)",
+    "targetCapexHint": "Fallback når target mangler capex-data",
+    "targetNwcLabel": "Target NWC (% av revenue)",
+    "targetNwcHint": "Fallback når target mangler arbeidskapitaldata",
+    "minorityPctLabel": "Minoritetsandel (%)",
+    "minorityPctHint": "Andel av FCF til minoriteter",
     "exitMultiplesLabel": "Exit-multipler (kommasep.)",
     "capitalStructureToggle": "Kapitalstruktur (aktiverer Level 2: Full Equity IRR)",
     "capitalStructureActive": "Aktiv",
@@ -731,7 +737,9 @@
     "standaloneVsPfAccretion": "Frittstående vs Pro Forma verdiøkning ({{year}})",
     "proForma": "Pro Forma",
     "pctColumn": "%",
-    "revenueBarName": "Omsetning"
+    "revenueBarName": "Omsetning",
+    "financingCosts": "Finansieringskostnader",
+    "netResult": "Nettoresultat (etter skatt)"
   },
   "targetOverview": {
     "loading": "Laster target-oversikt...",

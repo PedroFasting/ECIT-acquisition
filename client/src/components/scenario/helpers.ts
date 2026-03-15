@@ -196,6 +196,17 @@ export const getDebtFromSources = (sources: Array<{ name: string; amount: any; t
     .reduce((sum, s) => sum + toNum(s.amount), 0);
 };
 
+/**
+ * Extract Enterprise Value from Uses side of Sources & Uses.
+ * Matches items whose name contains "enterprise" (case-insensitive).
+ * Returns 0 if no matching item is found.
+ */
+export const getEvFromUses = (uses: Array<{ name: string; amount: any }> | undefined | null): number => {
+  if (!uses || uses.length === 0) return 0;
+  const evItem = uses.find((u) => u.name.toLowerCase().includes("enterprise"));
+  return evItem ? toNum(evItem.amount) : 0;
+};
+
 export const deltaColor = (val: number | null | undefined) => {
   if (val === null || val === undefined) return "";
   if (val > 0) return "text-green-700 bg-green-50";

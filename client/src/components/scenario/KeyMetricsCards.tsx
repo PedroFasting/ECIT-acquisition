@@ -1,6 +1,6 @@
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import type { AcquisitionScenario, FinancialPeriod, ProFormaPeriod } from "../../types";
-import { formatNum, formatPct, toNum, getEquityFromSources } from "./helpers";
+import { formatNum, formatPct, toNum, getEquityFromSources, getEvFromUses } from "./helpers";
 import { useTranslation } from "react-i18next";
 
 interface KeyMetricsCardsProps {
@@ -62,10 +62,14 @@ export default function KeyMetricsCards({
   const pfRef = findPfByLabel(pfPeriods, refLabel);
 
   // ── Derived metrics ──
+  // Implied acquisition multiple: EV from Uses (S&U) / target EBITDA
+  // Falls back to price_paid if Uses has no Enterprise Value item
+  const evFromUses = getEvFromUses(scenario.uses);
   const pricePaid = toNum(scenario.deal_parameters?.price_paid);
+  const targetEv = evFromUses > 0 ? evFromUses : pricePaid;
   const tgtEbitdaCur = tgtCur ? toNum(tgtCur.ebitda_total) : 0;
   const impliedMultiple =
-    pricePaid > 0 && tgtEbitdaCur > 0 ? pricePaid / tgtEbitdaCur : null;
+    targetEv > 0 && tgtEbitdaCur > 0 ? targetEv / tgtEbitdaCur : null;
 
   // Share count from first and last acquirer periods
   // "Same price, new share count" model: if OE and FMV are available,
@@ -78,11 +82,6 @@ export default function KeyMetricsCards({
   const dbEntryShares = firstAcq ? toNum(firstAcq.share_count) : 0;
   const dbExitShares = lastAcq ? toNum(lastAcq.share_count) : 0;
   const fmvPerShare = firstAcq ? toNum(firstAcq.eqv_post_dilution) : 0;
-
-  // PF EV from capital structure (OE + PE + debt) — declared before first usage below
-  const oe = toNum(scenario.ordinary_equity);
-  const pe = toNum(scenario.preferred_equity);
-  const nd = toNum(scenario.net_debt);
 
   // Share count: DB base shares + new shares from EK in sources
   // When the acquisition is financed partly with equity (Sources & Uses),
@@ -98,9 +97,6 @@ export default function KeyMetricsCards({
     entryShares > 0 && exitShares > entryShares
       ? (exitShares - entryShares) / entryShares
       : 0;
-  const pfEV = oe + pe + nd;
-  const pfEbitda = pfCur ? toNum(pfCur.total_ebitda_incl_synergies) : 0;
-  const pfMultiple = pfEV > 0 && pfEbitda > 0 ? pfEV / pfEbitda : null;
 
   // ── Card definitions ──
   interface MetricCard {
@@ -144,16 +140,6 @@ export default function KeyMetricsCards({
       curVal: `${nbFmt1.format(impliedMultiple)}x`,
       small: true,
       highlight: "border-amber-300",
-    });
-  }
-
-  // PF EV / EBITDA multiple
-  if (pfMultiple !== null) {
-    cards.push({
-      label: "PF EV / EBITDA",
-      curVal: `${nbFmt1.format(pfMultiple)}x`,
-      small: true,
-      highlight: "border-blue-300",
     });
   }
 

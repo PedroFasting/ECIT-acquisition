@@ -574,3 +574,449 @@ describe("calculateDealReturns", () => {
     });
   });
 });
+
+// ══════════════════════════════════════════════════════════════════
+// BASELINE: FCF CALCULATION PATHS
+// Documents current behaviour for acquirer/target/pro forma scenarios.
+// These tests pin exact values so we detect any change in FCF logic.
+// ══════════════════════════════════════════════════════════════════
+
+describe("FCF calculation — baseline", () => {
+  /**
+   * Scenario: ECIT-like acquirer
+   * Revenue: 1000, EBITDA: 200, capex: -30, NWC: -20
+   * All values supplied → formula path uses actuals.
+   *
+   * Expected FCF per period:
+   *   D&A proxy = 1000 * 0.05 = 50
+   *   EBT proxy = 200 - 50 = 150
+   *   Tax = -150 * 0.22 = -33
+   *   FCF = 200 + (-33) + (-30) + (-20) = 117
+   */
+  const acquirerPeriod: PeriodData = {
+    ebitda: 200,
+    revenue: 1000,
+    capex: -30,
+    change_nwc: -20,
+  };
+
+  /**
+   * Scenario: Herjedal-like target — no capex/NWC data
+   * Revenue: 500, EBITDA: 55
+   * capex/change_nwc: undefined → engine uses fallback from params
+   *
+   * With defaults (capex_pct_revenue=0.03, nwc_investment=0):
+   *   capex = -(500 * 0.03) = -15
+   *   NWC = 0
+   *   D&A proxy = 500 * 0.05 = 25
+   *   EBT proxy = 55 - 25 = 30
+   *   Tax = -30 * 0.22 = -6.6
+   *   FCF = 55 + (-6.6) + (-15) + 0 = 33.4
+   */
+  const targetPeriodNoCapex: PeriodData = {
+    ebitda: 55,
+    revenue: 500,
+    // capex: undefined → falls back to capex_pct_revenue
+    // change_nwc: undefined → falls back to nwc_investment
+  };
+
+  /**
+   * Scenario: Target with NIBD data (enables nibd_fcf path)
+   */
+  const targetPeriodWithNibd: PeriodData = {
+    ebitda: 55,
+    revenue: 500,
+    nibd_fcf: 40, // NIBD-derived FCF bypasses all other calculations
+  };
+
+  describe("Level 1 — formula path with actuals", () => {
+    it("pins exact FCF for acquirer-like period (all actuals provided)", () => {
+      const params = level1Params({ capex_pct_revenue: 0.03 });
+      const periods = [acquirerPeriod, acquirerPeriod, acquirerPeriod];
+      const result = computeLevel1Return(2000, periods, params, 12);
+
+      // FCF per period = 117 (see formula above)
+      // Exit = 200 * 12 = 2400
+      // CFs: [-2000, 117, 117, 117+2400] = [-2000, 117, 117, 2517]
+      // MoM = (117+117+2517)/2000 = 2751/2000 = 1.3755
+      expect(result.mom).not.toBeNull();
+      expect(round(result.mom!, 4)).toBe(1.3755);
+      expect(result.irr).not.toBeNull();
+    });
+
+    it("pins exact FCF for target-like period (no capex/NWC, fallback)", () => {
+      const params = level1Params({ capex_pct_revenue: 0.03, nwc_investment: 0 });
+      const periods = [targetPeriodNoCapex, targetPeriodNoCapex, targetPeriodNoCapex];
+      const result = computeLevel1Return(600, periods, params, 12);
+
+      // FCF per period = 33.4 (see formula above)
+      // Exit = 55 * 12 = 660
+      // CFs: [-600, 33.4, 33.4, 33.4+660] = [-600, 33.4, 33.4, 693.4]
+      // MoM = (33.4+33.4+693.4)/600 = 760.2/600 = 1.267
+      expect(result.mom).not.toBeNull();
+      expect(round(result.mom!, 3)).toBe(1.267);
+    });
+
+    it("pins exact FCF for target with custom capex/NWC percentages", () => {
+      // Simulating target_capex_pct_revenue=0.01 and target_nwc_pct_revenue=0.0097
+      // But the engine uses generic capex_pct_revenue, not target-specific ones.
+      // This documents that target-specific fields are IGNORED by the engine.
+      const params = level1Params({
+        capex_pct_revenue: 0.01,  // If someone maps target_capex_pct_revenue here
+        nwc_investment: 4.85,     // 500 * 0.0097 ≈ 4.85 as fixed amount
+      });
+      const periods = [targetPeriodNoCapex, targetPeriodNoCapex, targetPeriodNoCapex];
+      const result = computeLevel1Return(600, periods, params, 12);
+
+      // capex = -(500 * 0.01) = -5
+      // NWC = -4.85
+      // D&A proxy = 500 * 0.05 = 25
+      // EBT proxy = 55 - 25 = 30
+      // Tax = -30 * 0.22 = -6.6
+      // FCF = 55 + (-6.6) + (-5) + (-4.85) = 38.55
+      // Exit = 55 * 12 = 660
+      // CFs: [-600, 38.55, 38.55, 38.55+660]
+      // MoM = (38.55+38.55+698.55)/600 = 775.65/600 = 1.29275
+      expect(result.mom).not.toBeNull();
+      expect(round(result.mom!, 4)).toBe(1.2928);  // rounding
+    });
+  });
+
+  describe("Level 1 — NIBD-derived FCF path", () => {
+    it("NIBD-FCF bypasses tax/capex/NWC entirely", () => {
+      const params = level1Params();
+      const periods = [targetPeriodWithNibd, targetPeriodWithNibd, targetPeriodWithNibd];
+      const result = computeLevel1Return(600, periods, params, 12);
+
+      // With nibd_fcf=40: CFs: [-600, 40, 40, 40+660] = [-600, 40, 40, 700]
+      // MoM = (40+40+700)/600 = 780/600 = 1.3
+      expect(result.mom).not.toBeNull();
+      expect(round(result.mom!, 4)).toBe(1.3);
+    });
+
+    it("NIBD-FCF gives different result than formula path (documents gap)", () => {
+      const params = level1Params({ capex_pct_revenue: 0.03, nwc_investment: 0 });
+
+      const formulaResult = computeLevel1Return(
+        600,
+        [targetPeriodNoCapex, targetPeriodNoCapex, targetPeriodNoCapex],
+        params,
+        12,
+      );
+      const nibdResult = computeLevel1Return(
+        600,
+        [targetPeriodWithNibd, targetPeriodWithNibd, targetPeriodWithNibd],
+        params,
+        12,
+      );
+
+      // These SHOULD theoretically be similar if NIBD captures the same economics,
+      // but formula path FCF=33.4 vs NIBD path FCF=40 → different returns.
+      // Gap: formula MoM ≈ 1.267 vs NIBD MoM = 1.3 (difference of ~0.033).
+      // The gap is small in this simple example but compounds in longer deals.
+      expect(formulaResult.mom).not.toBeNull();
+      expect(nibdResult.mom).not.toBeNull();
+      expect(round(formulaResult.mom!, 3)).toBe(1.267);
+      expect(round(nibdResult.mom!, 3)).toBe(1.3);
+      expect(formulaResult.mom!).not.toBe(nibdResult.mom!);
+    });
+  });
+
+  describe("Level 2 — debt schedule with acquirer-like data", () => {
+    it("pins exact debt schedule for a 5-year deal", () => {
+      const periods = makePeriods(5, { ebitda: 200, revenue: 1000, capex: -30, change_nwc: -20 });
+      const params = level2Params({
+        net_debt: 500,
+        interest_rate: 0.05,
+        debt_amortisation: 50,
+        cash_sweep_pct: 1.0,
+        ordinary_equity: 400,
+        preferred_equity: 100,
+        preferred_equity_rate: 0.095,
+        rollover_equity: 0,
+      });
+      const result = computeLevel2Return(2000, periods, params, 12, true);
+      const schedule = result.schedule!;
+
+      expect(schedule.length).toBe(5);
+
+      // Year 1:
+      // Unlevered FCF = 117 (same as acquirer formula above)
+      // Interest = 500 * 0.05 = 25
+      // Mandatory amort = 50
+      // Mandatory debt service = 75
+      // Debt after mandatory = 450
+      // Excess FCF = 117 - 75 = 42
+      // Sweep = min(42 * 1.0, 450) = 42
+      // Closing debt = 450 - 42 = 408
+      // FCF to equity = 117 - (25+50+42) = 0
+      expect(schedule[0].opening_debt).toBe(500);
+      expect(round(schedule[0].interest, 2)).toBe(25);
+      expect(schedule[0].mandatory_amort).toBe(50);
+      expect(round(schedule[0].sweep, 2)).toBe(42);
+      expect(round(schedule[0].closing_debt, 0)).toBe(408);
+      expect(round(schedule[0].fcf_to_equity, 2)).toBe(0);
+
+      // Preferred: 100 * (1.095) = 109.5
+      expect(schedule[0].opening_pref).toBe(100);
+      expect(round(schedule[0].pik_accrual, 2)).toBe(9.5);
+      expect(round(schedule[0].closing_pref, 2)).toBe(109.5);
+
+      // Verify debt declines over the full schedule
+      for (let i = 1; i < schedule.length; i++) {
+        expect(schedule[i].closing_debt).toBeLessThanOrEqual(schedule[i - 1].closing_debt);
+      }
+    });
+  });
+
+  describe("Level 2 — minority_pct is NOT applied by the engine", () => {
+    it("minority_pct param has zero effect on Level 2 returns", () => {
+      const periods = makePeriods(3, { ebitda: 200, revenue: 1000 });
+      const withMinority = level2Params({ minority_pct: 0.20 });
+      const withoutMinority = level2Params({ minority_pct: 0 });
+
+      const r1 = computeLevel2Return(2000, periods, withMinority, 12);
+      const r2 = computeLevel2Return(2000, periods, withoutMinority, 12);
+
+      // Current engine ignores minority_pct entirely
+      expect(r1.irr).toEqual(r2.irr);
+      expect(r1.mom).toEqual(r2.mom);
+    });
+
+    it("minority_pct param has zero effect on Level 1 returns", () => {
+      const periods = makePeriods(3, { ebitda: 200, revenue: 1000 });
+      const withMinority = level1Params({ minority_pct: 0.20 });
+      const withoutMinority = level1Params({ minority_pct: 0 });
+
+      const r1 = computeLevel1Return(2000, periods, withMinority, 12);
+      const r2 = computeLevel1Return(2000, periods, withoutMinority, 12);
+
+      expect(r1.irr).toEqual(r2.irr);
+      expect(r1.mom).toEqual(r2.mom);
+    });
+  });
+
+  describe("target_capex/nwc_pct_revenue are NOT used by the engine", () => {
+    it("target_capex_pct_revenue has zero effect (engine uses capex_pct_revenue)", () => {
+      const periods = makePeriods(3, { ebitda: 100, revenue: 500 }); // no actual capex
+      const params1 = level1Params({ target_capex_pct_revenue: 0.01 });
+      const params2 = level1Params({ target_capex_pct_revenue: 0.10 });
+
+      const r1 = computeLevel1Return(600, periods, params1, 12);
+      const r2 = computeLevel1Return(600, periods, params2, 12);
+
+      // Both give identical results because target_capex_pct_revenue is ignored
+      expect(r1.irr).toEqual(r2.irr);
+      expect(r1.mom).toEqual(r2.mom);
+    });
+
+    it("target_nwc_pct_revenue has zero effect (engine uses nwc_investment)", () => {
+      const periods = makePeriods(3, { ebitda: 100, revenue: 500 });
+      const params1 = level1Params({ target_nwc_pct_revenue: 0.01 });
+      const params2 = level1Params({ target_nwc_pct_revenue: 0.05 });
+
+      const r1 = computeLevel1Return(600, periods, params1, 12);
+      const r2 = computeLevel1Return(600, periods, params2, 12);
+
+      expect(r1.irr).toEqual(r2.irr);
+      expect(r1.mom).toEqual(r2.mom);
+    });
+  });
+
+  describe("combined pro forma — acquirer actuals + target defaults", () => {
+    it("pro forma combines acquirer + target EBITDA but uses generic fallback", () => {
+      // This documents the current (potentially problematic) behaviour:
+      // Pro forma periods with combined revenue/EBITDA get the SAME
+      // capex_pct_revenue applied across the whole combined entity
+      const pfPeriod: PeriodData = {
+        ebitda: 255,  // 200 + 55
+        revenue: 1500, // 1000 + 500
+        capex: -35,    // -30 acquirer + -5 target (1% of 500)
+        change_nwc: -24.85, // -20 acquirer + -4.85 target (0.97% of 500)
+      };
+      const pfPeriods = [pfPeriod, pfPeriod, pfPeriod];
+      const params = level1Params();
+      const result = computeLevel1Return(2600, pfPeriods, params, 12);
+
+      // D&A proxy = 1500 * 0.05 = 75
+      // EBT proxy = 255 - 75 = 180
+      // Tax = -180 * 0.22 = -39.6
+      // FCF = 255 + (-39.6) + (-35) + (-24.85) = 155.55
+      // Exit = 255 * 12 = 3060
+      // CFs: [-2600, 155.55, 155.55, 155.55+3060]
+      // MoM = (155.55+155.55+3215.55)/2600 = 3526.65/2600 = 1.35641
+      expect(result.mom).not.toBeNull();
+      expect(round(result.mom!, 3)).toBe(1.356);
+    });
+
+    it("pro forma with pre-computed capex/NWC gives deterministic results", () => {
+      // When scenarios.ts pre-computes capex/NWC in PeriodData,
+      // the engine just uses those values — no fallback needed
+      const pfPeriod: PeriodData = {
+        ebitda: 255,
+        revenue: 1500,
+        capex: -35,
+        change_nwc: -24.85,
+      };
+      const pfPeriods = [pfPeriod, pfPeriod, pfPeriod];
+
+      // Changing capex_pct_revenue should NOT matter since actual capex is provided
+      const params1 = level1Params({ capex_pct_revenue: 0.01 });
+      const params2 = level1Params({ capex_pct_revenue: 0.10 });
+
+      const r1 = computeLevel1Return(2600, pfPeriods, params1, 12);
+      const r2 = computeLevel1Return(2600, pfPeriods, params2, 12);
+
+      expect(r1.irr).toEqual(r2.irr);
+      expect(r1.mom).toEqual(r2.mom);
+    });
+  });
+
+  describe("Level 2 — full ECIT + Herjedal scenario (realistic)", () => {
+    // Simulates realistic numbers close to the actual deal
+    const ecitLikePeriods = makePeriods(5, {
+      ebitda: 200,
+      revenue: 1000,
+      capex: -30,
+      change_nwc: -20,
+    });
+
+    // Herjedal target: no capex/NWC in period data, so depends on engine fallback
+    const herjedalLikePeriods = makePeriods(5, {
+      ebitda: 55,
+      revenue: 500,
+    });
+
+    // Pro forma: pre-computed by scenarios.ts
+    const pfPeriods = makePeriods(5, {
+      ebitda: 255,
+      revenue: 1500,
+      capex: -35,        // -30 acquirer + -5 (1% of 500 target)
+      change_nwc: -24.85, // -20 acquirer + -4.85 (0.97% of 500 target)
+    });
+
+    const realisticParams: DealParameters = {
+      price_paid: 600,
+      tax_rate: 0.22,
+      exit_multiples: [10, 11, 12],
+      acquirer_entry_ev: 2000,
+      // Level 2 fields
+      ordinary_equity: 400,
+      preferred_equity: 100,
+      preferred_equity_rate: 0.095,
+      net_debt: 500,
+      interest_rate: 0.05,
+      debt_amortisation: 50,
+      cash_sweep_pct: 1.0,
+      // Target-specific (currently ignored by engine)
+      target_capex_pct_revenue: 0.01,
+      target_nwc_pct_revenue: 0.0097,
+      minority_pct: 0.20,
+      // Generic fallbacks (these ARE used)
+      capex_pct_revenue: 0.03,
+      nwc_investment: 0,
+      da_pct_revenue: 0.05,
+    };
+
+    it("produces consistent results across cases", () => {
+      const result = calculateDealReturns(
+        ecitLikePeriods,
+        herjedalLikePeriods,
+        pfPeriods,
+        realisticParams,
+      );
+
+      expect(result.level).toBe(2);
+
+      // Should have Standalone and Kombinert for each of 3 multiples
+      const standalone = result.cases.filter((c) => c.return_case === "Standalone");
+      const combined = result.cases.filter((c) => c.return_case === "Kombinert");
+      expect(standalone.length).toBe(3);
+      expect(combined.length).toBe(3);
+
+      // Standalone uses acquirer periods (with actuals) → formula path
+      // Combined uses pro forma periods (with pre-computed capex/NWC) → formula path
+      // Both should produce real positive returns
+      for (const c of standalone) {
+        expect(c.irr).not.toBeNull();
+        expect(c.irr!).toBeGreaterThan(0);
+      }
+      for (const c of combined) {
+        expect(c.irr).not.toBeNull();
+        expect(c.irr!).toBeGreaterThan(0);
+      }
+    });
+
+    it("debt schedule exists and shows declining leverage", () => {
+      const result = calculateDealReturns(
+        ecitLikePeriods,
+        herjedalLikePeriods,
+        pfPeriods,
+        realisticParams,
+      );
+
+      expect(result.debt_schedule).toBeDefined();
+      expect(result.debt_schedule!.length).toBe(5);
+
+      // Entry leverage: 500/255 ≈ 1.96x
+      const firstRow = result.debt_schedule![0];
+      expect(firstRow.opening_debt).toBe(500);
+      expect(round(firstRow.leverage!, 1)).toBeLessThanOrEqual(2.0);
+
+      // Debt should decline
+      const lastRow = result.debt_schedule![result.debt_schedule!.length - 1];
+      expect(lastRow.closing_debt).toBeLessThan(firstRow.opening_debt);
+    });
+
+    it("standalone uses formula path (acquirer has capex/NWC)", () => {
+      // Verify standalone returns match what Level 1 gives for acquirer-only
+      const standaloneResult = computeLevel1Return(
+        2000,
+        ecitLikePeriods,
+        realisticParams,
+        12,
+      );
+
+      const fullResult = calculateDealReturns(
+        ecitLikePeriods,
+        herjedalLikePeriods,
+        pfPeriods,
+        realisticParams,
+      );
+
+      const standaloneCase = fullResult.cases.find(
+        (c) => c.return_case === "Standalone" && c.exit_multiple === 12,
+      );
+      expect(standaloneCase).toBeDefined();
+      // Standalone always uses Level 1
+      expect(round(standaloneCase!.irr!, 4)).toBe(round(standaloneResult.irr!, 4));
+    });
+
+    it("target periods (no capex/NWC) use generic fallbacks, not target-specific", () => {
+      // When herjedalLikePeriods are used directly (no capex/NWC),
+      // the engine falls back to capex_pct_revenue (0.03) and nwc_investment (0).
+      // It does NOT use target_capex_pct_revenue (0.01) or target_nwc_pct_revenue (0.0097).
+      //
+      // This is the root inconsistency: scenarios.ts pre-computes with target-specific
+      // rates for the pro forma display, but if deal returns were to use target periods
+      // directly, they'd get different (generic) rates.
+
+      // Compute what engine does with target periods directly
+      const targetOnly = computeLevel1Return(600, herjedalLikePeriods, realisticParams, 12);
+
+      // Manually compute expected FCF with generic fallbacks:
+      // capex = -(500 * 0.03) = -15, NWC = 0
+      // D&A proxy = 500 * 0.05 = 25, EBT = 55-25 = 30, tax = -6.6
+      // FCF = 55 - 6.6 - 15 = 33.4
+      //
+      // If target-specific rates were used:
+      // capex = -(500 * 0.01) = -5, NWC = -(500 * 0.0097) = -4.85
+      // FCF = 55 - 6.6 - 5 - 4.85 = 38.55
+      //
+      // These are different values → inconsistency documented.
+
+      // MoM with generic: (33.4*5 + 660)/600 = (167+660)/600 = 1.378
+      expect(round(targetOnly.mom!, 3)).toBe(1.378);
+    });
+  });
+});

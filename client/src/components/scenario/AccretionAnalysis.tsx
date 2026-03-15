@@ -9,7 +9,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import type { AcquisitionScenario, FinancialPeriod, ProFormaPeriod } from "../../types";
-import { toNum, formatNum, formatPct, formatPctDelta, formatTooltip, deltaColor } from "./helpers";
+import { toNum, formatNum, formatPct, formatPctDelta, formatTooltip, deltaColor, getDebtFromSources, getPreferredFromSources } from "./helpers";
 import SectionHeader from "./SectionHeader";
 import CopyChartButton from "./CopyChartButton";
 import { useTranslation } from "react-i18next";
@@ -364,6 +364,71 @@ export default function AccretionAnalysis({
               <h4 className="text-sm font-semibold text-gray-900 mb-3">
                 {t("accretion.standaloneVsPfAccretion", { year: accretionTableData.label })}
               </h4>
+              {(() => {
+                // Financing costs from acquisition debt and preferred equity
+                const dp = scenario.deal_parameters;
+                const acqDebt = getDebtFromSources(scenario.sources);
+                const acqPref = getPreferredFromSources(scenario.sources);
+                const interestRate = dp?.interest_rate ?? 0.05;
+                const pikRate = toNum(scenario.preferred_equity_rate) || 0.095;
+                const taxRate = dp?.tax_rate ?? 0.22;
+                const interestCost = acqDebt * interestRate;
+                const pikCost = acqPref * pikRate;
+                const totalFinancingCost = interestCost + pikCost;
+
+                // Net result after financing: EBITDA - financing costs - tax
+                // Standalone: acquirer has no incremental financing cost from this deal
+                const standaloneNetResult = accretionTableData.acqEbitda * (1 - taxRate);
+                const pfNetResult = (accretionTableData.pfEbitda - totalFinancingCost) * (1 - taxRate);
+
+                const rows = [
+                  {
+                    label: t("accretion.revenue"),
+                    standalone: accretionTableData.acqRev,
+                    pf: accretionTableData.pfRev,
+                    format: "num" as const,
+                  },
+                  {
+                    label: t("common.ebitda"),
+                    standalone: accretionTableData.acqEbitda,
+                    pf: accretionTableData.pfEbitda,
+                    format: "num" as const,
+                  },
+                  {
+                    label: t("accretion.ebitdaMargin"),
+                    standalone: accretionTableData.acquirerMargin,
+                    pf: accretionTableData.pfMargin,
+                    format: "pct" as const,
+                  },
+                  ...(totalFinancingCost > 0 ? [
+                    {
+                      label: t("accretion.financingCosts"),
+                      standalone: 0,
+                      pf: -totalFinancingCost,
+                      format: "num" as const,
+                    },
+                    {
+                      label: t("accretion.netResult"),
+                      standalone: standaloneNetResult,
+                      pf: pfNetResult,
+                      format: "num" as const,
+                    },
+                  ] : []),
+                  {
+                    label: t("accretion.operatingFcf"),
+                    standalone: accretionTableData.acqFcf,
+                    pf: accretionTableData.pfFcf,
+                    format: "num" as const,
+                  },
+                  {
+                    label: t("accretion.cashConversion"),
+                    standalone: accretionTableData.acqCashConversion,
+                    pf: accretionTableData.pfCashConversion,
+                    format: "pct" as const,
+                  },
+                ];
+
+                return (
               <table className="ecit-table border border-gray-200 rounded-lg overflow-hidden">
                 <thead>
                   <tr>
@@ -375,38 +440,7 @@ export default function AccretionAnalysis({
                   </tr>
                 </thead>
                 <tbody>
-                  {[
-                    {
-                      label: t("accretion.revenue"),
-                      standalone: accretionTableData.acqRev,
-                      pf: accretionTableData.pfRev,
-                      format: "num",
-                    },
-                    {
-                      label: t("common.ebitda"),
-                      standalone: accretionTableData.acqEbitda,
-                      pf: accretionTableData.pfEbitda,
-                      format: "num",
-                    },
-                    {
-                      label: t("accretion.ebitdaMargin"),
-                      standalone: accretionTableData.acquirerMargin,
-                      pf: accretionTableData.pfMargin,
-                      format: "pct",
-                    },
-                    {
-                      label: t("accretion.operatingFcf"),
-                      standalone: accretionTableData.acqFcf,
-                      pf: accretionTableData.pfFcf,
-                      format: "num",
-                    },
-                    {
-                      label: t("accretion.cashConversion"),
-                      standalone: accretionTableData.acqCashConversion,
-                      pf: accretionTableData.pfCashConversion,
-                      format: "pct",
-                    },
-                  ].map((row) => {
+                  {rows.map((row) => {
                     const delta = row.pf - row.standalone;
                     const pctChange =
                       row.format === "pct"
@@ -439,6 +473,8 @@ export default function AccretionAnalysis({
                   })}
                 </tbody>
               </table>
+                );
+              })()}
             </div>
           )}
         </div>

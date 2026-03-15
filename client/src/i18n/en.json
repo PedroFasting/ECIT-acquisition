@@ -442,6 +442,12 @@
     "taxRateLabel": "Tax rate (%)",
     "daLabel": "D&A (% of revenue)",
     "daHint": "Proxy for EBT calculation",
+    "targetCapexLabel": "Target capex (% of revenue)",
+    "targetCapexHint": "Fallback when target has no capex data",
+    "targetNwcLabel": "Target NWC (% of revenue)",
+    "targetNwcHint": "Fallback when target has no NWC data",
+    "minorityPctLabel": "Minority interest (%)",
+    "minorityPctHint": "Share of FCF to minority interests",
     "exitMultiplesLabel": "Exit multiples (comma-sep.)",
     "capitalStructureToggle": "Capital structure (enables Level 2: Full Equity IRR)",
     "capitalStructureActive": "Active",
@@ -731,7 +737,9 @@
     "standaloneVsPfAccretion": "Standalone vs Pro Forma value accretion ({{year}})",
     "proForma": "Pro Forma",
     "pctColumn": "%",
-    "revenueBarName": "Revenue"
+    "revenueBarName": "Revenue",
+    "financingCosts": "Financing costs",
+    "netResult": "Net result (after tax)"
   },
   "targetOverview": {
     "loading": "Loading target overview...",

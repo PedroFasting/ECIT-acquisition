@@ -87,6 +87,9 @@ const DEFAULT_PARAMS: DealParameters = {
   acquirer_entry_ev: 0,
   nwc_investment: 20,
   da_pct_revenue: 0.05,
+  target_capex_pct_revenue: 0.01,
+  target_nwc_pct_revenue: 0.0097,
+  minority_pct: 0.20,
 };
 
 // ── Component ──────────────────────────────────────────────────────
@@ -410,6 +413,60 @@ export default function DealReturnsMatrix({
                     placeholder={t("returns.egPlaceholder", { value: "5" })}
                   />
                   <span className="text-[10px] text-gray-400">{t("returns.daHint")}</span>
+                </div>
+                <div>
+                  <label className={labelCls}>{t("returns.targetCapexLabel")}</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={
+                      params.target_capex_pct_revenue
+                        ? (params.target_capex_pct_revenue * 100).toFixed(1)
+                        : ""
+                    }
+                    onChange={(e) =>
+                      updateParam("target_capex_pct_revenue", Number(e.target.value) / 100)
+                    }
+                    className={inputCls}
+                    placeholder={t("returns.egPlaceholder", { value: "1.0" })}
+                  />
+                  <span className="text-[10px] text-gray-400">{t("returns.targetCapexHint")}</span>
+                </div>
+                <div>
+                  <label className={labelCls}>{t("returns.targetNwcLabel")}</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={
+                      params.target_nwc_pct_revenue
+                        ? (params.target_nwc_pct_revenue * 100).toFixed(2)
+                        : ""
+                    }
+                    onChange={(e) =>
+                      updateParam("target_nwc_pct_revenue", Number(e.target.value) / 100)
+                    }
+                    className={inputCls}
+                    placeholder={t("returns.egPlaceholder", { value: "0.97" })}
+                  />
+                  <span className="text-[10px] text-gray-400">{t("returns.targetNwcHint")}</span>
+                </div>
+                <div>
+                  <label className={labelCls}>{t("returns.minorityPctLabel")}</label>
+                  <input
+                    type="number"
+                    step="1"
+                    value={
+                      params.minority_pct
+                        ? (params.minority_pct * 100).toFixed(0)
+                        : ""
+                    }
+                    onChange={(e) =>
+                      updateParam("minority_pct", Number(e.target.value) / 100)
+                    }
+                    className={inputCls}
+                    placeholder={t("returns.egPlaceholder", { value: "20" })}
+                  />
+                  <span className="text-[10px] text-gray-400">{t("returns.minorityPctHint")}</span>
                 </div>
                 <div>
                   <label className={labelCls}>{t("returns.exitMultiplesLabel")}</label>

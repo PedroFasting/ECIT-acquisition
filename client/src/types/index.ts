@@ -204,6 +204,11 @@ export interface DealParameters {
   nwc_investment?: number;
   // D&A as % of revenue for EBT proxy (default 5%)
   da_pct_revenue?: number;
+  // Target-specific FCF assumptions (applied when target period data is missing)
+  target_capex_pct_revenue?: number;  // e.g. 0.01 = 1% of target revenue
+  target_nwc_pct_revenue?: number;    // e.g. 0.0097 = 0.97% of target revenue
+  // Minority interest as % of post-tax cash flow (acquirer-level, e.g. 0.20 = 20%)
+  minority_pct?: number;
   // Level 2: Capital Structure (activates full equity IRR)
   ordinary_equity?: number;
   preferred_equity?: number;
