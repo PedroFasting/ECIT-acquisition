@@ -1,12 +1,13 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
-const _secret = process.env.JWT_SECRET;
-if (!_secret) {
-  console.error("FATAL: JWT_SECRET environment variable is not set. Exiting.");
-  process.exit(1);
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("FATAL: JWT_SECRET environment variable is not set.");
+  }
+  return secret;
 }
-const JWT_SECRET: string = _secret;
 
 export interface AuthRequest extends Request {
   userId?: number;
@@ -26,7 +27,7 @@ export function authMiddleware(
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as {
+    const decoded = jwt.verify(token, getJwtSecret()) as {
       userId: number;
       role: string;
     };
@@ -39,5 +40,5 @@ export function authMiddleware(
 }
 
 export function generateToken(userId: number, role: string): string {
-  return jwt.sign({ userId, role }, JWT_SECRET, { expiresIn: "7d" });
+  return jwt.sign({ userId, role }, getJwtSecret(), { expiresIn: "7d" });
 }

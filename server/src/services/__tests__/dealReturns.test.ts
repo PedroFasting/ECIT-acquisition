@@ -742,20 +742,20 @@ describe("FCF calculation — baseline", () => {
       expect(schedule.length).toBe(5);
 
       // Year 1:
-      // Unlevered FCF = 117 (same as acquirer formula above)
+      // Unlevered FCF = 122.5 (interest tax shield: EBT = 200-50-25=125, tax = -27.5)
       // Interest = 500 * 0.05 = 25
       // Mandatory amort = 50
       // Mandatory debt service = 75
       // Debt after mandatory = 450
-      // Excess FCF = 117 - 75 = 42
-      // Sweep = min(42 * 1.0, 450) = 42
-      // Closing debt = 450 - 42 = 408
-      // FCF to equity = 117 - (25+50+42) = 0
+      // Excess FCF = 122.5 - 75 = 47.5
+      // Sweep = min(47.5 * 1.0, 450) = 47.5
+      // Closing debt = 450 - 47.5 = 402.5
+      // FCF to equity = 122.5 - (25+50+47.5) = 0
       expect(schedule[0].opening_debt).toBe(500);
       expect(round(schedule[0].interest, 2)).toBe(25);
       expect(schedule[0].mandatory_amort).toBe(50);
-      expect(round(schedule[0].sweep, 2)).toBe(42);
-      expect(round(schedule[0].closing_debt, 0)).toBe(408);
+      expect(round(schedule[0].sweep, 2)).toBe(47.5);
+      expect(round(schedule[0].closing_debt, 0)).toBe(403);
       expect(round(schedule[0].fcf_to_equity, 2)).toBe(0);
 
       // Preferred: 100 * (1.095) = 109.5
@@ -1019,13 +1019,12 @@ describe("FCF calculation — baseline", () => {
       // FCF_before_minority = 55 - 6.6 - 15 = 33.4
       // minority_pct = 0.20 → FCF = 33.4 * 0.8 = 26.72
       //
-      // Exit = 55 * 12 = 660 (exit value NOT reduced by minority — it's the EV)
-      // CFs: [-600, 26.72, 26.72, 26.72, 26.72, 26.72+660]
-      // MoM = (26.72*5 + 660)/600 = (133.6+660)/600 = 793.6/600 = 1.32267
+      // Exit = 55 * 12 * (1 - 0.20) = 528 (minority deducted at exit too)
+      // CFs: [-600, 26.72, 26.72, 26.72, 26.72, 26.72+528]
+      // MoM = (133.6+528)/600 = 1.103
       //
-      // Note: minority_pct is now applied by the engine, changing
-      // the MoM from 1.378 (old, no minority) to 1.323 (new, with minority).
-      expect(round(targetOnly.mom!, 3)).toBe(1.323);
+      // Note: minority_pct is applied by the engine to BOTH FCF and exit EV.
+      expect(round(targetOnly.mom!, 3)).toBe(1.103);
     });
   });
 
@@ -1043,10 +1042,10 @@ describe("FCF calculation — baseline", () => {
       const params = level1Params({ minority_pct: 0.20 });
       const result = computeLevel1Return(1000, periods, params, 12);
 
-      // Exit = 100 * 12 = 1200
-      // CFs: [-1000, 54.8 + 1200] = [-1000, 1254.8]
-      // MoM = 1254.8 / 1000 = 1.2548
-      expect(round(result.mom!, 4)).toBe(1.2548);
+      // Exit EV = 100 * 12 * (1 - 0.20) = 960 (minority deducted at exit too)
+      // CFs: [-1000, 54.8 + 960] = [-1000, 1014.8]
+      // MoM = 1014.8 / 1000 = 1.0148
+      expect(round(result.mom!, 4)).toBe(1.0148);
     });
 
     it("minority_pct = 0 gives same result as omitting it", () => {
@@ -1063,10 +1062,11 @@ describe("FCF calculation — baseline", () => {
       const withoutMinority = computeLevel1Return(1000, periods, level1Params({ minority_pct: 0 }), 12);
 
       // NIBD FCF = 80, after minority = 64
-      // Without: CFs [-1000, 80, 80, 80+1200] → MoM = (80+80+1280)/1000 = 1.44
-      // With:    CFs [-1000, 64, 64, 64+1200] → MoM = (64+64+1264)/1000 = 1.392
+      // Exit EV without minority = 100*12 = 1200, with minority = 100*12*0.8 = 960
+      // Without: CFs [-1000, 80, 80, 80+1200] → MoM = 1440/1000 = 1.44
+      // With:    CFs [-1000, 64, 64, 64+960] → MoM = 1152/1000 = 1.152
       expect(round(withoutMinority.mom!, 3)).toBe(1.44);
-      expect(round(withMinority.mom!, 3)).toBe(1.392);
+      expect(round(withMinority.mom!, 3)).toBe(1.152);
     });
 
     it("minority_pct works in Level 2 debt schedule", () => {
@@ -1075,9 +1075,10 @@ describe("FCF calculation — baseline", () => {
       const result = computeLevel2Return(2000, periods, params, 12, true);
       const schedule = result.schedule!;
 
-      // Without minority: unlevered FCF = 117 (as in baseline tests)
-      // With 20% minority: unlevered FCF = 117 * 0.8 = 93.6
-      expect(round(schedule[0].unlevered_fcf, 2)).toBe(93.6);
+      // With interest tax shield: interest Y1 = 800*0.05 = 40
+      // EBT = 200 - 50 - 40 = 110, tax = -24.2, FCF = 200 - 24.2 - 30 - 20 = 125.8
+      // With 20% minority: unlevered FCF = 125.8 * 0.8 = 100.64
+      expect(round(schedule[0].unlevered_fcf, 2)).toBe(100.64);
     });
   });
 });

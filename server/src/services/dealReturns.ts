@@ -309,9 +309,9 @@ function computeLevel1Return(
     fcfs.push(fcf);
   }
 
-  // Exit value: exit EBITDA × multiple
+  // Exit value: exit EBITDA × multiple, reduced by minority share
   const exitEbitda = periods[periods.length - 1].ebitda;
-  const exitEV = exitEbitda * exitMultiple;
+  const exitEV = exitEbitda * exitMultiple * (1 - minorityPct);
 
   // Cash flow vector: [-entryEV, FCF1, ..., FCFn + exitEV]
   const cashFlows: number[] = [-entryEV];
@@ -375,6 +375,9 @@ function computeLevel2Return(
     const openingDebt = debtBalance;
     const openingPref = prefBalance;
 
+    // Interest on opening debt balance (known before FCF computation)
+    const interestPayment = debtBalance * interestRate;
+
     // Unlevered FCF: prefer NIBD-derived FCF when available
     let unleveredFCF: number;
     if (p.nibd_fcf != null) {
@@ -387,9 +390,9 @@ function computeLevel2Return(
       const capex = p.capex ?? -(revenue > 0 ? revenue * capexPctRevenue : Math.abs(ebitda) * capexPctRevenue);
       const changeNwc = p.change_nwc ?? -Math.abs(fallbackNwc);
 
-      // Tax on EBT proxy
+      // Tax on levered EBT proxy: EBT = EBITDA - D&A - interest (interest tax shield)
       const daProxy = revenue > 0 ? revenue * daPctRevenue : Math.abs(ebitda) * daPctRevenue;
-      const ebtProxy = ebitda - daProxy;
+      const ebtProxy = ebitda - daProxy - interestPayment;
       const tax = ebtProxy > 0 ? -ebtProxy * taxRate : 0;
 
       unleveredFCF = ebitda + tax + capex + changeNwc;
@@ -398,8 +401,7 @@ function computeLevel2Return(
     // Apply minority interest deduction (reduces FCF available to acquirer)
     if (minorityPct > 0) unleveredFCF = unleveredFCF * (1 - minorityPct);
 
-    // Debt service: interest on opening balance + mandatory amortisation
-    const interestPayment = debtBalance * interestRate;
+    // Debt service: mandatory amortisation
     const actualAmort = Math.min(debtAmort, debtBalance);
     const mandatoryDebtService = interestPayment + actualAmort;
     let debtAfterMandatory = Math.max(0, debtBalance - actualAmort);
@@ -432,8 +434,8 @@ function computeLevel2Return(
       exitEV = exitEbitda * exitMultiple;
       exitDebt = debtBalance;
       exitPref = prefBalance;
-      // Exit equity = Exit EV - remaining net debt - accrued preferred equity
-      const exitEquity = exitEV - debtBalance - prefBalance;
+      // Exit equity = Exit EV × (1 - minority%) - remaining net debt - accrued preferred equity
+      const exitEquity = exitEV * (1 - minorityPct) - debtBalance - prefBalance;
       equityCFs.push(fcfToEquity + exitEquity);
     } else {
       equityCFs.push(fcfToEquity);

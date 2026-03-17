@@ -206,10 +206,10 @@ export function buildProFormaPeriods(
     // Target capex/NWC: use period data if available, otherwise apply % assumptions
     const rawTgtCapex = tp ? parseFloat(tp.capex) : NaN;
     const rawTgtNwc = tp ? parseFloat(tp.change_nwc) : NaN;
-    const tgtCapex = (!isNaN(rawTgtCapex) && rawTgtCapex !== 0)
+    const tgtCapex = !isNaN(rawTgtCapex)
       ? rawTgtCapex
       : (tgtCapexPct > 0 ? -(targetRevenue * tgtCapexPct) : 0);
-    const tgtNwc = (!isNaN(rawTgtNwc) && rawTgtNwc !== 0)
+    const tgtNwc = !isNaN(rawTgtNwc)
       ? rawTgtNwc
       : (tgtNwcPct > 0 ? -(targetRevenue * tgtNwcPct) : 0);
 
@@ -350,10 +350,10 @@ export function buildProFormaPeriodData(
     // (mirrors buildProFormaPeriods display logic for consistency)
     const rawTgtCapex = tp?.capex != null ? parseFloat(tp.capex) : NaN;
     const rawTgtNwc = tp?.change_nwc != null ? parseFloat(tp.change_nwc) : NaN;
-    const tgtCapex = (!isNaN(rawTgtCapex) && rawTgtCapex !== 0)
+    const tgtCapex = !isNaN(rawTgtCapex)
       ? rawTgtCapex
       : (tgtCapexPct > 0 ? -(tgtRevenue * tgtCapexPct) : undefined);
-    const tgtNwc = (!isNaN(rawTgtNwc) && rawTgtNwc !== 0)
+    const tgtNwc = !isNaN(rawTgtNwc)
       ? rawTgtNwc
       : (tgtNwcPct > 0 ? -(tgtRevenue * tgtNwcPct) : undefined);
 
@@ -418,13 +418,20 @@ export function mergeScenarioParams(
   const srcPE = getPreferredFromSources(scenario.sources);
   const srcND = getDebtFromSources(scenario.sources);
 
+  // Safe parseFloat that returns undefined instead of NaN for garbage input
+  const safeParse = (v: any): number | undefined => {
+    if (v == null) return undefined;
+    const n = parseFloat(v);
+    return Number.isNaN(n) ? undefined : n;
+  };
+
   return {
     ...dp,
-    ordinary_equity: (scenario.ordinary_equity != null ? parseFloat(scenario.ordinary_equity) : undefined) ?? (srcOE > 0 ? srcOE : undefined) ?? dp.ordinary_equity,
-    preferred_equity: (scenario.preferred_equity != null ? parseFloat(scenario.preferred_equity) : undefined) ?? (srcPE > 0 ? srcPE : undefined) ?? dp.preferred_equity,
-    preferred_equity_rate: (scenario.preferred_equity_rate != null ? parseFloat(scenario.preferred_equity_rate) : undefined) ?? dp.preferred_equity_rate,
-    net_debt: (scenario.net_debt != null ? parseFloat(scenario.net_debt) : undefined) ?? (srcND > 0 ? srcND : undefined) ?? dp.net_debt,
-    rollover_equity: (scenario.rollover_shareholders != null ? parseFloat(scenario.rollover_shareholders) : undefined) ?? dp.rollover_equity,
+    ordinary_equity: safeParse(scenario.ordinary_equity) ?? (srcOE > 0 ? srcOE : undefined) ?? dp.ordinary_equity,
+    preferred_equity: safeParse(scenario.preferred_equity) ?? (srcPE > 0 ? srcPE : undefined) ?? dp.preferred_equity,
+    preferred_equity_rate: safeParse(scenario.preferred_equity_rate) ?? dp.preferred_equity_rate,
+    net_debt: safeParse(scenario.net_debt) ?? (srcND > 0 ? srcND : undefined) ?? dp.net_debt,
+    rollover_equity: safeParse(scenario.rollover_shareholders) ?? dp.rollover_equity,
     equity_from_sources: srcOE,
   };
 }
