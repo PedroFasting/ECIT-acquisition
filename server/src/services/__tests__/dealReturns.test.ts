@@ -1251,19 +1251,19 @@ describe("FCF calculation — baseline", () => {
   describe("minority_pct — exact FCF deduction", () => {
     it("minority_pct = 0.20 reduces FCF by exactly 20%", () => {
       // Single period: revenue=500, ebitda=100, no capex/NWC in period data
-      // Default: capex_pct=0.03, nwc_investment=0
-      // capex = -(500*0.03) = -15, NWC = 0
+      // Default: capex_pct=0.01, nwc_investment=0
+      // capex = -(500*0.01) = -5, NWC = 0
       // D&A = 500*0.05 = 25, EBT = 100-25 = 75, tax = -75*0.22 = -16.5
-      // FCF_before_minority = 100 - 16.5 - 15 = 68.5
-      // FCF_after_minority = 68.5 * 0.8 = 54.8
+      // FCF_before_minority = 100 - 16.5 - 5 = 78.5
+      // FCF_after_minority = 78.5 * 0.8 = 62.8
       const periods = makePeriods(1, { ebitda: 100, revenue: 500 });
       const params = level1Params({ minority_pct: 0.20 });
       const result = computeLevel1Return(1000, periods, params, 12);
 
       // Exit = 100 * 12 = 1200 (minority is cash flow only, not at exit)
-      // CFs: [-1000, 54.8 + 1200] = [-1000, 1254.8]
-      // MoM = 1254.8 / 1000 = 1.2548
-      expect(round(result.mom!, 4)).toBe(1.2548);
+      // CFs: [-1000, 62.8 + 1200] = [-1000, 1262.8]
+      // MoM = 1262.8 / 1000 = 1.2628
+      expect(round(result.mom!, 4)).toBe(1.2628);
     });
 
     it("minority_pct = 0 gives same result as omitting it", () => {
@@ -1297,6 +1297,108 @@ describe("FCF calculation — baseline", () => {
       // EBT = 200 - 50 - 40 = 110, tax = -24.2, FCF = 200 - 24.2 - 30 - 20 = 125.8
       // With 20% minority: unlevered FCF = 125.8 * 0.8 = 100.64
       expect(round(schedule[0].unlevered_fcf, 2)).toBe(100.64);
+    });
+  });
+
+  // ── nwc_pct_revenue — percentage-based NWC fallback ──────────────
+
+  describe("nwc_pct_revenue — percentage-based NWC fallback", () => {
+    it("nwc_pct_revenue takes precedence over nwc_investment", () => {
+      // revenue=500, nwc_pct_revenue=0.0075 → NWC = -(500*0.0075) = -3.75
+      // nwc_investment=20 is ignored when nwc_pct_revenue is set
+      const periods = makePeriods(1, { ebitda: 100, revenue: 500 });
+      const params = level1Params({ nwc_pct_revenue: 0.0075, nwc_investment: 20 });
+      const result = computeLevel1Return(1000, periods, params, 12);
+
+      // capex = -(500*0.01) = -5, NWC = -(500*0.0075) = -3.75
+      // D&A = 500*0.05 = 25, EBT = 100-25 = 75, tax = -75*0.22 = -16.5
+      // FCF = 100 + (-16.5) + (-5) + (-3.75) = 74.75
+      // Exit = 100*12 = 1200, CFs = [-1000, 74.75 + 1200] = [-1000, 1274.75]
+      // MoM = 1274.75 / 1000 = 1.27475
+      expect(round(result.mom!, 4)).toBe(1.2748); // rounded to 4dp: 1274.75/1000
+    });
+
+    it("nwc_investment is used when nwc_pct_revenue is not set", () => {
+      // revenue=500, nwc_investment=20, no nwc_pct_revenue
+      const periods = makePeriods(1, { ebitda: 100, revenue: 500 });
+      const params = level1Params({ nwc_investment: 20 });
+      const result = computeLevel1Return(1000, periods, params, 12);
+
+      // capex = -(500*0.01) = -5, NWC = -20 (flat)
+      // D&A = 500*0.05 = 25, EBT = 75, tax = -16.5
+      // FCF = 100 - 16.5 - 5 - 20 = 58.5
+      // CFs = [-1000, 58.5 + 1200] = [-1000, 1258.5]
+      // MoM = 1258.5 / 1000 = 1.2585
+      expect(round(result.mom!, 4)).toBe(1.2585);
+    });
+
+    it("neither nwc_pct_revenue nor nwc_investment → NWC fallback is 0", () => {
+      const periods = makePeriods(1, { ebitda: 100, revenue: 500 });
+      const params = level1Params(); // no nwc params
+      const result = computeLevel1Return(1000, periods, params, 12);
+
+      // capex = -(500*0.01) = -5, NWC = 0
+      // FCF = 100 - 16.5 - 5 = 78.5
+      // CFs = [-1000, 78.5 + 1200] = [-1000, 1278.5]
+      // MoM = 1278.5 / 1000 = 1.2785
+      expect(round(result.mom!, 4)).toBe(1.2785);
+    });
+
+    it("actual change_nwc in period data overrides both nwc_pct_revenue and nwc_investment", () => {
+      // period has change_nwc=-10 → that takes precedence over all fallbacks
+      const periods = makePeriods(1, { ebitda: 100, revenue: 500, change_nwc: -10 });
+      const paramsWithPct = level1Params({ nwc_pct_revenue: 0.05, nwc_investment: 99 });
+      const paramsWithout = level1Params();
+      const resultWith = computeLevel1Return(1000, periods, paramsWithPct, 12);
+      const resultWithout = computeLevel1Return(1000, periods, paramsWithout, 12);
+
+      // Both should use period-level change_nwc=-10, so identical results
+      expect(resultWith.mom).toBe(resultWithout.mom);
+      expect(resultWith.irr).toBe(resultWithout.irr);
+    });
+
+    it("nwc_pct_revenue works in Level 2 (leveraged)", () => {
+      const periods = makePeriods(3, { ebitda: 200, revenue: 1000 });
+      const params = level2Params({ nwc_pct_revenue: 0.0075 });
+      const result = computeLevel2Return(2000, periods, params, 12, true);
+      const schedule = result.schedule!;
+
+      // Period 1: interest = 800*0.05 = 40
+      // capex = -(1000*0.01) = -10, NWC = -(1000*0.0075) = -7.5
+      // D&A = 1000*0.05 = 50, EBT = 200-50-40 = 110, tax = -110*0.22 = -24.2
+      // FCF = 200 + (-24.2) + (-10) + (-7.5) = 158.3
+      expect(round(schedule[0].unlevered_fcf, 1)).toBe(158.3);
+    });
+  });
+
+  // ── capex default is 1% of revenue ───────────────────────────────
+
+  describe("capex default — 1% of revenue", () => {
+    it("explicit capex_pct_revenue overrides the 1% default", () => {
+      const periods = makePeriods(1, { ebitda: 100, revenue: 500 });
+      const paramsDefault = level1Params();
+      const paramsCustom = level1Params({ capex_pct_revenue: 0.03 });
+      const resultDefault = computeLevel1Return(1000, periods, paramsDefault, 12);
+      const resultCustom = computeLevel1Return(1000, periods, paramsCustom, 12);
+
+      // Default capex = 500*0.01 = 5; Custom capex = 500*0.03 = 15
+      // FCF_default = 100 - 16.5 - 5 = 78.5
+      // FCF_custom = 100 - 16.5 - 15 = 68.5
+      // MoM_default = (78.5 + 1200) / 1000 = 1.2785
+      // MoM_custom = (68.5 + 1200) / 1000 = 1.2685
+      expect(round(resultDefault.mom!, 4)).toBe(1.2785);
+      expect(round(resultCustom.mom!, 4)).toBe(1.2685);
+      expect(resultDefault.mom).not.toBe(resultCustom.mom);
+    });
+
+    it("actual period capex overrides the default entirely", () => {
+      const periods = makePeriods(1, { ebitda: 100, revenue: 500, capex: -30 });
+      const result = computeLevel1Return(1000, periods, level1Params(), 12);
+
+      // capex = -30 (from period), NWC = 0
+      // FCF = 100 - 16.5 - 30 = 53.5
+      // MoM = (53.5 + 1200) / 1000 = 1.2535
+      expect(round(result.mom!, 4)).toBe(1.2535);
     });
   });
 });

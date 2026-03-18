@@ -204,6 +204,7 @@ export const DealParametersSchema = z.object({
   exit_multiples: z.array(num).min(1, "At least one exit multiple is required").max(20),
   acquirer_entry_ev: optNonNegNum,
   nwc_investment: optNum,
+  nwc_pct_revenue: optPct,
   capex_pct_revenue: optPct,
   da_pct_revenue: optPct,
   target_capex_pct_revenue: optPct,

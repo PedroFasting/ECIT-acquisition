@@ -40,7 +40,10 @@ export interface DealParameters {
 
   // Fallback NWC investment when period-level change_nwc is missing (NOKm per year)
   nwc_investment?: number;
-  // Fallback capex as % of revenue when period-level capex is missing (decimal, default 0.03 = 3%)
+  // Fallback NWC as % of revenue when period-level change_nwc is missing (decimal, e.g. 0.0075 = 0.75%)
+  // Takes precedence over nwc_investment when set.
+  nwc_pct_revenue?: number;
+  // Fallback capex as % of revenue when period-level capex is missing (decimal, default 0.01 = 1%)
   capex_pct_revenue?: number;
 
   // D&A as % of revenue, used to proxy EBT = EBITDA - D&A (default 5%)
@@ -270,8 +273,9 @@ function computeLevel1Return(
 
   const taxRate = params.tax_rate ?? 0.22;
   const daPctRevenue = params.da_pct_revenue ?? 0.05;
-  const fallbackNwc = params.nwc_investment ?? 0;
-  const capexPctRevenue = params.capex_pct_revenue ?? 0.03;
+  const nwcPctRevenue = params.nwc_pct_revenue;
+  const fallbackNwcFlat = params.nwc_investment ?? 0;
+  const capexPctRevenue = params.capex_pct_revenue ?? 0.01;
   const minorityPct = params.minority_pct ?? 0;
 
   const fcfs: number[] = [];
@@ -292,7 +296,8 @@ function computeLevel1Return(
     // Use actual capex from period data if available, otherwise proxy as % of revenue
     const revenue = p.revenue ?? 0;
     const capex = p.capex ?? -(revenue > 0 ? revenue * capexPctRevenue : Math.abs(ebitda) * capexPctRevenue);
-    const changeNwc = p.change_nwc ?? -fallbackNwc;
+    // NWC fallback: nwc_pct_revenue takes precedence over flat nwc_investment
+    const changeNwc = p.change_nwc ?? (nwcPctRevenue != null && revenue > 0 ? -(revenue * nwcPctRevenue) : -fallbackNwcFlat);
 
     // Tax on EBT proxy: EBT ≈ EBITDA - D&A (D&A proxied as % of revenue)
     const daProxy = revenue > 0 ? revenue * daPctRevenue : Math.abs(ebitda) * daPctRevenue;
@@ -342,8 +347,9 @@ function computeLevel2Return(
 
   const taxRate = params.tax_rate ?? 0.22;
   const daPctRevenue = params.da_pct_revenue ?? 0.05;
-  const fallbackNwc = params.nwc_investment ?? 0;
-  const capexPctRevenue = params.capex_pct_revenue ?? 0.03;
+  const nwcPctRevenue = params.nwc_pct_revenue;
+  const fallbackNwcFlat = params.nwc_investment ?? 0;
+  const capexPctRevenue = params.capex_pct_revenue ?? 0.01;
   const minorityPct = params.minority_pct ?? 0;
 
   const ordinaryEquity = params.ordinary_equity ?? 0;
@@ -386,7 +392,8 @@ function computeLevel2Return(
       // Capex / NWC — use actual period data, otherwise proxy capex as % of revenue
       const revenue = p.revenue ?? 0;
       const capex = p.capex ?? -(revenue > 0 ? revenue * capexPctRevenue : Math.abs(ebitda) * capexPctRevenue);
-      const changeNwc = p.change_nwc ?? -fallbackNwc;
+      // NWC fallback: nwc_pct_revenue takes precedence over flat nwc_investment
+      const changeNwc = p.change_nwc ?? (nwcPctRevenue != null && revenue > 0 ? -(revenue * nwcPctRevenue) : -fallbackNwcFlat);
 
       // Tax on levered EBT proxy: EBT = EBITDA - D&A - interest (interest tax shield)
       const daProxy = revenue > 0 ? revenue * daPctRevenue : Math.abs(ebitda) * daPctRevenue;

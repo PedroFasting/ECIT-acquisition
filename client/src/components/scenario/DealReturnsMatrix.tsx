@@ -400,6 +400,26 @@ export default function DealReturnsMatrix({
                   <span className="text-[10px] text-gray-400">{t("returns.fallbackCapexHint")}</span>
                 </div>
                 <div>
+                  <label className={labelCls}>
+                    {t("returns.nwcPctRevenueLabel")}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={
+                      params.nwc_pct_revenue != null
+                        ? (params.nwc_pct_revenue * 100).toFixed(2)
+                        : ""
+                    }
+                    onChange={(e) =>
+                      updateParam("nwc_pct_revenue", e.target.value ? Number(e.target.value) / 100 : undefined)
+                    }
+                    className={inputCls}
+                    placeholder={t("returns.egPlaceholder", { value: "0.75" })}
+                  />
+                  <span className="text-[10px] text-gray-400">{t("returns.nwcPctRevenueHint")}</span>
+                </div>
+                <div>
                   <label className={labelCls}>{t("returns.taxRateLabel")}</label>
                   <input
                     type="number"

@@ -490,20 +490,19 @@ describe("exact IRR verification for full deal scenarios", () => {
     // 3 periods, constant EBITDA=100, revenue=500, no capex/NWC actuals
     // Entry EV = 1000, exit at 12x
     // D&A proxy = 500*0.05 = 25, EBT = 100-25 = 75, tax = -75*0.22 = -16.5
-    // FCF = 100 - 16.5 = 83.5 (no capex/NWC actuals, fallback: capex=500*0.03=15, NWC=0)
-    // Actually: capex = -(500*0.03) = -15, NWC = -|0| = 0
-    // FCF = 100 + (-16.5) + (-15) + 0 = 68.5
+    // Capex fallback = -(500*0.01) = -5, NWC fallback = 0
+    // FCF = 100 + (-16.5) + (-5) + 0 = 78.5
     // Exit EV = 100 * 12 = 1200
-    // CFs = [-1000, 68.5, 68.5, 68.5 + 1200]
-    // MoM = (68.5 + 68.5 + 1268.5) / 1000 = 1405.5 / 1000 = 1.4055
+    // CFs = [-1000, 78.5, 78.5, 78.5 + 1200]
+    // MoM = (78.5 + 78.5 + 1278.5) / 1000 = 1435.5 / 1000 = 1.4355
     const periods = makePeriods(3);
     const result = computeLevel1Return(1000, periods, level1Params(), 12);
 
-    expect(round(result.mom, 4)).toBe(1.4055);
+    expect(round(result.mom, 4)).toBe(1.4355);
 
-    // IRR for CFs [-1000, 68.5, 68.5, 1268.5]:
+    // IRR for CFs [-1000, 78.5, 78.5, 1278.5]:
     // Verify via computeIRR directly
-    const irr = computeIRR([-1000, 68.5, 68.5, 1268.5]);
+    const irr = computeIRR([-1000, 78.5, 78.5, 1278.5]);
     expect(result.irr).not.toBeNull();
     expect(round(result.irr!, 4)).toBe(round(irr!, 4));
   });
