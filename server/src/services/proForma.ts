@@ -101,6 +101,12 @@ export function getDebtFromSources(sources: SourceItem[] | null | undefined): nu
     .reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
 }
 
+/** Sum all Uses items (= total price paid for the acquisition). */
+export function getUsesTotal(uses: SourceItem[] | null | undefined): number {
+  if (!uses || uses.length === 0) return 0;
+  return uses.reduce((sum, u) => sum + (parseFloat(u.amount) || 0), 0);
+}
+
 // ── Dilution Parameters ──────────────────────────────────────────
 
 /**
@@ -402,6 +408,8 @@ export function buildProFormaPeriodDataFromStored(
  *   1. scenario-level columns (highest priority)
  *   2. source-derived amounts (from S&U classification)
  *   3. deal_parameters JSON (lowest priority, can be stale)
+ *
+ * Also auto-derives price_paid from Uses total when not explicitly set.
  */
 export function mergeScenarioParams(
   dp: DealParameters,
@@ -412,11 +420,13 @@ export function mergeScenarioParams(
     net_debt?: any;
     rollover_shareholders?: any;
     sources?: SourceItem[] | null;
+    uses?: SourceItem[] | null;
   },
 ): DealParameters {
   const srcOE = getEquityFromSources(scenario.sources);
   const srcPE = getPreferredFromSources(scenario.sources);
   const srcND = getDebtFromSources(scenario.sources);
+  const usesTotal = getUsesTotal(scenario.uses);
 
   // Safe parseFloat that returns undefined instead of NaN for garbage input
   const safeParse = (v: any): number | undefined => {
@@ -427,6 +437,8 @@ export function mergeScenarioParams(
 
   return {
     ...dp,
+    // Auto-derive price_paid from Uses total (S&U) when not explicitly set on deal_parameters
+    price_paid: dp.price_paid > 0 ? dp.price_paid : (usesTotal > 0 ? usesTotal : dp.price_paid),
     ordinary_equity: safeParse(scenario.ordinary_equity) ?? (srcOE > 0 ? srcOE : undefined) ?? dp.ordinary_equity,
     preferred_equity: safeParse(scenario.preferred_equity) ?? (srcPE > 0 ? srcPE : undefined) ?? dp.preferred_equity,
     preferred_equity_rate: safeParse(scenario.preferred_equity_rate) ?? dp.preferred_equity_rate,
@@ -506,6 +518,7 @@ export function prepareFullDealParams(
     net_debt?: any;
     rollover_shareholders?: any;
     sources?: SourceItem[] | null;
+    uses?: SourceItem[] | null;
   },
   acquirerPeriods: any[],
   acquirerModelParams: Record<string, any> | null | undefined,

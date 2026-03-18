@@ -636,17 +636,21 @@ export function calculateDealReturns(
       let perShareMom: number | null = null;
 
       if (hasShareData && level === 2 && result.irr !== null) {
-        // ── Waterfall dilution (cascading) ──────────────────────
-        // Each dilution step changes the share count and per-share value
-        // for the next step. Strike payments from warrant/option exercise
-        // are added to EQV (holders pay strike to convert).
+        // ── Dilution waterfall (value deductions, NOT new shares) ───
+        // MIP, TSO, and warrants are claims on equity value, not share issuance.
+        // They can be settled via cashless exercise (treasury shares or cash).
         //
-        // Step 0: Start with EQV_gross and dilution_base_shares
-        // Step 1: MIP — units = mip_pct × EQV / PPS → new shares issued
-        // Step 2: TSO — tso_count shares added, strike × count added to EQV
-        //         TSO value = tso_count × (PPS_after_mip − strike)
-        // Step 3: Existing warrants — same logic on post-TSO values
-        // Step 4: Subtract preferred equity → ordinary equity
+        // The waterfall cascades: each step's PPS informs the next step's
+        // in-the-money calculation. But total share count does NOT change.
+        //
+        // Step 0: EQV_gross = exitEV - exitDebt. PPS = EQV_gross / dilutionBaseShares
+        // Step 1: MIP — mipAmount = mip_pct × EQV_gross → deduct from EQV
+        //         (MIP % is diluted by new shares from target EK, but MIP itself
+        //          does not create shares)
+        // Step 2: TSO — if PPS_post_MIP > strike: tsoAmount = count × (PPS - strike)
+        //         Strike payment flows back: net is tsoAmount deducted
+        // Step 3: Warrants — same as TSO on post-TSO PPS
+        // Step 4: Subtract preferred equity → EQV post-dilution
 
         const exitEV = result.exit_ev ?? 0;
         const exitDebtBalance = result.exit_debt ?? 0;
@@ -654,61 +658,48 @@ export function calculateDealReturns(
         const eqvGross = exitEV - exitDebtBalance; // Total equity value before pref/dilution
 
         let mipAmount = 0;
-        let mipUnits = 0;
         let tsoAmount = 0;
         let warAmount = 0;
 
-        let currentEqv = eqvGross;
-        let currentShares = dilutionBaseShares;
-
         if (hasDilutionParams && eqvGross > 0 && dilutionBaseShares > 0) {
-          // ── Step 1: MIP dilution ──
+          let currentEqv = eqvGross;
+
+          // ── Step 1: MIP ──
           // MIP pool = mip_pct × EQV_gross (percentage of total equity)
-          // MIP units (new shares) = MIP pool / PPS_before_mip
+          // Deducted from EQV, not via new shares
           if (mipSharePct > 0) {
             mipAmount = mipSharePct * eqvGross;
-            const ppsBefore = currentEqv / currentShares;
-            mipUnits = ppsBefore > 0 ? mipAmount / ppsBefore : 0;
-            currentShares += mipUnits;
-            // EQV doesn't change from MIP (it's a carve-out, not strike-based)
-            // but PPS drops because more shares outstanding
+            currentEqv -= mipAmount;
           }
 
           // ── Step 2: TSO warrants ──
-          // TSO holders exercise at strike price → they pay strike × count into equity
-          // New shares: tso_count added to share count
-          // TSO value: tso_count × (PPS_after_mip − strike), only if in-the-money
-          if (tsoCount > 0) {
-            const ppsAfterMip = currentShares > 0 ? currentEqv / currentShares : 0;
-            if (ppsAfterMip > tsoStrike) {
-              tsoAmount = tsoCount * (ppsAfterMip - tsoStrike);
-              currentShares += tsoCount;
-              currentEqv += tsoCount * tsoStrike; // strike payment adds to equity pool
+          // PPS after MIP for in-the-money check
+          // Cashless exercise: tsoAmount = count × (PPS_post_mip - strike)
+          if (tsoCount > 0 && dilutionBaseShares > 0) {
+            const ppsPostMip = currentEqv / dilutionBaseShares;
+            if (ppsPostMip > tsoStrike) {
+              tsoAmount = tsoCount * (ppsPostMip - tsoStrike);
+              currentEqv -= tsoAmount;
             }
-            // If out-of-money (PPS < strike), TSO not exercised → no dilution
           }
 
           // ── Step 3: Existing warrants ──
-          // Same logic as TSO but using post-TSO PPS and warrant strike
-          if (warCount > 0) {
-            const ppsAfterTso = currentShares > 0 ? currentEqv / currentShares : 0;
-            if (ppsAfterTso > warStrike) {
-              warAmount = warCount * (ppsAfterTso - warStrike);
-              currentShares += warCount;
-              currentEqv += warCount * warStrike; // strike payment adds to equity pool
+          // Same as TSO, using post-TSO PPS
+          if (warCount > 0 && dilutionBaseShares > 0) {
+            const ppsPostTso = currentEqv / dilutionBaseShares;
+            if (ppsPostTso > warStrike) {
+              warAmount = warCount * (ppsPostTso - warStrike);
+              currentEqv -= warAmount;
             }
           }
         }
 
         // ── Step 4: Subtract preferred equity → ordinary equity ──
-        const eqvPostDilution = currentEqv - exitPrefBalance - mipAmount - tsoAmount - warAmount;
+        const eqvPostDilution = eqvGross - exitPrefBalance - mipAmount - tsoAmount - warAmount;
 
-        // Per-share exit value: post-dilution equity / total shares (including waterfall shares)
-        // Use currentShares (fully diluted) for per-share, but totalExitShares for consistency
-        // with entry share basis. The exit share count should also reflect the waterfall dilution.
-        const fullyDilutedExitShares = currentShares + rolloverShares - dilutionBaseShares + exitSharesBase;
-        // Simplified: fullyDilutedExitShares ≈ totalExitShares + mipUnits + exercised tso + exercised war
-        perShareExit = fullyDilutedExitShares > 0 ? eqvPostDilution / fullyDilutedExitShares : null;
+        // Per-share exit value: post-dilution equity / total exit shares
+        // Share count = exitSharesBase + rolloverShares (NO MIP/TSO/warrant shares added)
+        perShareExit = totalExitShares > 0 ? eqvPostDilution / totalExitShares : null;
 
         // Capture dilution info for median multiple (for share_summary reporting)
         if (mult === medianMultiple) {
@@ -722,7 +713,7 @@ export function calculateDealReturns(
             warrantsAmount: warAmount,
             eqvPostDilution,
             perSharePre: ppsPreWaterfall,
-            perSharePost: fullyDilutedExitShares > 0 ? eqvPostDilution / fullyDilutedExitShares : 0,
+            perSharePost: totalExitShares > 0 ? eqvPostDilution / totalExitShares : 0,
             dilutionValuePct: eqvGross > 0 ? totalDilution / eqvGross : 0,
           };
         }

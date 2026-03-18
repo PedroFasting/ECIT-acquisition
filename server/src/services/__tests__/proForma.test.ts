@@ -5,6 +5,7 @@ import {
   getEquityFromSources,
   getPreferredFromSources,
   getDebtFromSources,
+  getUsesTotal,
   extractDilutionParams,
   computeNibdFcf,
   buildProFormaPeriods,
@@ -136,6 +137,31 @@ describe("getDebtFromSources", () => {
       { name: "Ordinary Equity", amount: "400" },
     ];
     expect(getDebtFromSources(sources)).toBe(800);
+  });
+});
+
+describe("getUsesTotal", () => {
+  it("sums all Uses items regardless of classification", () => {
+    const uses: SourceItem[] = [
+      { name: "Enterprise Value", amount: "2000" },
+      { name: "Transaction costs", amount: "50" },
+      { name: "NWC adjustment", amount: "30" },
+    ];
+    expect(getUsesTotal(uses)).toBe(2080);
+  });
+
+  it("returns 0 for null/undefined/empty", () => {
+    expect(getUsesTotal(null)).toBe(0);
+    expect(getUsesTotal(undefined)).toBe(0);
+    expect(getUsesTotal([])).toBe(0);
+  });
+
+  it("handles non-numeric amounts gracefully", () => {
+    const uses: SourceItem[] = [
+      { name: "Enterprise Value", amount: "not-a-number" },
+      { name: "Transaction costs", amount: "50" },
+    ];
+    expect(getUsesTotal(uses)).toBe(50);
   });
 });
 
@@ -569,6 +595,32 @@ describe("mergeScenarioParams", () => {
       rollover_shareholders: "100",
     });
     expect(result.rollover_equity).toBe(100);
+  });
+
+  it("auto-derives price_paid from Uses total when dp.price_paid is 0", () => {
+    const dp: DealParameters = { ...baseDp, price_paid: 0 };
+    const uses: SourceItem[] = [
+      { name: "Enterprise Value", amount: "2000" },
+      { name: "Transaction costs", amount: "50" },
+    ];
+    const result = mergeScenarioParams(dp, { uses });
+    expect(result.price_paid).toBe(2050);
+  });
+
+  it("does NOT override explicit price_paid with Uses total", () => {
+    const dp: DealParameters = { ...baseDp, price_paid: 1500 };
+    const uses: SourceItem[] = [
+      { name: "Enterprise Value", amount: "2000" },
+      { name: "Transaction costs", amount: "50" },
+    ];
+    const result = mergeScenarioParams(dp, { uses });
+    expect(result.price_paid).toBe(1500); // kept user-set value
+  });
+
+  it("keeps price_paid 0 when no Uses provided", () => {
+    const dp: DealParameters = { ...baseDp, price_paid: 0 };
+    const result = mergeScenarioParams(dp, {});
+    expect(result.price_paid).toBe(0);
   });
 });
 

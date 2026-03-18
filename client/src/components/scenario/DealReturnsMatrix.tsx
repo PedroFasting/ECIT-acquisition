@@ -195,6 +195,18 @@ export default function DealReturnsMatrix({
     }
   }, [acquirerPeriods, params.acquirer_entry_ev]);
 
+  // Auto-derive price_paid from S&U Uses total.
+  // Uses total = sum of all Uses items (Enterprise Value + transaction costs + NWC adj etc.)
+  // Only auto-fills when price_paid is not explicitly set (0 or missing).
+  useEffect(() => {
+    if (!params.price_paid && scenario.uses?.length > 0) {
+      const usesTotal = scenario.uses.reduce((sum, u) => sum + (toNum(u.amount) || 0), 0);
+      if (usesTotal > 0) {
+        setParams((p) => ({ ...p, price_paid: Math.round(usesTotal) }));
+      }
+    }
+  }, [scenario.uses, params.price_paid]);
+
   // Detect level based on current params
   const currentLevel: 1 | 2 = (params.ordinary_equity ?? 0) > 0 && (params.net_debt ?? 0) > 0 ? 2 : 1;
 

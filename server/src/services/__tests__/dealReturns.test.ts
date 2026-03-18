@@ -522,6 +522,228 @@ describe("calculateDealReturns", () => {
       const ss = result.share_summary!;
       expect(ss.exit_tso_amount).toBe(0);
     });
+
+    // ── KEY INVARIANT: MIP/TSO/warrants are value deductions only ──
+    // They do NOT create new shares. Total exit shares = exitSharesBase + rolloverShares.
+
+    it("MIP does not change total exit share count", () => {
+      // Without MIP
+      const baseParams = level2Params({
+        acquirer_entry_ev: 2000,
+        entry_shares: 356.1,
+        exit_shares: 400,
+        entry_price_per_share: 25,
+        dilution_base_shares: 331.6,
+      });
+      const baseResult = calculateDealReturns(acquirerPeriods, proFormaPeriods, baseParams);
+
+      // With 10% MIP
+      const mipParams = level2Params({
+        acquirer_entry_ev: 2000,
+        entry_shares: 356.1,
+        exit_shares: 400,
+        entry_price_per_share: 25,
+        mip_share_pct: 0.10,
+        dilution_base_shares: 331.6,
+      });
+      const mipResult = calculateDealReturns(acquirerPeriods, proFormaPeriods, mipParams);
+
+      // Share counts must be identical — MIP is a value deduction, not share issuance
+      expect(mipResult.share_summary!.total_exit_shares).toBe(baseResult.share_summary!.total_exit_shares);
+      expect(mipResult.share_summary!.entry_shares).toBe(baseResult.share_summary!.entry_shares);
+      expect(mipResult.share_summary!.exit_shares_base).toBe(baseResult.share_summary!.exit_shares_base);
+    });
+
+    it("TSO warrants do not change total exit share count", () => {
+      const baseParams = level2Params({
+        acquirer_entry_ev: 2000,
+        entry_shares: 356.1,
+        exit_shares: 400,
+        entry_price_per_share: 25,
+        dilution_base_shares: 331.6,
+      });
+      const baseResult = calculateDealReturns(acquirerPeriods, proFormaPeriods, baseParams);
+
+      // With ITM TSO warrants
+      const tsoParams = level2Params({
+        acquirer_entry_ev: 2000,
+        entry_shares: 356.1,
+        exit_shares: 400,
+        entry_price_per_share: 25,
+        tso_warrants_count: 50,
+        tso_warrants_price: 1, // deep in the money
+        dilution_base_shares: 331.6,
+      });
+      const tsoResult = calculateDealReturns(acquirerPeriods, proFormaPeriods, tsoParams);
+
+      // Share count must be the same — TSO is cashless exercise (value deduction only)
+      expect(tsoResult.share_summary!.total_exit_shares).toBe(baseResult.share_summary!.total_exit_shares);
+      // But per-share exit value should be lower due to TSO deduction
+      const baseCombined = baseResult.cases.filter(c => c.return_case === "Kombinert");
+      const tsoCombined = tsoResult.cases.filter(c => c.return_case === "Kombinert");
+      const baseMedian = baseCombined[Math.floor(baseCombined.length / 2)];
+      const tsoMedian = tsoCombined[Math.floor(tsoCombined.length / 2)];
+      if (baseMedian.per_share_exit !== null && tsoMedian.per_share_exit !== null) {
+        expect(tsoMedian.per_share_exit).toBeLessThan(baseMedian.per_share_exit);
+      }
+    });
+
+    it("existing warrants do not change total exit share count", () => {
+      const baseParams = level2Params({
+        acquirer_entry_ev: 2000,
+        entry_shares: 356.1,
+        exit_shares: 400,
+        entry_price_per_share: 25,
+        dilution_base_shares: 331.6,
+      });
+      const baseResult = calculateDealReturns(acquirerPeriods, proFormaPeriods, baseParams);
+
+      // With ITM existing warrants
+      const warParams = level2Params({
+        acquirer_entry_ev: 2000,
+        entry_shares: 356.1,
+        exit_shares: 400,
+        entry_price_per_share: 25,
+        existing_warrants_count: 30,
+        existing_warrants_price: 2, // deep in the money
+        dilution_base_shares: 331.6,
+      });
+      const warResult = calculateDealReturns(acquirerPeriods, proFormaPeriods, warParams);
+
+      expect(warResult.share_summary!.total_exit_shares).toBe(baseResult.share_summary!.total_exit_shares);
+    });
+
+    it("MIP value deduction = mip_pct × EQV_gross (exact math)", () => {
+      const params = level2Params({
+        acquirer_entry_ev: 2000,
+        entry_shares: 356.1,
+        exit_shares: 400,
+        entry_price_per_share: 25,
+        mip_share_pct: 0.05,
+        dilution_base_shares: 331.6,
+      });
+      const result = calculateDealReturns(acquirerPeriods, proFormaPeriods, params);
+      const ss = result.share_summary!;
+
+      // MIP amount should be exactly 5% of EQV_gross
+      const expectedMipAmount = 0.05 * ss.exit_eqv_gross!;
+      expect(ss.exit_mip_amount).toBeCloseTo(expectedMipAmount, 2);
+    });
+
+    it("TSO cashless exercise value = count × (PPS_post_mip - strike)", () => {
+      const params = level2Params({
+        acquirer_entry_ev: 2000,
+        entry_shares: 356.1,
+        exit_shares: 400,
+        entry_price_per_share: 25,
+        mip_share_pct: 0.05,
+        tso_warrants_count: 10,
+        tso_warrants_price: 5,
+        dilution_base_shares: 331.6,
+      });
+      const result = calculateDealReturns(acquirerPeriods, proFormaPeriods, params);
+      const ss = result.share_summary!;
+
+      // After MIP deduction, compute PPS for TSO in-the-money check
+      const eqvPostMip = ss.exit_eqv_gross! - ss.exit_mip_amount!;
+      const ppsPostMip = eqvPostMip / 331.6; // dilutionBaseShares
+      const expectedTsoAmount = 10 * (ppsPostMip - 5);
+      expect(ss.exit_tso_amount).toBeCloseTo(expectedTsoAmount, 2);
+    });
+
+    it("waterfall cascades: warrant PPS uses post-TSO equity", () => {
+      const params = level2Params({
+        acquirer_entry_ev: 2000,
+        entry_shares: 356.1,
+        exit_shares: 400,
+        entry_price_per_share: 25,
+        mip_share_pct: 0.05,
+        tso_warrants_count: 10,
+        tso_warrants_price: 5,
+        existing_warrants_count: 20,
+        existing_warrants_price: 3,
+        dilution_base_shares: 331.6,
+      });
+      const result = calculateDealReturns(acquirerPeriods, proFormaPeriods, params);
+      const ss = result.share_summary!;
+
+      // Verify cascade: warrant PPS is based on post-MIP-post-TSO equity
+      const eqvPostMip = ss.exit_eqv_gross! - ss.exit_mip_amount!;
+      const eqvPostTso = eqvPostMip - ss.exit_tso_amount!;
+      const ppsPostTso = eqvPostTso / 331.6;
+      const expectedWarAmount = 20 * (ppsPostTso - 3);
+      expect(ss.exit_warrants_amount).toBeCloseTo(expectedWarAmount, 2);
+    });
+
+    it("eqvPostDilution = EQV_gross - preferred - MIP - TSO - warrants", () => {
+      const params = level2Params({
+        acquirer_entry_ev: 2000,
+        entry_shares: 356.1,
+        exit_shares: 400,
+        entry_price_per_share: 25,
+        mip_share_pct: 0.05,
+        tso_warrants_count: 10,
+        tso_warrants_price: 5,
+        existing_warrants_count: 20,
+        existing_warrants_price: 3,
+        dilution_base_shares: 331.6,
+      });
+      const result = calculateDealReturns(acquirerPeriods, proFormaPeriods, params);
+      const ss = result.share_summary!;
+
+      const expected = ss.exit_eqv_gross!
+        - ss.exit_preferred_equity!
+        - ss.exit_mip_amount!
+        - ss.exit_tso_amount!
+        - ss.exit_warrants_amount!;
+      expect(ss.exit_eqv_post_dilution).toBeCloseTo(expected, 2);
+    });
+
+    it("per-share exit = eqvPostDilution / totalExitShares (not diluted shares)", () => {
+      const params = level2Params({
+        acquirer_entry_ev: 2000,
+        entry_shares: 356.1,
+        exit_shares: 400,
+        entry_price_per_share: 25,
+        mip_share_pct: 0.10,
+        tso_warrants_count: 20,
+        tso_warrants_price: 5,
+        dilution_base_shares: 331.6,
+      });
+      const result = calculateDealReturns(acquirerPeriods, proFormaPeriods, params);
+      const ss = result.share_summary!;
+
+      // totalExitShares = exitSharesBase + rolloverShares = 400 + 0 = 400
+      expect(ss.total_exit_shares).toBe(400);
+
+      // Per-share exit on median case should equal eqvPostDilution / totalExitShares
+      const expectedPerShare = ss.exit_eqv_post_dilution! / ss.total_exit_shares;
+      const combined = result.cases.filter(c => c.return_case === "Kombinert");
+      const medianCase = combined[Math.floor(combined.length / 2)];
+      expect(medianCase.per_share_exit).toBeCloseTo(expectedPerShare, 2);
+    });
+
+    it("zero dilution params produces no deductions", () => {
+      const params = level2Params({
+        acquirer_entry_ev: 2000,
+        entry_shares: 356.1,
+        exit_shares: 400,
+        entry_price_per_share: 25,
+        dilution_base_shares: 331.6,
+        // No MIP/TSO/warrants
+      });
+      const result = calculateDealReturns(acquirerPeriods, proFormaPeriods, params);
+      const ss = result.share_summary!;
+
+      // With no dilution, the only deduction should be preferred equity
+      expect(ss.exit_mip_amount ?? 0).toBe(0);
+      expect(ss.exit_tso_amount ?? 0).toBe(0);
+      expect(ss.exit_warrants_amount ?? 0).toBe(0);
+
+      // eqvPostDilution = eqvGross - preferred
+      const expected = ss.exit_eqv_gross! - ss.exit_preferred_equity!;
+      expect(ss.exit_eqv_post_dilution).toBeCloseTo(expected, 2);
+    });
   });
 
   // ── Synergies ───────────────────────────────────────────────────
