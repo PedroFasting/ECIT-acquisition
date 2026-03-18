@@ -326,12 +326,11 @@ describe("computeLevel2Return", () => {
 
 describe("calculateDealReturns", () => {
   const acquirerPeriods = makePeriods(3, { ebitda: 200, revenue: 1000 });
-  const targetPeriods = makePeriods(3, { ebitda: 100, revenue: 500 });
   const proFormaPeriods = makePeriods(3, { ebitda: 300, revenue: 1500 });
 
   it("detects Level 1 when no capital structure", () => {
     const result = calculateDealReturns(
-      acquirerPeriods, targetPeriods, proFormaPeriods,
+      acquirerPeriods, proFormaPeriods,
       level1Params({ acquirer_entry_ev: 2000 }),
     );
     expect(result.level).toBe(1);
@@ -340,7 +339,7 @@ describe("calculateDealReturns", () => {
 
   it("detects Level 2 when capital structure is present", () => {
     const result = calculateDealReturns(
-      acquirerPeriods, targetPeriods, proFormaPeriods,
+      acquirerPeriods, proFormaPeriods,
       level2Params({ acquirer_entry_ev: 2000 }),
     );
     expect(result.level).toBe(2);
@@ -353,7 +352,7 @@ describe("calculateDealReturns", () => {
       exit_multiples: [10, 12, 14],
     });
     const result = calculateDealReturns(
-      acquirerPeriods, targetPeriods, proFormaPeriods, params,
+      acquirerPeriods, proFormaPeriods, params,
     );
 
     const standalone = result.cases.filter((c) => c.return_case === "Standalone");
@@ -370,7 +369,7 @@ describe("calculateDealReturns", () => {
       exit_multiples: [10, 12],
     });
     const result = calculateDealReturns(
-      acquirerPeriods, targetPeriods, proFormaPeriods, params,
+      acquirerPeriods, proFormaPeriods, params,
     );
     expect(result.standalone_by_multiple[10]).toBeDefined();
     expect(result.standalone_by_multiple[12]).toBeDefined();
@@ -383,7 +382,7 @@ describe("calculateDealReturns", () => {
       exit_multiples: [],
     });
     const result = calculateDealReturns(
-      acquirerPeriods, targetPeriods, proFormaPeriods, params,
+      acquirerPeriods, proFormaPeriods, params,
     );
     const multiples = result.cases.filter((c) => c.return_case === "Standalone").map((c) => c.exit_multiple);
     expect(multiples).toEqual([10, 11, 12, 13, 14]);
@@ -391,7 +390,7 @@ describe("calculateDealReturns", () => {
 
   it("includes debt_schedule in Level 2 results", () => {
     const result = calculateDealReturns(
-      acquirerPeriods, targetPeriods, proFormaPeriods,
+      acquirerPeriods, proFormaPeriods,
       level2Params({ acquirer_entry_ev: 2000 }),
     );
     expect(result.debt_schedule).toBeDefined();
@@ -400,7 +399,7 @@ describe("calculateDealReturns", () => {
 
   it("does not include debt_schedule in Level 1 results", () => {
     const result = calculateDealReturns(
-      acquirerPeriods, targetPeriods, proFormaPeriods,
+      acquirerPeriods, proFormaPeriods,
       level1Params({ acquirer_entry_ev: 2000 }),
     );
     expect(result.debt_schedule).toBeUndefined();
@@ -417,7 +416,7 @@ describe("calculateDealReturns", () => {
         entry_price_per_share: 25,
       });
       const result = calculateDealReturns(
-        acquirerPeriods, targetPeriods, proFormaPeriods, params,
+        acquirerPeriods, proFormaPeriods, params,
       );
       expect(result.share_summary).toBeDefined();
       expect(result.share_summary!.entry_shares).toBe(356.1);
@@ -425,7 +424,7 @@ describe("calculateDealReturns", () => {
 
     it("does not return share_summary when share data is missing", () => {
       const result = calculateDealReturns(
-        acquirerPeriods, targetPeriods, proFormaPeriods,
+        acquirerPeriods, proFormaPeriods,
         level2Params({ acquirer_entry_ev: 2000 }),
       );
       expect(result.share_summary).toBeUndefined();
@@ -440,7 +439,7 @@ describe("calculateDealReturns", () => {
         equity_from_sources: 250, // 250 / 25 = 10 new shares
       });
       const result = calculateDealReturns(
-        acquirerPeriods, targetPeriods, proFormaPeriods, params,
+        acquirerPeriods, proFormaPeriods, params,
       );
       const ss = result.share_summary!;
       expect(ss.target_ek_shares).toBeCloseTo(10, 4);
@@ -458,7 +457,7 @@ describe("calculateDealReturns", () => {
         // rollover_shares = 100 / 25 = 4
       });
       const result = calculateDealReturns(
-        acquirerPeriods, targetPeriods, proFormaPeriods, params,
+        acquirerPeriods, proFormaPeriods, params,
       );
       const ss = result.share_summary!;
       expect(ss.rollover_shares).toBeCloseTo(4, 4);
@@ -479,7 +478,7 @@ describe("calculateDealReturns", () => {
         dilution_base_shares: 331.6,
       });
       const result = calculateDealReturns(
-        acquirerPeriods, targetPeriods, proFormaPeriods, params,
+        acquirerPeriods, proFormaPeriods, params,
       );
       const ss = result.share_summary!;
       expect(ss.exit_mip_amount).toBeDefined();
@@ -496,7 +495,7 @@ describe("calculateDealReturns", () => {
         dilution_base_shares: 331.6,
       });
       const result = calculateDealReturns(
-        acquirerPeriods, targetPeriods, proFormaPeriods, params,
+        acquirerPeriods, proFormaPeriods, params,
       );
       const combined = result.cases.filter((c) => c.return_case === "Kombinert");
       const medianCase = combined[Math.floor(combined.length / 2)];
@@ -518,7 +517,7 @@ describe("calculateDealReturns", () => {
         dilution_base_shares: 331.6,
       });
       const result = calculateDealReturns(
-        acquirerPeriods, targetPeriods, proFormaPeriods, params,
+        acquirerPeriods, proFormaPeriods, params,
       );
       const ss = result.share_summary!;
       expect(ss.exit_tso_amount).toBe(0);
@@ -531,10 +530,9 @@ describe("calculateDealReturns", () => {
     it("standalone case does not include synergies", () => {
       const params = level1Params({
         acquirer_entry_ev: 2000,
-        cost_synergies: [10, 20, 30],
       });
       const result = calculateDealReturns(
-        acquirerPeriods, targetPeriods, proFormaPeriods, params,
+        acquirerPeriods, proFormaPeriods, params,
       );
       // Standalone IRR should not be affected by synergies
       // (synergies only flow through proFormaPeriods, which already include them)
@@ -550,7 +548,7 @@ describe("calculateDealReturns", () => {
     it("handles zero price_paid gracefully", () => {
       const params = level1Params({ price_paid: 0, acquirer_entry_ev: 2000 });
       const result = calculateDealReturns(
-        acquirerPeriods, targetPeriods, proFormaPeriods, params,
+        acquirerPeriods, proFormaPeriods, params,
       );
       // Combined case should still produce results (combined EV = acquirer EV)
       expect(result.cases.length).toBeGreaterThan(0);
@@ -559,7 +557,7 @@ describe("calculateDealReturns", () => {
     it("handles single-period projections", () => {
       const single = makePeriods(1, { ebitda: 100, revenue: 500 });
       const result = calculateDealReturns(
-        single, single, single,
+        single, single,
         level1Params({ acquirer_entry_ev: 1000 }),
       );
       expect(result.cases.length).toBeGreaterThan(0);
@@ -928,7 +926,6 @@ describe("FCF calculation — baseline", () => {
     it("produces consistent results across cases", () => {
       const result = calculateDealReturns(
         ecitLikePeriods,
-        herjedalLikePeriods,
         pfPeriods,
         realisticParams,
       );
@@ -957,7 +954,6 @@ describe("FCF calculation — baseline", () => {
     it("debt schedule exists and shows declining leverage", () => {
       const result = calculateDealReturns(
         ecitLikePeriods,
-        herjedalLikePeriods,
         pfPeriods,
         realisticParams,
       );
@@ -986,7 +982,6 @@ describe("FCF calculation — baseline", () => {
 
       const fullResult = calculateDealReturns(
         ecitLikePeriods,
-        herjedalLikePeriods,
         pfPeriods,
         realisticParams,
       );

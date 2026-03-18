@@ -466,7 +466,7 @@ router.post(
 
       // Pre-compute shared period data (invariant across grid cells)
       const tgtNibdFcf = computeNibdFcf(ctx.targetPeriods);
-      const { acqData, tgtData, periodLabels } = buildComputationData(ctx, base_params, tgtNibdFcf);
+      const { acqData, periodLabels } = buildComputationData(ctx, base_params, tgtNibdFcf);
 
       // ── Run the grid ──
       const matrix: (number | null)[][] = [];
@@ -490,7 +490,7 @@ router.post(
           const mergedDp = prepareFullDealParams(dp, ctx.scenario, ctx.acquirerPeriods, ctx.acquirerModelParams, ctx.synergiesTimeline);
           const pfData = buildProFormaPeriodData(ctx.acquirerPeriods, ctx.targetPeriods, ctx.synergiesTimeline, mergedDp, tgtNibdFcf);
 
-          const result = calculateDealReturns(acqData, tgtData, pfData, mergedDp, periodLabels);
+          const result = calculateDealReturns(acqData, pfData, mergedDp, periodLabels);
 
           // Extract the requested metric from the target case
           const caseResult = result.cases.find(c => c.return_case === targetCase);

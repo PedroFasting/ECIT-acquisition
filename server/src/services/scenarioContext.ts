@@ -209,8 +209,8 @@ export function runFullCalculation(
     ctx.synergiesTimeline,
   );
 
-  const { acqData, tgtData, pfData, periodLabels } = buildComputationData(ctx, mergedDp, undefined, storedPf);
-  const result = calculateDealReturns(acqData, tgtData, pfData, mergedDp, periodLabels);
+  const { acqData, pfData, periodLabels } = buildComputationData(ctx, mergedDp, undefined, storedPf);
+  const result = calculateDealReturns(acqData, pfData, mergedDp, periodLabels);
 
   return { mergedDp, result };
 }

@@ -219,7 +219,6 @@ export interface DealParameters {
   rollover_equity?: number;
   // Cash sweep: % of excess FCF after mandatory amort applied to debt repayment (0-1)
   cash_sweep_pct?: number;
-  cost_synergies?: number[];
   // Share tracking (per-share returns with dilution)
   entry_shares?: number;
   exit_shares?: number;

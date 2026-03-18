@@ -515,7 +515,6 @@ export function prepareFullDealParams(
   applyShareTracking(merged, acquirerPeriods);
   const dilution = extractDilutionParams(acquirerModelParams);
   Object.assign(merged, dilution);
-  merged.cost_synergies = buildSynergiesArray(acquirerPeriods, synergiesTimeline);
   return merged;
 }
 

@@ -138,6 +138,79 @@ describe("zero capex/NWC is a valid value, not missing data", () => {
 });
 
 // ══════════════════════════════════════════════════════════════════
+// 1b. NWC SIGN CONVENTION — negative nwc_investment means cash release
+// ══════════════════════════════════════════════════════════════════
+
+describe("NWC fallback sign convention", () => {
+  // nwc_investment is the flat NOK amount used as fallback when
+  // period data has no change_nwc.  The formula is: changeNwc = -nwc_investment
+  //   positive nwc_investment → negative changeNwc (cash outflow, working capital tied up)
+  //   negative nwc_investment → positive changeNwc (cash inflow, working capital released)
+  //   zero nwc_investment → zero changeNwc
+  //
+  // Previously Math.abs(fallbackNwc) was used, which silently flipped
+  // a negative nwc_investment (cash release) into a cash outflow.
+
+  const periods = makePeriods(5, { ebitda: 200, revenue: 1000 });
+  // Remove capex/change_nwc from period data so the engine uses fallbacks
+  for (const p of periods) {
+    delete (p as any).capex;
+    delete (p as any).change_nwc;
+  }
+
+  it("positive nwc_investment reduces FCF (cash outflow)", () => {
+    const paramsPos = level1Params({ nwc_investment: 20 });
+    const paramsZero = level1Params({ nwc_investment: 0 });
+
+    const resPos = computeLevel1Return(1000, periods, paramsPos, 12);
+    const resZero = computeLevel1Return(1000, periods, paramsZero, 12);
+
+    expect(resPos.mom).not.toBeNull();
+    expect(resZero.mom).not.toBeNull();
+    // Positive NWC investment ties up cash → lower returns
+    expect(resPos.mom!).toBeLessThan(resZero.mom!);
+  });
+
+  it("negative nwc_investment increases FCF (cash release)", () => {
+    const paramsNeg = level1Params({ nwc_investment: -20 });
+    const paramsZero = level1Params({ nwc_investment: 0 });
+
+    const resNeg = computeLevel1Return(1000, periods, paramsNeg, 12);
+    const resZero = computeLevel1Return(1000, periods, paramsZero, 12);
+
+    expect(resNeg.mom).not.toBeNull();
+    expect(resZero.mom).not.toBeNull();
+    // Negative NWC investment releases cash → higher returns
+    expect(resNeg.mom!).toBeGreaterThan(resZero.mom!);
+  });
+
+  it("negative nwc_investment gives higher MoM than positive (symmetric)", () => {
+    const paramsPos = level1Params({ nwc_investment: 20 });
+    const paramsNeg = level1Params({ nwc_investment: -20 });
+
+    const resPos = computeLevel1Return(1000, periods, paramsPos, 12);
+    const resNeg = computeLevel1Return(1000, periods, paramsNeg, 12);
+
+    expect(resPos.mom).not.toBeNull();
+    expect(resNeg.mom).not.toBeNull();
+    // Cash release (negative) should give better returns than cash drain (positive)
+    expect(resNeg.mom!).toBeGreaterThan(resPos.mom!);
+  });
+
+  it("Level 2 also respects NWC sign convention", () => {
+    const paramsPos = level2Params({ nwc_investment: 20 });
+    const paramsNeg = level2Params({ nwc_investment: -20 });
+
+    const resPos = computeLevel2Return(1000, periods, paramsPos, 12, true);
+    const resNeg = computeLevel2Return(1000, periods, paramsNeg, 12, true);
+
+    expect(resPos.mom).not.toBeNull();
+    expect(resNeg.mom).not.toBeNull();
+    expect(resNeg.mom!).toBeGreaterThan(resPos.mom!);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════
 // 2. MINORITY INTEREST — must reduce BOTH interim FCF AND exit equity
 // ══════════════════════════════════════════════════════════════════
 
@@ -489,7 +562,7 @@ describe("dilution waterfall — exact values", () => {
       mip_share_pct: 0.10,  // 10% MIP
       // No TSO or warrants
     });
-    const result = calculateDealReturns(periods, [], periods, params);
+    const result = calculateDealReturns(periods, periods, params);
 
     expect(result.share_summary).toBeDefined();
     const ss = result.share_summary!;
@@ -521,7 +594,7 @@ describe("dilution waterfall — exact values", () => {
       tso_warrants_count: 10,
       tso_warrants_price: 5,   // low strike → definitely ITM
     });
-    const result = calculateDealReturns(periods, [], periods, params);
+    const result = calculateDealReturns(periods, periods, params);
     const ss = result.share_summary!;
 
     expect(ss.exit_tso_amount).toBeDefined();
@@ -541,7 +614,7 @@ describe("dilution waterfall — exact values", () => {
       tso_warrants_count: 10,
       tso_warrants_price: 99999, // extremely high strike → OTM
     });
-    const result = calculateDealReturns(periods, [], periods, params);
+    const result = calculateDealReturns(periods, periods, params);
     const ss = result.share_summary!;
 
     expect(ss.exit_tso_amount).toBe(0);
@@ -560,7 +633,7 @@ describe("dilution waterfall — exact values", () => {
       existing_warrants_count: 5,
       existing_warrants_price: 10,
     });
-    const result = calculateDealReturns(periods, [], periods, params);
+    const result = calculateDealReturns(periods, periods, params);
     const ss = result.share_summary!;
 
     expect(ss.exit_warrants_amount).toBeDefined();

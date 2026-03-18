@@ -700,7 +700,5 @@ describe("prepareFullDealParams", () => {
     // Dilution params applied
     expect(result.mip_share_pct).toBe(0.05);
     expect(result.dilution_base_shares).toBe(331.6);
-    // Synergies array built
-    expect(result.cost_synergies).toEqual([5, 10]);
   });
 });

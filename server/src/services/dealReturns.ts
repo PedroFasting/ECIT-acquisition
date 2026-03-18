@@ -101,9 +101,6 @@ export interface DealParameters {
   // Usually the "shares at completion" or first-period ordinary shares (~331.6 or ~356.1)
   dilution_base_shares?: number;
 
-  // Cost synergies per year (indexed by period index 0..N-1), passed from scenario
-  cost_synergies?: number[];
-
   // ── Deprecated (kept for backward compat, ignored in calc) ──
   nibd_target?: number;
   wacc?: number;
@@ -295,7 +292,7 @@ function computeLevel1Return(
     // Use actual capex from period data if available, otherwise proxy as % of revenue
     const revenue = p.revenue ?? 0;
     const capex = p.capex ?? -(revenue > 0 ? revenue * capexPctRevenue : Math.abs(ebitda) * capexPctRevenue);
-    const changeNwc = p.change_nwc ?? -Math.abs(fallbackNwc);
+    const changeNwc = p.change_nwc ?? -fallbackNwc;
 
     // Tax on EBT proxy: EBT ≈ EBITDA - D&A (D&A proxied as % of revenue)
     const daProxy = revenue > 0 ? revenue * daPctRevenue : Math.abs(ebitda) * daPctRevenue;
@@ -389,7 +386,7 @@ function computeLevel2Return(
       // Capex / NWC — use actual period data, otherwise proxy capex as % of revenue
       const revenue = p.revenue ?? 0;
       const capex = p.capex ?? -(revenue > 0 ? revenue * capexPctRevenue : Math.abs(ebitda) * capexPctRevenue);
-      const changeNwc = p.change_nwc ?? -Math.abs(fallbackNwc);
+      const changeNwc = p.change_nwc ?? -fallbackNwc;
 
       // Tax on levered EBT proxy: EBT = EBITDA - D&A - interest (interest tax shield)
       const daProxy = revenue > 0 ? revenue * daPctRevenue : Math.abs(ebitda) * daPctRevenue;
@@ -499,14 +496,12 @@ export { computeIRR, bisectionIRR, isLevel2, computeLevel1Return, computeLevel2R
  * Calculate deal returns for all cases and exit multiples.
  *
  * acquirerPeriods: per-period data for acquirer (year 1..N)
- * targetPeriods: per-period data for target
  * proFormaPeriods: combined pro forma data (including synergies)
  * params: deal parameters from the scenario
  * periodLabels: optional labels for each period (e.g. ["2026E", "2027E", ...])
  */
 export function calculateDealReturns(
   acquirerPeriods: PeriodData[],
-  targetPeriods: PeriodData[],
   proFormaPeriods: PeriodData[],
   params: DealParameters,
   periodLabels?: string[],
@@ -603,7 +598,6 @@ export function calculateDealReturns(
   const standaloneParams: DealParameters = {
     ...params,
     nibd_target: 0,
-    cost_synergies: undefined,
   };
   // For Level 2 standalone, equity bridge uses acquirer-only capital structure
   // We use Level 1 for standalone since standalone doesn't have a separate equity bridge

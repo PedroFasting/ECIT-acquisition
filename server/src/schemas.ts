@@ -235,9 +235,6 @@ export const DealParametersSchema = z.object({
   existing_warrants_price: optNum,
   dilution_base_shares: optNum,
 
-  // Synergies
-  cost_synergies: z.array(num).optional(),
-
   // Deprecated (accepted but ignored)
   nibd_target: optNum,
   wacc: optNum,
