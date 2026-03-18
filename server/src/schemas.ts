@@ -199,7 +199,7 @@ export const UpdateScenarioSchema = z.object({
 // ── Deal Parameters (the core financial engine input) ──
 
 export const DealParametersSchema = z.object({
-  price_paid: posNum,
+  price_paid: posNum.optional(), // auto-derived from Uses total when S&U exists
   tax_rate: pct,
   exit_multiples: z.array(num).min(1, "At least one exit multiple is required").max(20),
   acquirer_entry_ev: optNonNegNum,
