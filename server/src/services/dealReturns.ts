@@ -309,9 +309,10 @@ function computeLevel1Return(
     fcfs.push(fcf);
   }
 
-  // Exit value: exit EBITDA × multiple, reduced by minority share
+  // Exit value: exit EBITDA × multiple
+  // (minority is a cash flow claim, not an ownership stake — option debt handles exit buyout)
   const exitEbitda = periods[periods.length - 1].ebitda;
-  const exitEV = exitEbitda * exitMultiple * (1 - minorityPct);
+  const exitEV = exitEbitda * exitMultiple;
 
   // Cash flow vector: [-entryEV, FCF1, ..., FCFn + exitEV]
   const cashFlows: number[] = [-entryEV];
@@ -434,8 +435,10 @@ function computeLevel2Return(
       exitEV = exitEbitda * exitMultiple;
       exitDebt = debtBalance;
       exitPref = prefBalance;
-      // Exit equity = Exit EV × (1 - minority%) - remaining net debt - accrued preferred equity
-      const exitEquity = exitEV * (1 - minorityPct) - debtBalance - prefBalance;
+      // Exit equity = Exit EV - remaining net debt - accrued preferred equity
+      // (minority is a cash flow claim only; option debt for minority buyout
+      //  is reflected in the equity bridge, not as a % deduction here)
+      const exitEquity = exitEV - debtBalance - prefBalance;
       equityCFs.push(fcfToEquity + exitEquity);
     } else {
       equityCFs.push(fcfToEquity);

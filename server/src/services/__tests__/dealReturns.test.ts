@@ -1019,12 +1019,13 @@ describe("FCF calculation — baseline", () => {
       // FCF_before_minority = 55 - 6.6 - 15 = 33.4
       // minority_pct = 0.20 → FCF = 33.4 * 0.8 = 26.72
       //
-      // Exit = 55 * 12 * (1 - 0.20) = 528 (minority deducted at exit too)
-      // CFs: [-600, 26.72, 26.72, 26.72, 26.72, 26.72+528]
-      // MoM = (133.6+528)/600 = 1.103
+      // Exit = 55 * 12 = 660 (minority is cash flow only, not at exit)
+      // CFs: [-600, 26.72, 26.72, 26.72, 26.72, 26.72+660]
+      // MoM = (133.6+660)/600 = 1.323
       //
-      // Note: minority_pct is applied by the engine to BOTH FCF and exit EV.
-      expect(round(targetOnly.mom!, 3)).toBe(1.103);
+      // Note: minority_pct is applied to interim FCF only; at exit, option debt
+      // handles the minority buyout (reflected in equity bridge, not here).
+      expect(round(targetOnly.mom!, 3)).toBe(1.323);
     });
   });
 
@@ -1042,10 +1043,10 @@ describe("FCF calculation — baseline", () => {
       const params = level1Params({ minority_pct: 0.20 });
       const result = computeLevel1Return(1000, periods, params, 12);
 
-      // Exit EV = 100 * 12 * (1 - 0.20) = 960 (minority deducted at exit too)
-      // CFs: [-1000, 54.8 + 960] = [-1000, 1014.8]
-      // MoM = 1014.8 / 1000 = 1.0148
-      expect(round(result.mom!, 4)).toBe(1.0148);
+      // Exit = 100 * 12 = 1200 (minority is cash flow only, not at exit)
+      // CFs: [-1000, 54.8 + 1200] = [-1000, 1254.8]
+      // MoM = 1254.8 / 1000 = 1.2548
+      expect(round(result.mom!, 4)).toBe(1.2548);
     });
 
     it("minority_pct = 0 gives same result as omitting it", () => {
@@ -1062,11 +1063,11 @@ describe("FCF calculation — baseline", () => {
       const withoutMinority = computeLevel1Return(1000, periods, level1Params({ minority_pct: 0 }), 12);
 
       // NIBD FCF = 80, after minority = 64
-      // Exit EV without minority = 100*12 = 1200, with minority = 100*12*0.8 = 960
+      // Exit EV = 100*12 = 1200 (minority is cash flow only, not at exit)
       // Without: CFs [-1000, 80, 80, 80+1200] → MoM = 1440/1000 = 1.44
-      // With:    CFs [-1000, 64, 64, 64+960] → MoM = 1152/1000 = 1.152
+      // With:    CFs [-1000, 64, 64, 64+1200] → MoM = 1392/1000 = 1.392
       expect(round(withoutMinority.mom!, 3)).toBe(1.44);
-      expect(round(withMinority.mom!, 3)).toBe(1.152);
+      expect(round(withMinority.mom!, 3)).toBe(1.392);
     });
 
     it("minority_pct works in Level 2 debt schedule", () => {
