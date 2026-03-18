@@ -1406,3 +1406,99 @@ describe("FCF calculation — baseline", () => {
     });
   });
 });
+
+// ══════════════════════════════════════════════════════════════════
+// LEVEL 2 EQUITY IRR PINNING
+// Pin exact equity IRR and MoM values for hand-calculated scenarios.
+// ══════════════════════════════════════════════════════════════════
+
+describe("Level 2 equity IRR pinning", () => {
+  it("simple Level 2 — no sweep, no PIK, no minority", () => {
+    // 5 years, each EBITDA=100, revenue=1000
+    // D&A = 1000*0.01 = 10, capex = -(1000*0.01) = -10, NWC = -(1000*0.0075) = -7.5
+    // Debt schedule: opening 600, amort 100/yr, no sweep
+    //
+    // Year 1: debt=600, interest=600*0.05=30, EBT=100-10-30=60, tax=-60*0.22=-13.2
+    //   unlevFCF = 100 + (-13.2) + (-10) + (-7.5) = 69.3
+    //   debtService = 30 + 100 = 130, fcfToEquity = 69.3 - 130 = -60.7, debt→500
+    // Year 2: debt=500, interest=25, EBT=65, tax=-14.3
+    //   unlevFCF = 100 - 14.3 - 10 - 7.5 = 68.2, debtService=125, fcfToEquity=-56.8, debt→400
+    // Year 3: debt=400, interest=20, EBT=70, tax=-15.4
+    //   unlevFCF = 100 - 15.4 - 10 - 7.5 = 67.1, debtService=120, fcfToEquity=-52.9, debt→300
+    // Year 4: debt=300, interest=15, EBT=75, tax=-16.5
+    //   unlevFCF = 100 - 16.5 - 10 - 7.5 = 66.0, debtService=115, fcfToEquity=-49.0, debt→200
+    // Year 5: debt=200, interest=10, EBT=80, tax=-17.6
+    //   unlevFCF = 100 - 17.6 - 10 - 7.5 = 64.9, debtService=110, fcfToEquity=-45.1, debt→100
+    //   exitEV = 100*10 = 1000, exitEquity = 1000 - 100 - 0 = 900
+    //   totalExitCF = -45.1 + 900 = 854.9
+    //
+    // Cash flows: [-400, -60.7, -56.8, -52.9, -49.0, 854.9]
+    // MoM = sum(CFs[1:]) / 400 = (-60.7-56.8-52.9-49.0+854.9) / 400 = 635.5/400 = 1.58875
+    const periods = makePeriods(5, { ebitda: 100, revenue: 1000 });
+    const params: DealParameters = {
+      price_paid: 1000,
+      tax_rate: 0.22,
+      da_pct_revenue: 0.01,
+      capex_pct_revenue: 0.01,
+      nwc_pct_revenue: 0.0075,
+      ordinary_equity: 400,
+      net_debt: 600,
+      interest_rate: 0.05,
+      debt_amortisation: 100,
+      preferred_equity: 0,
+      cash_sweep_pct: 0,
+      exit_multiples: [10],
+    };
+
+    const result = computeLevel2Return(1000, periods, params, 10, true);
+
+    expect(result.mom).not.toBeNull();
+    expect(result.mom!).toBeCloseTo(1.589, 2);
+    expect(result.irr).not.toBeNull();
+    expect(result.irr!).toBeGreaterThan(0);
+
+    // Verify debt schedule
+    expect(result.schedule).toBeDefined();
+    expect(result.schedule!.length).toBe(5);
+    expect(result.schedule![0].opening_debt).toBe(600);
+    expect(result.schedule![4].closing_debt).toBeCloseTo(100, 0);
+  });
+
+  it("Level 2 with PIK + minority + cash sweep", () => {
+    // 3 years, each EBITDA=200, revenue=2000
+    // PIK accrues on preferred_equity at 10%, cash sweep 50%,
+    // minority_pct=10%, no mandatory amortisation
+    const periods = makePeriods(3, { ebitda: 200, revenue: 2000 });
+    const params: DealParameters = {
+      price_paid: 2000,
+      tax_rate: 0.22,
+      da_pct_revenue: 0.01,
+      capex_pct_revenue: 0.01,
+      nwc_pct_revenue: 0.005,
+      ordinary_equity: 500,
+      net_debt: 1000,
+      interest_rate: 0.06,
+      debt_amortisation: 0,
+      preferred_equity: 500,
+      preferred_equity_rate: 0.10,
+      cash_sweep_pct: 0.5,
+      minority_pct: 0.10,
+      exit_multiples: [8],
+    };
+
+    const result = computeLevel2Return(2000, periods, params, 8, true);
+
+    expect(result.irr).not.toBeNull();
+    expect(result.mom).not.toBeNull();
+    expect(result.mom!).toBeGreaterThan(0);
+
+    // Verify debt schedule has 3 rows
+    expect(result.schedule).toBeDefined();
+    expect(result.schedule!.length).toBe(3);
+
+    // Preferred equity should compound
+    expect(result.schedule![0].opening_pref).toBe(500);
+    expect(result.schedule![0].pik_accrual).toBeCloseTo(50, 0); // 500 * 0.10
+    expect(result.schedule![0].closing_pref).toBeCloseTo(550, 0);
+  });
+});

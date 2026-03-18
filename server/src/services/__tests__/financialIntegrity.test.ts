@@ -1015,3 +1015,122 @@ describe("margin identity in pro forma display", () => {
     );
   });
 });
+
+// ══════════════════════════════════════════════════════════════════
+// 17. LEVEL 2 CONVERGES TO LEVEL 1 WHEN DEBT = 0
+// ══════════════════════════════════════════════════════════════════
+
+describe("Level 2 converges to Level 1 when debt ≈ 0", () => {
+  it("with negligible debt, Kombinert MoM/IRR ≈ Standalone MoM/IRR", () => {
+    // When there is essentially no debt, Level 2 equity returns should
+    // converge to Level 1 unlevered returns because:
+    // - equity invested = price_paid (no leverage)
+    // - no interest deduction or debt service
+    // - exit equity ≈ exit EV (no debt/pref to subtract)
+    const periods: PeriodData[] = [
+      { ebitda: 50, revenue: 500 },
+      { ebitda: 55, revenue: 550 },
+      { ebitda: 60, revenue: 600 },
+    ];
+
+    // Use tiny net_debt to activate Level 2 (isLevel2 requires net_debt > 0)
+    // Set ordinary_equity to cover virtually all of price_paid
+    const dp: DealParameters = {
+      price_paid: 500,
+      tax_rate: 0.22,
+      exit_multiples: [10],
+      da_pct_revenue: 0.01,
+      capex_pct_revenue: 0.01,
+      ordinary_equity: 499.99,
+      net_debt: 0.01,
+      preferred_equity: 0,
+      interest_rate: 0,
+      debt_amortisation: 0,
+      cash_sweep_pct: 0,
+    };
+
+    // Single call: calculateDealReturns produces both Standalone (Level 1)
+    // and Kombinert (Level 2) when net_debt > 0
+    const result = calculateDealReturns(periods, periods, dp);
+
+    expect(result.level).toBe(2); // Level 2 activated
+
+    const standalone = result.cases.find(
+      (c) => c.return_case === "Standalone" && c.exit_multiple === 10,
+    );
+    const kombinert = result.cases.find(
+      (c) => c.return_case === "Kombinert" && c.exit_multiple === 10,
+    );
+
+    expect(standalone).toBeDefined();
+    expect(kombinert).toBeDefined();
+    expect(standalone!.irr).not.toBeNull();
+    expect(kombinert!.irr).not.toBeNull();
+    expect(standalone!.mom).not.toBeNull();
+    expect(kombinert!.mom).not.toBeNull();
+
+    // With debt ≈ 0, they should be nearly identical
+    expect(kombinert!.irr!).toBeCloseTo(standalone!.irr!, 2);
+    expect(kombinert!.mom!).toBeCloseTo(standalone!.mom!, 2);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════
+// 18. PER-SHARE MOM CONSISTENCY WITH TOTAL EQUITY
+// ══════════════════════════════════════════════════════════════════
+
+describe("per-share MoM consistency with total equity", () => {
+  it("per_share_exit and per_share_mom are consistent with share summary", () => {
+    const periods = makePeriods(3, { ebitda: 200, revenue: 1000 });
+    const dp: DealParameters = {
+      price_paid: 1000,
+      tax_rate: 0.22,
+      exit_multiples: [12],
+      ordinary_equity: 400,
+      net_debt: 600,
+      preferred_equity: 0,
+      interest_rate: 0.05,
+      da_pct_revenue: 0.01,
+      capex_pct_revenue: 0.01,
+      debt_amortisation: 50,
+      cash_sweep_pct: 1.0,
+      entry_shares: 100,
+      exit_shares: 100,
+      entry_price_per_share: 4,
+      mip_share_pct: 0.05,
+      dilution_base_shares: 100,
+    };
+
+    const result = calculateDealReturns(periods, periods, dp);
+
+    const kombinert = result.cases.find(
+      (c) => c.return_case === "Kombinert" && c.exit_multiple === 12,
+    );
+    expect(kombinert).toBeDefined();
+
+    // Per-share fields should exist
+    expect(kombinert!.per_share_exit).not.toBeNull();
+    expect(kombinert!.per_share_mom).not.toBeNull();
+
+    // Share summary should exist and contain dilution info
+    expect(result.share_summary).toBeDefined();
+    const ss = result.share_summary!;
+
+    // Per-share exit should equal eqvPostDilution / totalExitShares
+    if (ss.exit_eqv_post_dilution != null && ss.total_exit_shares > 0) {
+      const expectedPerShare = ss.exit_eqv_post_dilution / ss.total_exit_shares;
+      expect(kombinert!.per_share_exit).toBeCloseTo(expectedPerShare, 2);
+    }
+
+    // Per-share MoM = per_share_exit / per_share_entry
+    if (kombinert!.per_share_exit != null && kombinert!.per_share_entry != null && kombinert!.per_share_entry > 0) {
+      const expectedMoM = kombinert!.per_share_exit / kombinert!.per_share_entry;
+      expect(kombinert!.per_share_mom).toBeCloseTo(expectedMoM, 2);
+    }
+
+    // MIP dilution should reduce per-share returns below total returns
+    if (kombinert!.per_share_irr != null && kombinert!.irr != null) {
+      expect(kombinert!.per_share_irr).toBeLessThanOrEqual(kombinert!.irr);
+    }
+  });
+});

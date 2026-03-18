@@ -14,6 +14,7 @@ import {
   buildTargetPeriodData,
   buildProFormaPeriodData,
   mergeScenarioParams,
+  sensitivityParamSetters,
   applyShareTracking,
   buildSynergiesArray,
   extractPeriodLabels,
@@ -931,5 +932,109 @@ describe("S&U → deal returns integration", () => {
     expect(combined.length).toBe(0); // no combined case when price_paid = 0
     expect(standalone.length).toBe(1); // standalone always computed
     expect(standalone[0].mom).not.toBeNull();
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════
+// SENSITIVITY PARAMETER SETTERS
+// ══════════════════════════════════════════════════════════════════
+
+describe("sensitivityParamSetters", () => {
+  const baseDp: DealParameters = {
+    price_paid: 100,
+    tax_rate: 0.22,
+    exit_multiples: [10],
+  };
+
+  it("exit_multiple setter creates exit_multiples: [val]", () => {
+    const result = sensitivityParamSetters["exit_multiple"](baseDp, 15);
+    expect(result.exit_multiples).toEqual([15]);
+    // Other params unchanged
+    expect(result.price_paid).toBe(100);
+    expect(result.tax_rate).toBe(0.22);
+  });
+
+  it("price_paid setter overrides price_paid", () => {
+    const result = sensitivityParamSetters["price_paid"](baseDp, 999);
+    expect(result.price_paid).toBe(999);
+    expect(result.exit_multiples).toEqual([10]);
+  });
+
+  it("interest_rate setter overrides interest_rate", () => {
+    const result = sensitivityParamSetters["interest_rate"](baseDp, 0.08);
+    expect(result.interest_rate).toBe(0.08);
+    expect(result.price_paid).toBe(100);
+  });
+
+  it("tax_rate setter overrides tax_rate", () => {
+    const result = sensitivityParamSetters["tax_rate"](baseDp, 0.30);
+    expect(result.tax_rate).toBe(0.30);
+  });
+
+  it("net_debt setter overrides net_debt", () => {
+    const result = sensitivityParamSetters["net_debt"](baseDp, 500);
+    expect(result.net_debt).toBe(500);
+    expect(result.price_paid).toBe(100);
+  });
+
+  it("cash_sweep_pct setter overrides cash_sweep_pct", () => {
+    const result = sensitivityParamSetters["cash_sweep_pct"](baseDp, 0.75);
+    expect(result.cash_sweep_pct).toBe(0.75);
+  });
+
+  it("unknown param key returns undefined from the map", () => {
+    expect(sensitivityParamSetters["nonexistent_key"]).toBeUndefined();
+    expect(sensitivityParamSetters["random_param"]).toBeUndefined();
+  });
+
+  it("all 12 setter keys exist", () => {
+    const keys = Object.keys(sensitivityParamSetters);
+    expect(keys.length).toBe(12);
+    // Verify specific keys are present
+    const expectedKeys = [
+      "exit_multiple", "price_paid", "interest_rate", "ordinary_equity",
+      "net_debt", "debt_amortisation", "cash_sweep_pct", "preferred_equity_rate",
+      "tax_rate", "preferred_equity", "da_pct_revenue", "acquirer_entry_ev",
+    ];
+    for (const key of expectedKeys) {
+      expect(sensitivityParamSetters[key]).toBeDefined();
+      expect(typeof sensitivityParamSetters[key]).toBe("function");
+    }
+  });
+
+  it("setters return new objects (immutability)", () => {
+    const result = sensitivityParamSetters["price_paid"](baseDp, 999);
+    expect(result).not.toBe(baseDp); // different reference
+    expect(baseDp.price_paid).toBe(100); // original unchanged
+  });
+
+  it("ordinary_equity setter overrides ordinary_equity", () => {
+    const result = sensitivityParamSetters["ordinary_equity"](baseDp, 300);
+    expect(result.ordinary_equity).toBe(300);
+  });
+
+  it("debt_amortisation setter overrides debt_amortisation", () => {
+    const result = sensitivityParamSetters["debt_amortisation"](baseDp, 50);
+    expect(result.debt_amortisation).toBe(50);
+  });
+
+  it("preferred_equity_rate setter overrides preferred_equity_rate", () => {
+    const result = sensitivityParamSetters["preferred_equity_rate"](baseDp, 0.12);
+    expect(result.preferred_equity_rate).toBe(0.12);
+  });
+
+  it("preferred_equity setter overrides preferred_equity", () => {
+    const result = sensitivityParamSetters["preferred_equity"](baseDp, 200);
+    expect(result.preferred_equity).toBe(200);
+  });
+
+  it("da_pct_revenue setter overrides da_pct_revenue", () => {
+    const result = sensitivityParamSetters["da_pct_revenue"](baseDp, 0.05);
+    expect(result.da_pct_revenue).toBe(0.05);
+  });
+
+  it("acquirer_entry_ev setter overrides acquirer_entry_ev", () => {
+    const result = sensitivityParamSetters["acquirer_entry_ev"](baseDp, 5000);
+    expect(result.acquirer_entry_ev).toBe(5000);
   });
 });
