@@ -519,7 +519,9 @@
     "summaryDAProxy": "D&A proxy:",
     "ofExcessFcf": "of excess FCF",
     "ofRevenue": "of revenue",
-    "egPlaceholder": "e.g. {{value}}"
+    "egPlaceholder": "e.g. {{value}}",
+    "priceDerivedFromSU": "Derived from Sources & Uses total",
+    "priceDerivedHint": "Price paid is derived from Uses total in Sources & Uses. Edit S&U to change."
   },
   "bridge": {
     "title": "Equity bridge",

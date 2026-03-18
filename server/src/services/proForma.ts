@@ -437,8 +437,9 @@ export function mergeScenarioParams(
 
   return {
     ...dp,
-    // Auto-derive price_paid from Uses total (S&U) when not explicitly set on deal_parameters
-    price_paid: dp.price_paid > 0 ? dp.price_paid : (usesTotal > 0 ? usesTotal : dp.price_paid),
+    // price_paid = Uses total when S&U exists (Uses is the source of truth for deal size).
+    // Falls back to dp.price_paid only when no Uses are defined.
+    price_paid: usesTotal > 0 ? usesTotal : dp.price_paid,
     ordinary_equity: safeParse(scenario.ordinary_equity) ?? (srcOE > 0 ? srcOE : undefined) ?? dp.ordinary_equity,
     preferred_equity: safeParse(scenario.preferred_equity) ?? (srcPE > 0 ? srcPE : undefined) ?? dp.preferred_equity,
     preferred_equity_rate: safeParse(scenario.preferred_equity_rate) ?? dp.preferred_equity_rate,

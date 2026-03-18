@@ -519,7 +519,9 @@
     "summaryDAProxy": "D&A proxy:",
     "ofExcessFcf": "av overskudds-FCF",
     "ofRevenue": "av revenue",
-    "egPlaceholder": "f.eks. {{value}}"
+    "egPlaceholder": "f.eks. {{value}}",
+    "priceDerivedFromSU": "Avledet fra Sources & Uses totalt",
+    "priceDerivedHint": "Price paid er avledet fra Uses-totalen i Sources & Uses. Rediger S&U for å endre."
   },
   "bridge": {
     "title": "Egenkapitalbrygge",

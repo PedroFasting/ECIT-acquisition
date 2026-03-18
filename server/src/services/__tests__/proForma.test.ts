@@ -607,14 +607,14 @@ describe("mergeScenarioParams", () => {
     expect(result.price_paid).toBe(2050);
   });
 
-  it("does NOT override explicit price_paid with Uses total", () => {
+  it("overrides explicit price_paid with Uses total (Uses is source of truth)", () => {
     const dp: DealParameters = { ...baseDp, price_paid: 1500 };
     const uses: SourceItem[] = [
       { name: "Enterprise Value", amount: "2000" },
       { name: "Transaction costs", amount: "50" },
     ];
     const result = mergeScenarioParams(dp, { uses });
-    expect(result.price_paid).toBe(1500); // kept user-set value
+    expect(result.price_paid).toBe(2050); // Uses total always wins
   });
 
   it("keeps price_paid 0 when no Uses provided", () => {
@@ -752,5 +752,184 @@ describe("prepareFullDealParams", () => {
     // Dilution params applied
     expect(result.mip_share_pct).toBe(0.05);
     expect(result.dilution_base_shares).toBe(331.6);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════
+// S&U → DEAL RETURNS INTEGRATION
+// ══════════════════════════════════════════════════════════════════
+// These tests verify the full pipeline: Sources & Uses → mergeScenarioParams →
+// calculateDealReturns, ensuring price_paid from Uses flows through to IRR/MoM.
+
+import { calculateDealReturns, type PeriodData } from "../dealReturns.js";
+
+describe("S&U → deal returns integration", () => {
+  // Proper PeriodData objects with numeric values for calculateDealReturns
+  const acquirerPeriods: PeriodData[] = [
+    { ebitda: 100, revenue: 500 },
+    { ebitda: 110, revenue: 550 },
+    { ebitda: 120, revenue: 600 },
+    { ebitda: 130, revenue: 650 },
+    { ebitda: 140, revenue: 700 },
+  ];
+
+  // Combined pro-forma: acquirer + target
+  const proFormaPeriods: PeriodData[] = [
+    { ebitda: 150, revenue: 700 },
+    { ebitda: 165, revenue: 770 },
+    { ebitda: 180, revenue: 840 },
+    { ebitda: 195, revenue: 910 },
+    { ebitda: 210, revenue: 980 },
+  ];
+
+  it("Uses total flows through to IRR as price_paid", () => {
+    const uses: SourceItem[] = [
+      { name: "Purchase price", amount: "500" },
+      { name: "Transaction costs", amount: "10" },
+    ];
+    const baseDp: DealParameters = {
+      price_paid: 0,      // will be overridden by Uses
+      acquirer_entry_ev: 1000,
+      tax_rate: 0.22,
+      exit_multiples: [12],
+    };
+    const merged = mergeScenarioParams(baseDp, { uses });
+    expect(merged.price_paid).toBe(510); // Uses total
+
+    const result = calculateDealReturns(acquirerPeriods, proFormaPeriods, merged);
+    const combined = result.cases.filter((c) => c.return_case === "Kombinert");
+    expect(combined.length).toBe(1);
+    expect(combined[0].exit_multiple).toBe(12);
+    expect(combined[0].irr).not.toBeNull();
+    expect(combined[0].mom).not.toBeNull();
+    expect(combined[0].mom!).toBeGreaterThan(1); // should be profitable at 12x
+  });
+
+  it("changing Uses items changes price_paid and therefore IRR", () => {
+    const usesSmall: SourceItem[] = [
+      { name: "Purchase price", amount: "300" },
+    ];
+    const usesLarge: SourceItem[] = [
+      { name: "Purchase price", amount: "800" },
+    ];
+    const baseDp: DealParameters = {
+      price_paid: 0,
+      acquirer_entry_ev: 1000,
+      tax_rate: 0.22,
+      exit_multiples: [12],
+    };
+    const mergedSmall = mergeScenarioParams(baseDp, { uses: usesSmall });
+    const mergedLarge = mergeScenarioParams(baseDp, { uses: usesLarge });
+
+    expect(mergedSmall.price_paid).toBe(300);
+    expect(mergedLarge.price_paid).toBe(800);
+
+    const resultSmall = calculateDealReturns(acquirerPeriods, proFormaPeriods, mergedSmall);
+    const resultLarge = calculateDealReturns(acquirerPeriods, proFormaPeriods, mergedLarge);
+
+    const combinedSmall = resultSmall.cases.filter((c) => c.return_case === "Kombinert");
+    const combinedLarge = resultLarge.cases.filter((c) => c.return_case === "Kombinert");
+
+    // Lower price → higher MoM; higher price → lower MoM
+    expect(combinedSmall[0].mom!).toBeGreaterThan(combinedLarge[0].mom!);
+    // Lower price → higher IRR
+    expect(combinedSmall[0].irr!).toBeGreaterThan(combinedLarge[0].irr!);
+  });
+
+  it("exit multiple independence from price_paid (exit EV depends only on EBITDA x multiple)", () => {
+    const uses: SourceItem[] = [
+      { name: "Purchase price", amount: "600" },
+    ];
+    const baseDp: DealParameters = {
+      price_paid: 0,
+      acquirer_entry_ev: 1000,
+      tax_rate: 0.22,
+      exit_multiples: [10, 12, 14],
+    };
+    const merged = mergeScenarioParams(baseDp, { uses });
+
+    const result = calculateDealReturns(acquirerPeriods, proFormaPeriods, merged);
+
+    const combined = result.cases.filter((c) => c.return_case === "Kombinert");
+    const moms = combined.map((c) => c.mom!);
+    // Higher multiple → higher MoM (monotonically increasing)
+    expect(moms[2]).toBeGreaterThan(moms[1]);
+    expect(moms[1]).toBeGreaterThan(moms[0]);
+    // All should be positive
+    expect(moms[0]).toBeGreaterThan(0);
+    // MoM differences should be proportional to multiple differences:
+    // delta(10→12) ≈ delta(12→14) since exit EV scales linearly with multiple
+    const delta1 = moms[1] - moms[0]; // 10x → 12x
+    const delta2 = moms[2] - moms[1]; // 12x → 14x
+    expect(delta1).toBeCloseTo(delta2, 1); // same EBITDA * 2 / same entryEV
+  });
+
+  it("Uses total always overrides any manual price_paid value", () => {
+    const uses: SourceItem[] = [
+      { name: "Purchase price", amount: "700" },
+      { name: "Advisory fees", amount: "25" },
+    ];
+    const baseDp: DealParameters = {
+      price_paid: 999, // should be overridden
+      acquirer_entry_ev: 1000,
+      tax_rate: 0.22,
+      exit_multiples: [12],
+    };
+    const merged = mergeScenarioParams(baseDp, { uses });
+    expect(merged.price_paid).toBe(725); // 700 + 25, NOT 999
+
+    // Verify price_paid = 725 produces different returns than 999 would
+    const resultWith725 = calculateDealReturns(acquirerPeriods, proFormaPeriods, merged);
+    const combined725 = resultWith725.cases.filter((c) => c.return_case === "Kombinert");
+
+    const resultWith999 = calculateDealReturns(acquirerPeriods, proFormaPeriods, {
+      ...baseDp, price_paid: 999,
+    });
+    const combined999 = resultWith999.cases.filter((c) => c.return_case === "Kombinert");
+
+    // Lower price_paid (725) → higher MoM than 999
+    expect(combined725[0].mom!).toBeGreaterThan(combined999[0].mom!);
+    // Both should produce valid returns
+    expect(combined725[0].irr).not.toBeNull();
+    expect(combined999[0].irr).not.toBeNull();
+  });
+
+  it("without Uses, falls back to dp.price_paid", () => {
+    const baseDp: DealParameters = {
+      price_paid: 500,
+      acquirer_entry_ev: 1000,
+      tax_rate: 0.22,
+      exit_multiples: [12],
+    };
+    const merged = mergeScenarioParams(baseDp, {}); // no uses
+    expect(merged.price_paid).toBe(500);
+
+    const result = calculateDealReturns(acquirerPeriods, proFormaPeriods, merged);
+    const combined = result.cases.filter((c) => c.return_case === "Kombinert");
+    expect(combined.length).toBe(1);
+    expect(combined[0].mom).not.toBeNull();
+    expect(combined[0].irr).not.toBeNull();
+    // Combined EV = 1000 + 500 = 1500, should produce positive returns at 12x
+    expect(combined[0].mom!).toBeGreaterThan(1);
+  });
+
+  it("zero Uses total with zero price_paid → no combined case (no target acquisition)", () => {
+    const baseDp: DealParameters = {
+      price_paid: 0,
+      acquirer_entry_ev: 1000,
+      tax_rate: 0.22,
+      exit_multiples: [12],
+    };
+    const merged = mergeScenarioParams(baseDp, { uses: [] }); // empty uses array
+    expect(merged.price_paid).toBe(0);
+
+    // With price_paid = 0, engine correctly skips combined calculation
+    // (no target acquisition to model)
+    const result = calculateDealReturns(acquirerPeriods, proFormaPeriods, merged);
+    const combined = result.cases.filter((c) => c.return_case === "Kombinert");
+    const standalone = result.cases.filter((c) => c.return_case === "Standalone");
+    expect(combined.length).toBe(0); // no combined case when price_paid = 0
+    expect(standalone.length).toBe(1); // standalone always computed
+    expect(standalone[0].mom).not.toBeNull();
   });
 });

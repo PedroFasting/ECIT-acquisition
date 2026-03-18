@@ -196,16 +196,19 @@ export default function DealReturnsMatrix({
   }, [acquirerPeriods, params.acquirer_entry_ev]);
 
   // Auto-derive price_paid from S&U Uses total.
-  // Uses total = sum of all Uses items (Enterprise Value + transaction costs + NWC adj etc.)
-  // Only auto-fills when price_paid is not explicitly set (0 or missing).
+  // Uses total IS the price_paid (source of truth for deal size).
+  // Always overrides when Uses exist — user must edit S&U to change the deal price.
+  const usesTotal = (scenario.uses?.length > 0)
+    ? scenario.uses.reduce((sum, u) => sum + (toNum(u.amount) || 0), 0)
+    : 0;
+  const priceDerivedFromUses = usesTotal > 0;
+
   useEffect(() => {
-    if (!params.price_paid && scenario.uses?.length > 0) {
-      const usesTotal = scenario.uses.reduce((sum, u) => sum + (toNum(u.amount) || 0), 0);
-      if (usesTotal > 0) {
-        setParams((p) => ({ ...p, price_paid: Math.round(usesTotal) }));
-      }
+    if (priceDerivedFromUses) {
+      const rounded = Math.round(usesTotal);
+      setParams((p) => p.price_paid !== rounded ? { ...p, price_paid: rounded } : p);
     }
-  }, [scenario.uses, params.price_paid]);
+  }, [usesTotal, priceDerivedFromUses]);
 
   // Detect level based on current params
   const currentLevel: 1 | 2 = (params.ordinary_equity ?? 0) > 0 && (params.net_debt ?? 0) > 0 ? 2 : 1;
@@ -356,11 +359,16 @@ export default function DealReturnsMatrix({
                     type="number"
                     value={params.price_paid || ""}
                     onChange={(e) =>
-                      updateParam("price_paid", Number(e.target.value))
+                      !priceDerivedFromUses && updateParam("price_paid", Number(e.target.value))
                     }
-                    className={inputCls}
+                    className={`${inputCls}${priceDerivedFromUses ? " bg-gray-50 text-gray-500 cursor-not-allowed" : ""}`}
+                    readOnly={priceDerivedFromUses}
                     placeholder={t("returns.egPlaceholder", { value: "2253" })}
+                    title={priceDerivedFromUses ? t("returns.priceDerivedHint") : undefined}
                   />
+                  {priceDerivedFromUses && (
+                    <p className="text-[10px] text-gray-400 mt-0.5">{t("returns.priceDerivedFromSU")}</p>
+                  )}
                 </div>
                 <div>
                   <label className={labelCls}>
