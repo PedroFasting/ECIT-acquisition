@@ -337,7 +337,7 @@ export function buildProFormaPeriodData(
     let pfNibdFcf: number | undefined;
     if (tgtFcf != null) {
       const taxRate = dp.tax_rate ?? 0.22;
-      const daPctRevenue = dp.da_pct_revenue ?? 0.05;
+      const daPctRevenue = dp.da_pct_revenue ?? 0.01;
       const acqRevenue = parseFloat(ap.revenue_total) || 0;
       const acqCapex = ap.capex != null ? parseFloat(ap.capex) : 0;
       const acqNwc = ap.change_nwc != null ? parseFloat(ap.change_nwc) : 0;

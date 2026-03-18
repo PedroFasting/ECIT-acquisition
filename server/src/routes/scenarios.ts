@@ -675,7 +675,7 @@ router.get(
             exit_multiples: [10, 11, 12, 13, 14],
             acquirer_entry_ev: 0,
             tax_rate: 0.22,
-            da_pct_revenue: 0.05,
+            da_pct_revenue: 0.01,
           };
 
       // Run full calculation

@@ -196,8 +196,9 @@ describe("computeLevel1Return", () => {
   });
 
   it("applies zero tax when EBT proxy is negative", () => {
-    // EBITDA = 10, revenue = 500, D&A proxy = 500*0.05 = 25
-    // EBT = 10 - 25 = -15 → tax should be 0
+    // EBITDA = 10, revenue = 500, D&A proxy = 500*0.01 = 5
+    // EBT = 10 - 5 = 5 → tax = -5*0.22 = -1.1 (positive EBT with default D&A)
+    // Note: with da_pct_revenue=0.05, D&A=25 → EBT=-15 → tax=0
     const periods = makePeriods(3, { ebitda: 10, revenue: 500 });
     const result = computeLevel1Return(100, periods, level1Params(), 12);
     expect(result.irr).not.toBeNull();
@@ -809,10 +810,10 @@ describe("FCF calculation — baseline", () => {
    * All values supplied → formula path uses actuals.
    *
    * Expected FCF per period:
-   *   D&A proxy = 1000 * 0.05 = 50
-   *   EBT proxy = 200 - 50 = 150
-   *   Tax = -150 * 0.22 = -33
-   *   FCF = 200 + (-33) + (-30) + (-20) = 117
+   *   D&A proxy = 1000 * 0.01 = 10
+   *   EBT proxy = 200 - 10 = 190
+   *   Tax = -190 * 0.22 = -41.8
+   *   FCF = 200 + (-41.8) + (-30) + (-20) = 108.2
    */
   const acquirerPeriod: PeriodData = {
     ebitda: 200,
@@ -829,10 +830,10 @@ describe("FCF calculation — baseline", () => {
    * With defaults (capex_pct_revenue=0.03, nwc_investment=0):
    *   capex = -(500 * 0.03) = -15
    *   NWC = 0
-   *   D&A proxy = 500 * 0.05 = 25
-   *   EBT proxy = 55 - 25 = 30
-   *   Tax = -30 * 0.22 = -6.6
-   *   FCF = 55 + (-6.6) + (-15) + 0 = 33.4
+   *   D&A proxy = 500 * 0.01 = 5
+   *   EBT proxy = 55 - 5 = 50
+   *   Tax = -50 * 0.22 = -11
+   *   FCF = 55 + (-11) + (-15) + 0 = 29
    */
   const targetPeriodNoCapex: PeriodData = {
     ebitda: 55,
@@ -856,12 +857,12 @@ describe("FCF calculation — baseline", () => {
       const periods = [acquirerPeriod, acquirerPeriod, acquirerPeriod];
       const result = computeLevel1Return(2000, periods, params, 12);
 
-      // FCF per period = 117 (see formula above)
+      // FCF per period = 108.2 (see formula above)
       // Exit = 200 * 12 = 2400
-      // CFs: [-2000, 117, 117, 117+2400] = [-2000, 117, 117, 2517]
-      // MoM = (117+117+2517)/2000 = 2751/2000 = 1.3755
+      // CFs: [-2000, 108.2, 108.2, 108.2+2400] = [-2000, 108.2, 108.2, 2508.2]
+      // MoM = (108.2+108.2+2508.2)/2000 = 2724.6/2000 = 1.3623
       expect(result.mom).not.toBeNull();
-      expect(round(result.mom!, 4)).toBe(1.3755);
+      expect(round(result.mom!, 4)).toBe(1.3623);
       expect(result.irr).not.toBeNull();
     });
 
@@ -870,12 +871,12 @@ describe("FCF calculation — baseline", () => {
       const periods = [targetPeriodNoCapex, targetPeriodNoCapex, targetPeriodNoCapex];
       const result = computeLevel1Return(600, periods, params, 12);
 
-      // FCF per period = 33.4 (see formula above)
+      // FCF per period = 29 (see formula above)
       // Exit = 55 * 12 = 660
-      // CFs: [-600, 33.4, 33.4, 33.4+660] = [-600, 33.4, 33.4, 693.4]
-      // MoM = (33.4+33.4+693.4)/600 = 760.2/600 = 1.267
+      // CFs: [-600, 29, 29, 29+660] = [-600, 29, 29, 689]
+      // MoM = (29+29+689)/600 = 747/600 = 1.245
       expect(result.mom).not.toBeNull();
-      expect(round(result.mom!, 3)).toBe(1.267);
+      expect(round(result.mom!, 3)).toBe(1.245);
     });
 
     it("pins exact FCF for target with custom capex/NWC percentages", () => {
@@ -891,15 +892,15 @@ describe("FCF calculation — baseline", () => {
 
       // capex = -(500 * 0.01) = -5
       // NWC = -4.85
-      // D&A proxy = 500 * 0.05 = 25
-      // EBT proxy = 55 - 25 = 30
-      // Tax = -30 * 0.22 = -6.6
-      // FCF = 55 + (-6.6) + (-5) + (-4.85) = 38.55
+      // D&A proxy = 500 * 0.01 = 5
+      // EBT proxy = 55 - 5 = 50
+      // Tax = -50 * 0.22 = -11
+      // FCF = 55 + (-11) + (-5) + (-4.85) = 34.15
       // Exit = 55 * 12 = 660
-      // CFs: [-600, 38.55, 38.55, 38.55+660]
-      // MoM = (38.55+38.55+698.55)/600 = 775.65/600 = 1.29275
+      // CFs: [-600, 34.15, 34.15, 34.15+660]
+      // MoM = (34.15+34.15+694.15)/600 = 762.45/600 = 1.27075
       expect(result.mom).not.toBeNull();
-      expect(round(result.mom!, 4)).toBe(1.2928);  // rounding
+      expect(round(result.mom!, 4)).toBe(1.2707);  // rounding
     });
   });
 
@@ -932,12 +933,12 @@ describe("FCF calculation — baseline", () => {
       );
 
       // These SHOULD theoretically be similar if NIBD captures the same economics,
-      // but formula path FCF=33.4 vs NIBD path FCF=40 → different returns.
-      // Gap: formula MoM ≈ 1.267 vs NIBD MoM = 1.3 (difference of ~0.033).
+      // but formula path FCF=29 vs NIBD path FCF=40 → different returns.
+      // Gap: formula MoM ≈ 1.245 vs NIBD MoM = 1.3 (difference of ~0.055).
       // The gap is small in this simple example but compounds in longer deals.
       expect(formulaResult.mom).not.toBeNull();
       expect(nibdResult.mom).not.toBeNull();
-      expect(round(formulaResult.mom!, 3)).toBe(1.267);
+      expect(round(formulaResult.mom!, 3)).toBe(1.245);
       expect(round(nibdResult.mom!, 3)).toBe(1.3);
       expect(formulaResult.mom!).not.toBe(nibdResult.mom!);
     });
@@ -962,20 +963,20 @@ describe("FCF calculation — baseline", () => {
       expect(schedule.length).toBe(5);
 
       // Year 1:
-      // Unlevered FCF = 122.5 (interest tax shield: EBT = 200-50-25=125, tax = -27.5)
+      // Unlevered FCF = 113.7 (interest tax shield: EBT = 200-10-25=165, tax = -36.3)
       // Interest = 500 * 0.05 = 25
       // Mandatory amort = 50
       // Mandatory debt service = 75
       // Debt after mandatory = 450
-      // Excess FCF = 122.5 - 75 = 47.5
-      // Sweep = min(47.5 * 1.0, 450) = 47.5
-      // Closing debt = 450 - 47.5 = 402.5
-      // FCF to equity = 122.5 - (25+50+47.5) = 0
+      // Excess FCF = 113.7 - 75 = 38.7
+      // Sweep = min(38.7 * 1.0, 450) = 38.7
+      // Closing debt = 450 - 38.7 = 411.3
+      // FCF to equity = 113.7 - (25+50+38.7) = 0
       expect(schedule[0].opening_debt).toBe(500);
       expect(round(schedule[0].interest, 2)).toBe(25);
       expect(schedule[0].mandatory_amort).toBe(50);
-      expect(round(schedule[0].sweep, 2)).toBe(47.5);
-      expect(round(schedule[0].closing_debt, 0)).toBe(403);
+      expect(round(schedule[0].sweep, 2)).toBe(38.7);
+      expect(round(schedule[0].closing_debt, 0)).toBe(411);
       expect(round(schedule[0].fcf_to_equity, 2)).toBe(0);
 
       // Preferred: 100 * (1.095) = 109.5
@@ -1064,15 +1065,15 @@ describe("FCF calculation — baseline", () => {
       const params = level1Params();
       const result = computeLevel1Return(2600, pfPeriods, params, 12);
 
-      // D&A proxy = 1500 * 0.05 = 75
-      // EBT proxy = 255 - 75 = 180
-      // Tax = -180 * 0.22 = -39.6
-      // FCF = 255 + (-39.6) + (-35) + (-24.85) = 155.55
+      // D&A proxy = 1500 * 0.01 = 15
+      // EBT proxy = 255 - 15 = 240
+      // Tax = -240 * 0.22 = -52.8
+      // FCF = 255 + (-52.8) + (-35) + (-24.85) = 142.35
       // Exit = 255 * 12 = 3060
-      // CFs: [-2600, 155.55, 155.55, 155.55+3060]
-      // MoM = (155.55+155.55+3215.55)/2600 = 3526.65/2600 = 1.35641
+      // CFs: [-2600, 142.35, 142.35, 142.35+3060]
+      // MoM = (142.35+142.35+3202.35)/2600 = 3487.05/2600 = 1.34117
       expect(result.mom).not.toBeNull();
-      expect(round(result.mom!, 3)).toBe(1.356);
+      expect(round(result.mom!, 3)).toBe(1.341);
     });
 
     it("pro forma with pre-computed capex/NWC gives deterministic results", () => {
@@ -1253,17 +1254,17 @@ describe("FCF calculation — baseline", () => {
       // Single period: revenue=500, ebitda=100, no capex/NWC in period data
       // Default: capex_pct=0.01, nwc_investment=0
       // capex = -(500*0.01) = -5, NWC = 0
-      // D&A = 500*0.05 = 25, EBT = 100-25 = 75, tax = -75*0.22 = -16.5
-      // FCF_before_minority = 100 - 16.5 - 5 = 78.5
-      // FCF_after_minority = 78.5 * 0.8 = 62.8
+      // D&A = 500*0.01 = 5, EBT = 100-5 = 95, tax = -95*0.22 = -20.9
+      // FCF_before_minority = 100 - 20.9 - 5 = 74.1
+      // FCF_after_minority = 74.1 * 0.8 = 59.28
       const periods = makePeriods(1, { ebitda: 100, revenue: 500 });
       const params = level1Params({ minority_pct: 0.20 });
       const result = computeLevel1Return(1000, periods, params, 12);
 
       // Exit = 100 * 12 = 1200 (minority is cash flow only, not at exit)
-      // CFs: [-1000, 62.8 + 1200] = [-1000, 1262.8]
-      // MoM = 1262.8 / 1000 = 1.2628
-      expect(round(result.mom!, 4)).toBe(1.2628);
+      // CFs: [-1000, 59.28 + 1200] = [-1000, 1259.28]
+      // MoM = 1259.28 / 1000 = 1.25928
+      expect(round(result.mom!, 4)).toBe(1.2593);
     });
 
     it("minority_pct = 0 gives same result as omitting it", () => {
@@ -1294,9 +1295,9 @@ describe("FCF calculation — baseline", () => {
       const schedule = result.schedule!;
 
       // With interest tax shield: interest Y1 = 800*0.05 = 40
-      // EBT = 200 - 50 - 40 = 110, tax = -24.2, FCF = 200 - 24.2 - 30 - 20 = 125.8
-      // With 20% minority: unlevered FCF = 125.8 * 0.8 = 100.64
-      expect(round(schedule[0].unlevered_fcf, 2)).toBe(100.64);
+      // EBT = 200 - 10 - 40 = 150, tax = -33, FCF = 200 - 33 - 30 - 20 = 117
+      // With 20% minority: unlevered FCF = 117 * 0.8 = 93.6
+      expect(round(schedule[0].unlevered_fcf, 2)).toBe(93.6);
     });
   });
 
@@ -1311,11 +1312,11 @@ describe("FCF calculation — baseline", () => {
       const result = computeLevel1Return(1000, periods, params, 12);
 
       // capex = -(500*0.01) = -5, NWC = -(500*0.0075) = -3.75
-      // D&A = 500*0.05 = 25, EBT = 100-25 = 75, tax = -75*0.22 = -16.5
-      // FCF = 100 + (-16.5) + (-5) + (-3.75) = 74.75
-      // Exit = 100*12 = 1200, CFs = [-1000, 74.75 + 1200] = [-1000, 1274.75]
-      // MoM = 1274.75 / 1000 = 1.27475
-      expect(round(result.mom!, 4)).toBe(1.2748); // rounded to 4dp: 1274.75/1000
+      // D&A = 500*0.01 = 5, EBT = 100-5 = 95, tax = -95*0.22 = -20.9
+      // FCF = 100 + (-20.9) + (-5) + (-3.75) = 70.35
+      // Exit = 100*12 = 1200, CFs = [-1000, 70.35 + 1200] = [-1000, 1270.35]
+      // MoM = 1270.35 / 1000 = 1.27035
+      expect(round(result.mom!, 4)).toBe(1.2703); // rounded to 4dp: 1270.35/1000 (fp rounding)
     });
 
     it("nwc_investment is used when nwc_pct_revenue is not set", () => {
@@ -1325,11 +1326,11 @@ describe("FCF calculation — baseline", () => {
       const result = computeLevel1Return(1000, periods, params, 12);
 
       // capex = -(500*0.01) = -5, NWC = -20 (flat)
-      // D&A = 500*0.05 = 25, EBT = 75, tax = -16.5
-      // FCF = 100 - 16.5 - 5 - 20 = 58.5
-      // CFs = [-1000, 58.5 + 1200] = [-1000, 1258.5]
-      // MoM = 1258.5 / 1000 = 1.2585
-      expect(round(result.mom!, 4)).toBe(1.2585);
+      // D&A = 500*0.01 = 5, EBT = 95, tax = -20.9
+      // FCF = 100 - 20.9 - 5 - 20 = 54.1
+      // CFs = [-1000, 54.1 + 1200] = [-1000, 1254.1]
+      // MoM = 1254.1 / 1000 = 1.2541
+      expect(round(result.mom!, 4)).toBe(1.2541);
     });
 
     it("neither nwc_pct_revenue nor nwc_investment → NWC fallback is 0", () => {
@@ -1338,10 +1339,11 @@ describe("FCF calculation — baseline", () => {
       const result = computeLevel1Return(1000, periods, params, 12);
 
       // capex = -(500*0.01) = -5, NWC = 0
-      // FCF = 100 - 16.5 - 5 = 78.5
-      // CFs = [-1000, 78.5 + 1200] = [-1000, 1278.5]
-      // MoM = 1278.5 / 1000 = 1.2785
-      expect(round(result.mom!, 4)).toBe(1.2785);
+      // D&A = 500*0.01 = 5, EBT = 95, tax = -20.9
+      // FCF = 100 - 20.9 - 5 = 74.1
+      // CFs = [-1000, 74.1 + 1200] = [-1000, 1274.1]
+      // MoM = 1274.1 / 1000 = 1.2741
+      expect(round(result.mom!, 4)).toBe(1.2741);
     });
 
     it("actual change_nwc in period data overrides both nwc_pct_revenue and nwc_investment", () => {
@@ -1365,9 +1367,9 @@ describe("FCF calculation — baseline", () => {
 
       // Period 1: interest = 800*0.05 = 40
       // capex = -(1000*0.01) = -10, NWC = -(1000*0.0075) = -7.5
-      // D&A = 1000*0.05 = 50, EBT = 200-50-40 = 110, tax = -110*0.22 = -24.2
-      // FCF = 200 + (-24.2) + (-10) + (-7.5) = 158.3
-      expect(round(schedule[0].unlevered_fcf, 1)).toBe(158.3);
+      // D&A = 1000*0.01 = 10, EBT = 200-10-40 = 150, tax = -150*0.22 = -33
+      // FCF = 200 + (-33) + (-10) + (-7.5) = 149.5
+      expect(round(schedule[0].unlevered_fcf, 1)).toBe(149.5);
     });
   });
 
@@ -1382,12 +1384,13 @@ describe("FCF calculation — baseline", () => {
       const resultCustom = computeLevel1Return(1000, periods, paramsCustom, 12);
 
       // Default capex = 500*0.01 = 5; Custom capex = 500*0.03 = 15
-      // FCF_default = 100 - 16.5 - 5 = 78.5
-      // FCF_custom = 100 - 16.5 - 15 = 68.5
-      // MoM_default = (78.5 + 1200) / 1000 = 1.2785
-      // MoM_custom = (68.5 + 1200) / 1000 = 1.2685
-      expect(round(resultDefault.mom!, 4)).toBe(1.2785);
-      expect(round(resultCustom.mom!, 4)).toBe(1.2685);
+      // D&A = 500*0.01 = 5, EBT = 100-5 = 95, tax = -95*0.22 = -20.9
+      // FCF_default = 100 - 20.9 - 5 = 74.1
+      // FCF_custom = 100 - 20.9 - 15 = 64.1
+      // MoM_default = (74.1 + 1200) / 1000 = 1.2741
+      // MoM_custom = (64.1 + 1200) / 1000 = 1.2641
+      expect(round(resultDefault.mom!, 4)).toBe(1.2741);
+      expect(round(resultCustom.mom!, 4)).toBe(1.2641);
       expect(resultDefault.mom).not.toBe(resultCustom.mom);
     });
 
@@ -1396,9 +1399,10 @@ describe("FCF calculation — baseline", () => {
       const result = computeLevel1Return(1000, periods, level1Params(), 12);
 
       // capex = -30 (from period), NWC = 0
-      // FCF = 100 - 16.5 - 30 = 53.5
-      // MoM = (53.5 + 1200) / 1000 = 1.2535
-      expect(round(result.mom!, 4)).toBe(1.2535);
+      // D&A = 500*0.01 = 5, EBT = 100-5 = 95, tax = -20.9
+      // FCF = 100 - 20.9 - 30 = 49.1
+      // MoM = (49.1 + 1200) / 1000 = 1.2491
+      expect(round(result.mom!, 4)).toBe(1.2491);
     });
   });
 });

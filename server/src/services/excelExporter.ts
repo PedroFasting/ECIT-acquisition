@@ -247,7 +247,7 @@ function buildInputsSheet(wb: ExcelJS.Workbook, data: ExportData) {
   addInput("Price Paid (Target EV)", data.dealParams.price_paid ?? 0, NUM_FORMAT, "NOKm", "price_paid");
   addInput("Tax Rate", data.dealParams.tax_rate ?? 0.22, PCT_FORMAT, "", "tax_rate");
   addInput("Acquirer Entry EV", data.dealParams.acquirer_entry_ev ?? 0, NUM_FORMAT, "NOKm", "acquirer_entry_ev");
-  addInput("D&A % of Revenue", data.dealParams.da_pct_revenue ?? 0.05, PCT_FORMAT, "", "da_pct_revenue");
+  addInput("D&A % of Revenue", data.dealParams.da_pct_revenue ?? 0.01, PCT_FORMAT, "", "da_pct_revenue");
   addInput("NWC Investment (fallback)", data.dealParams.nwc_investment ?? 0, NUM_FORMAT, "NOKm/yr", "nwc_investment");
   r++;
 

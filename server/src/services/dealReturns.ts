@@ -46,7 +46,7 @@ export interface DealParameters {
   // Fallback capex as % of revenue when period-level capex is missing (decimal, default 0.01 = 1%)
   capex_pct_revenue?: number;
 
-  // D&A as % of revenue, used to proxy EBT = EBITDA - D&A (default 5%)
+  // D&A as % of revenue, used to proxy EBT = EBITDA - D&A (default 1%)
   da_pct_revenue?: number;
 
   // Target-specific FCF assumptions (applied when target period data is missing)
@@ -272,7 +272,7 @@ function computeLevel1Return(
   if (periods.length === 0 || entryEV <= 0) return { irr: null, mom: null };
 
   const taxRate = params.tax_rate ?? 0.22;
-  const daPctRevenue = params.da_pct_revenue ?? 0.05;
+  const daPctRevenue = params.da_pct_revenue ?? 0.01;
   const nwcPctRevenue = params.nwc_pct_revenue;
   const fallbackNwcFlat = params.nwc_investment ?? 0;
   const capexPctRevenue = params.capex_pct_revenue ?? 0.01;
@@ -346,7 +346,7 @@ function computeLevel2Return(
   if (periods.length === 0) return { irr: null, mom: null };
 
   const taxRate = params.tax_rate ?? 0.22;
-  const daPctRevenue = params.da_pct_revenue ?? 0.05;
+  const daPctRevenue = params.da_pct_revenue ?? 0.01;
   const nwcPctRevenue = params.nwc_pct_revenue;
   const fallbackNwcFlat = params.nwc_investment ?? 0;
   const capexPctRevenue = params.capex_pct_revenue ?? 0.01;

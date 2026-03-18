@@ -86,7 +86,7 @@ const DEFAULT_PARAMS: DealParameters = {
   exit_multiples: [10, 11, 12, 13, 14],
   acquirer_entry_ev: 0,
   nwc_investment: 20,
-  da_pct_revenue: 0.05,
+  da_pct_revenue: 0.01,
   target_capex_pct_revenue: 0.01,
   target_nwc_pct_revenue: 0.0097,
   minority_pct: 0.20,

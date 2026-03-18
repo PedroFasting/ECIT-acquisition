@@ -204,7 +204,7 @@ export interface DealParameters {
   nwc_investment?: number;
   nwc_pct_revenue?: number;  // NWC as % of revenue (takes precedence over nwc_investment)
   capex_pct_revenue?: number;  // Capex as % of revenue (default 1%)
-  // D&A as % of revenue for EBT proxy (default 5%)
+  // D&A as % of revenue for EBT proxy (default 1%)
   da_pct_revenue?: number;
   // Target-specific FCF assumptions (applied when target period data is missing)
   target_capex_pct_revenue?: number;  // e.g. 0.01 = 1% of target revenue

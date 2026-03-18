@@ -511,11 +511,11 @@ describe("buildProFormaPeriodData", () => {
     const result = buildProFormaPeriodData(acq, tgt, {}, baseDp, tgtNibdFcf);
     // Combined FCF = acquirer formula FCF + target NIBD FCF + synergy(0)
     // Acquirer formula FCF: EBITDA(200) + tax + capex(-30) + NWC(-20)
-    // D&A proxy = 1000 * 0.05 = 50, EBT = 200-50 = 150, tax = -150*0.22 = -33
-    // Acquirer FCF = 200 + (-33) + (-30) + (-20) = 117
-    // Combined = 117 + 40 = 157
+    // D&A proxy = 1000 * 0.01 = 10, EBT = 200-10 = 190, tax = -190*0.22 = -41.8
+    // Acquirer FCF = 200 + (-41.8) + (-30) + (-20) = 108.2
+    // Combined = 108.2 + 40 = 148.2
     expect(result[0].nibd_fcf).not.toBeUndefined();
-    expect(round(result[0].nibd_fcf!, 2)).toBe(157);
+    expect(round(result[0].nibd_fcf!, 2)).toBe(148.2);
   });
 
   it("nibd_fcf is undefined when target has no NIBD data", () => {

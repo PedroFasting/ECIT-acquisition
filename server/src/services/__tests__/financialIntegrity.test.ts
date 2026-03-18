@@ -277,9 +277,9 @@ describe("interest tax shield in Level 2", () => {
   const periods = makePeriods(5, { ebitda: 200, revenue: 1000, capex: -30, change_nwc: -20 });
 
   it("Level 2 tax should be lower than Level 1 tax due to interest deduction", () => {
-    // Level 1 tax: (EBITDA - D&A_proxy) * tax_rate = (200 - 50) * 0.22 = 33
+    // Level 1 tax: (EBITDA - D&A_proxy) * tax_rate = (200 - 10) * 0.22 = 41.8
     // Level 2 year 1 tax: (EBITDA - D&A_proxy - interest) * tax_rate
-    //   = (200 - 50 - 800*0.05) * 0.22 = (200 - 50 - 40) * 0.22 = 110 * 0.22 = 24.2
+    //   = (200 - 10 - 800*0.05) * 0.22 = (200 - 10 - 40) * 0.22 = 150 * 0.22 = 33
     // Interest = 800 * 0.05 = 40. Tax shield = 40 * 0.22 = 8.8
 
     const params = level2Params();
@@ -289,12 +289,12 @@ describe("interest tax shield in Level 2", () => {
     expect(result.schedule!.length).toBe(5);
 
     // Year 1: unlevered FCF should be higher than without tax shield
-    // Without shield: FCF = 200 + (-33) + (-30) + (-20) = 117
-    // With shield:    FCF = 200 + (-24.2) + (-30) + (-20) = 125.8
-    // The unlevered FCF in the schedule should be ~125.8 (with tax shield)
+    // Without shield: FCF = 200 + (-41.8) + (-30) + (-20) = 108.2
+    // With shield:    FCF = 200 + (-33) + (-30) + (-20) = 117
+    // The unlevered FCF in the schedule should be ~117 (with tax shield)
     const yr1 = result.schedule![0];
-    expect(yr1.unlevered_fcf).toBeGreaterThan(117); // must be > no-shield value
-    expect(round(yr1.unlevered_fcf, 1)).toBeCloseTo(125.8, 0); // approximately 125.8
+    expect(yr1.unlevered_fcf).toBeGreaterThan(108.2); // must be > no-shield value
+    expect(round(yr1.unlevered_fcf, 1)).toBeCloseTo(117, 0); // approximately 117
   });
 
   it("tax shield increases equity returns compared to no-shield model", () => {
@@ -303,14 +303,14 @@ describe("interest tax shield in Level 2", () => {
     const params = level2Params();
     const result = computeLevel2Return(1000, periods, params, 12, true);
 
-    // Without tax shield, unlevered FCF = 117 per year (all same)
+    // Without tax shield, unlevered FCF = 108.2 per year (all same)
     // With tax shield, unlevered FCF is higher (varies as debt decreases)
     // The IRR should be meaningfully higher than the no-shield case
     expect(result.irr).not.toBeNull();
 
-    // Cross-check: compute "no-shield" by providing the FCF directly via nibd_fcf=117
+    // Cross-check: compute "no-shield" by providing the FCF directly via nibd_fcf=108.2
     // (nibd_fcf bypasses the tax calc entirely)
-    const noShieldPeriods = makePeriods(5, { ebitda: 200, nibd_fcf: 117 });
+    const noShieldPeriods = makePeriods(5, { ebitda: 200, nibd_fcf: 108.2 });
     const noShieldResult = computeLevel2Return(1000, noShieldPeriods, params, 12);
 
     // Tax shield should produce HIGHER IRR
@@ -341,16 +341,16 @@ describe("interest tax shield in Level 2", () => {
 describe("multi-year debt schedule — exact values all years", () => {
   // Known scenario: debt=500, interest=5%, amort=50, sweep=100%, EBITDA=200
   // FCF per year (Level 1 formula without tax shield): 200 + tax + (-30) + (-20)
-  // D&A proxy = 1000 * 0.05 = 50, EBT = 200 - 50 = 150, tax = -150 * 0.22 = -33
-  // Unlevered FCF = 200 - 33 - 30 - 20 = 117
+  // D&A proxy = 1000 * 0.01 = 10, EBT = 200 - 10 = 190, tax = -190 * 0.22 = -41.8
+  // Unlevered FCF = 200 - 41.8 - 30 - 20 = 108.2
   //
   // WITH tax shield (desired behavior):
   // Year 1: interest = 500*0.05 = 25
-  //   EBT = 200 - 50 - 25 = 125, tax = -125*0.22 = -27.5
-  //   Unlevered FCF = 200 - 27.5 - 30 - 20 = 122.5
-  //   Mandatory = 25 + 50 = 75, excess = 122.5 - 75 = 47.5
-  //   Sweep = min(47.5, 500-50) = 47.5
-  //   Closing debt = 500 - 50 - 47.5 = 402.5
+  //   EBT = 200 - 10 - 25 = 165, tax = -165*0.22 = -36.3
+  //   Unlevered FCF = 200 - 36.3 - 30 - 20 = 113.7
+  //   Mandatory = 25 + 50 = 75, excess = 113.7 - 75 = 38.7
+  //   Sweep = min(38.7, 500-50) = 38.7
+  //   Closing debt = 500 - 50 - 38.7 = 411.3
 
   const periods = makePeriods(5, { ebitda: 200, revenue: 1000, capex: -30, change_nwc: -20 });
   const params = level2Params({
@@ -489,33 +489,33 @@ describe("exact IRR verification for full deal scenarios", () => {
   it("Level 1: known 3-period deal has pinned IRR and MoM", () => {
     // 3 periods, constant EBITDA=100, revenue=500, no capex/NWC actuals
     // Entry EV = 1000, exit at 12x
-    // D&A proxy = 500*0.05 = 25, EBT = 100-25 = 75, tax = -75*0.22 = -16.5
+    // D&A proxy = 500*0.01 = 5, EBT = 100-5 = 95, tax = -95*0.22 = -20.9
     // Capex fallback = -(500*0.01) = -5, NWC fallback = 0
-    // FCF = 100 + (-16.5) + (-5) + 0 = 78.5
+    // FCF = 100 + (-20.9) + (-5) + 0 = 74.1
     // Exit EV = 100 * 12 = 1200
-    // CFs = [-1000, 78.5, 78.5, 78.5 + 1200]
-    // MoM = (78.5 + 78.5 + 1278.5) / 1000 = 1435.5 / 1000 = 1.4355
+    // CFs = [-1000, 74.1, 74.1, 74.1 + 1200]
+    // MoM = (74.1 + 74.1 + 1274.1) / 1000 = 1422.3 / 1000 = 1.4223
     const periods = makePeriods(3);
     const result = computeLevel1Return(1000, periods, level1Params(), 12);
 
-    expect(round(result.mom, 4)).toBe(1.4355);
+    expect(round(result.mom, 4)).toBe(1.4223);
 
-    // IRR for CFs [-1000, 78.5, 78.5, 1278.5]:
+    // IRR for CFs [-1000, 74.1, 74.1, 1274.1]:
     // Verify via computeIRR directly
-    const irr = computeIRR([-1000, 78.5, 78.5, 1278.5]);
+    const irr = computeIRR([-1000, 74.1, 74.1, 1274.1]);
     expect(result.irr).not.toBeNull();
     expect(round(result.irr!, 4)).toBe(round(irr!, 4));
   });
 
   it("Level 1: with actual capex/NWC, FCF matches hand calculation", () => {
     // EBITDA=200, rev=1000, capex=-30, NWC=-20
-    // D&A = 1000*0.05 = 50, EBT = 200-50 = 150, tax = -150*0.22 = -33
-    // FCF = 200 - 33 - 30 - 20 = 117
+    // D&A = 1000*0.01 = 10, EBT = 200-10 = 190, tax = -190*0.22 = -41.8
+    // FCF = 200 - 41.8 - 30 - 20 = 108.2
     const periods = makePeriods(1, { ebitda: 200, revenue: 1000, capex: -30, change_nwc: -20 });
     const result = computeLevel1Return(1000, periods, level1Params(), 12);
 
-    // MoM = (117 + 200*12) / 1000 = (117 + 2400) / 1000 = 2.517
-    expect(round(result.mom, 4)).toBe(2.517);
+    // MoM = (108.2 + 200*12) / 1000 = (108.2 + 2400) / 1000 = 2.5082
+    expect(round(result.mom, 4)).toBe(2.5082);
   });
 
   it("Level 2: MoM matches hand calculation for single-period deal", () => {
@@ -942,10 +942,10 @@ describe("Level 1 and Level 2 unlevered FCF consistency", () => {
 
     const l2 = computeLevel2Return(1000, periods, params, 12, true);
 
-    // Level 1 FCF = 200 + (-33) + (-30) + (-20) = 117
-    // Level 2 FCF should also be 117 (no interest to deduct from tax base)
+    // Level 1 FCF = 200 + (-41.8) + (-30) + (-20) = 108.2
+    // Level 2 FCF should also be 108.2 (no interest to deduct from tax base)
     expect(l2.schedule).toBeDefined();
-    expect(round(l2.schedule![0].unlevered_fcf, 1)).toBeCloseTo(117, 0);
+    expect(round(l2.schedule![0].unlevered_fcf, 1)).toBeCloseTo(108.2, 0);
   });
 });
 
