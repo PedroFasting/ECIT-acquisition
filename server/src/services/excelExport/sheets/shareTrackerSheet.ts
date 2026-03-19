@@ -63,9 +63,8 @@ export function buildShareTrackerSheet(wb: ExcelJS.Workbook, data: ExportData) {
   r++;
 
   addRow("DB Entry Shares", "entry_shares_db", NUM_FORMAT_1, "m shares", true);
-  addRow("Equity from Sources (EK)", "equity_from_sources", NUM_FORMAT, "NOKm", true);
+  addRow("Equity from Sources (EK)", "equity_from_sources", NUM_FORMAT, "NOKm — metadata only", true);
   addRow("FMV per Share", "fmv_per_share", NUM_FORMAT_2, "NOK", true);
-  addRow("New Shares (EK / FMV)", "target_ek_shares", NUM_FORMAT_1, "m shares", true);
   addRow("Total Entry Shares", "total_entry_shares", NUM_FORMAT_1, "m shares", true, true);
   r++;
 
@@ -76,8 +75,7 @@ export function buildShareTrackerSheet(wb: ExcelJS.Workbook, data: ExportData) {
   r++;
 
   addRow("DB Exit Shares", "exit_shares_db", NUM_FORMAT_1, "m shares", true);
-  addRow("+ Target EK Shares", "target_ek_shares", NUM_FORMAT_1, "m shares", true);
-  addRow("Exit Shares (base)", "exit_shares_db+target_ek_shares", NUM_FORMAT_1, "m shares", true);
+  addRow("Exit Shares (base)", "exit_shares_db", NUM_FORMAT_1, "m shares", true);
 
   const rolloverShares = ss.rollover_shares ?? 0;
   addRow("Rollover Shares", rolloverShares, NUM_FORMAT_1, "m shares");

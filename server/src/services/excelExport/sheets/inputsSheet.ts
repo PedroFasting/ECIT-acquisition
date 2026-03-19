@@ -104,42 +104,27 @@ export function buildInputsSheet(wb: ExcelJS.Workbook, data: ExportData) {
   addInput("Entry Shares (DB)", data.dealParams.entry_shares ?? 0, NUM_FORMAT_1, "m shares", "entry_shares_db");
   addInput("Exit Shares (DB)", data.dealParams.exit_shares ?? 0, NUM_FORMAT_1, "m shares", "exit_shares_db");
   addInput("FMV per Share (entry)", data.dealParams.entry_price_per_share ?? 0, NUM_FORMAT_2, "NOK", "fmv_per_share", "Fully diluted (eqv_post_dilution)");
-  addInput("Equity from Sources", data.dealParams.equity_from_sources ?? 0, NUM_FORMAT, "NOKm", "equity_from_sources");
+  addInput("Equity from Sources", data.dealParams.equity_from_sources ?? 0, NUM_FORMAT, "NOKm", "equity_from_sources", "Metadata only — does not create new shares");
 
-  // Computed: new shares from EK
-  const ekSharesRow = r;
-  const ekRow = ws.getRow(r);
-  ekRow.getCell(1).value = "New Shares (EK / FMV)";
-  ekRow.getCell(1).font = LABEL_FONT;
-  ekRow.getCell(1).border = THIN_BORDER;
-  const ekCell = ekRow.getCell(2);
-  ekCell.value = { formula: 'IF(fmv_per_share>0,equity_from_sources/fmv_per_share,0)' };
-  ekCell.numFmt = NUM_FORMAT_1;
-  styleFormulaCell(ekCell);
-  ekRow.getCell(3).value = "m shares";
-  ekRow.getCell(3).font = VALUE_FONT;
-  wb.definedNames.add(`'Inputs'!$B$${r}`, "target_ek_shares");
-  r++;
-
-  // Total entry shares
+  // Total entry shares (= DB shares, no additive EK conversion)
   const entryTotalRow = ws.getRow(r);
   entryTotalRow.getCell(1).value = "Total Entry Shares";
   entryTotalRow.getCell(1).font = LABEL_FONT;
   entryTotalRow.getCell(1).border = THIN_BORDER;
   const entryTotalCell = entryTotalRow.getCell(2);
-  entryTotalCell.value = { formula: 'entry_shares_db+target_ek_shares' };
+  entryTotalCell.value = { formula: 'entry_shares_db' };
   entryTotalCell.numFmt = NUM_FORMAT_1;
   styleFormulaCell(entryTotalCell);
   wb.definedNames.add(`'Inputs'!$B$${r}`, "total_entry_shares");
   r++;
 
-  // Total exit shares
+  // Total exit shares (= DB exit shares)
   const exitTotalRow = ws.getRow(r);
   exitTotalRow.getCell(1).value = "Total Exit Shares";
   exitTotalRow.getCell(1).font = LABEL_FONT;
   exitTotalRow.getCell(1).border = THIN_BORDER;
   const exitTotalCell = exitTotalRow.getCell(2);
-  exitTotalCell.value = { formula: 'exit_shares_db+target_ek_shares' };
+  exitTotalCell.value = { formula: 'exit_shares_db' };
   exitTotalCell.numFmt = NUM_FORMAT_1;
   styleFormulaCell(exitTotalCell);
   wb.definedNames.add(`'Inputs'!$B$${r}`, "total_exit_shares");

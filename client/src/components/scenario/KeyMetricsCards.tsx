@@ -1,6 +1,6 @@
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import type { AcquisitionScenario, FinancialPeriod, ProFormaPeriod } from "../../types";
-import { formatNum, formatPct, toNum, getEquityFromSources, getEvFromUses } from "./helpers";
+import { formatNum, formatPct, toNum, getEvFromUses } from "./helpers";
 import { useTranslation } from "react-i18next";
 
 interface KeyMetricsCardsProps {
@@ -83,16 +83,10 @@ export default function KeyMetricsCards({
   const dbExitShares = lastAcq ? toNum(lastAcq.share_count) : 0;
   const fmvPerShare = firstAcq ? toNum(firstAcq.eqv_post_dilution) : 0;
 
-  // Share count: DB base shares + new shares from EK in sources
-  // When the acquisition is financed partly with equity (Sources & Uses),
-  // new shares are issued at FMV per share, additive to DB values.
-  const equityFromSources = getEquityFromSources(scenario.sources);
-  const targetEkShares = (fmvPerShare > 0 && equityFromSources > 0)
-    ? equityFromSources / fmvPerShare
-    : 0;
-  const entryShares = dbEntryShares + targetEkShares;
-  // Exit shares: DB exit + same target EK shares (M&A growth already in DB)
-  const exitShares = dbExitShares + targetEkShares;
+  // Share count: DB share counts are the source of truth.
+  // equity_from_sources is metadata only — it does NOT create new shares.
+  const entryShares = dbEntryShares;
+  const exitShares = dbExitShares;
   const dilutionPct =
     entryShares > 0 && exitShares > entryShares
       ? (exitShares - entryShares) / entryShares

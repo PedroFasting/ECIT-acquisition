@@ -262,8 +262,7 @@ export interface ShareSummary {
   entry_price_per_share: number;
   db_entry_shares?: number;
   db_exit_shares?: number;
-  target_ek_shares?: number;      // new shares from EK financing of target
-  equity_from_sources?: number;   // EK amount from Sources & Uses
+  equity_from_sources?: number;   // EK amount from Sources & Uses (metadata only)
   // Post-dilution breakdown (at exit)
   exit_eqv_gross?: number;
   exit_preferred_equity?: number;

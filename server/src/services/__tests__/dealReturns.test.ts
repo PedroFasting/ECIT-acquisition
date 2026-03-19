@@ -431,21 +431,21 @@ describe("calculateDealReturns", () => {
       expect(result.share_summary).toBeUndefined();
     });
 
-    it("adds target EK shares to both entry and exit counts", () => {
+    it("equity_from_sources is metadata only — does NOT create new shares", () => {
       const params = level2Params({
         acquirer_entry_ev: 2000,
         entry_shares: 356.1,
         exit_shares: 400,
         entry_price_per_share: 25,
-        equity_from_sources: 250, // 250 / 25 = 10 new shares
+        equity_from_sources: 250, // metadata only, no share creation
       });
       const result = calculateDealReturns(
         acquirerPeriods, proFormaPeriods, params,
       );
       const ss = result.share_summary!;
-      expect(ss.target_ek_shares).toBeCloseTo(10, 4);
-      expect(ss.entry_shares).toBeCloseTo(366.1, 4); // 356.1 + 10
-      expect(ss.exit_shares_base).toBeCloseTo(410, 4); // 400 + 10
+      // DB share counts are the source of truth — equity_from_sources doesn't add shares
+      expect(ss.entry_shares).toBeCloseTo(356.1, 4); // unchanged
+      expect(ss.exit_shares_base).toBeCloseTo(400, 4); // unchanged
     });
 
     it("includes rollover dilution in total exit shares", () => {

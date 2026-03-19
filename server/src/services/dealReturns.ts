@@ -86,8 +86,8 @@ export interface DealParameters {
   // If not set, computed automatically when entry_price_per_share > 0
   rollover_shares?: number;
 
-  // Equity raised from Sources & Uses to finance the target acquisition.
-  // New shares = equity_from_sources / entry_price_per_share, added to DB base shares.
+  // Equity amount from Sources & Uses (metadata only — does NOT create new shares).
+  // DB share counts already reflect the fully-diluted capital structure.
   equity_from_sources?: number;
 
   // ── Dilution: MIP / TSO warrants / Existing warrants ──
@@ -148,15 +148,14 @@ export interface CalculatedReturns {
   // Share summary (when share data is available)
   share_summary?: {
     entry_shares: number;
-    exit_shares_base: number;    // from acquirer model (includes budgeted M&A) + target EK
+    exit_shares_base: number;    // from acquirer model (includes budgeted M&A)
     rollover_shares: number;     // new shares for rollover equity
     total_exit_shares: number;   // exit_shares_base + rollover_shares
     dilution_pct: number;        // rollover dilution as % of exit shares
     entry_price_per_share: number;
-    db_entry_shares?: number;    // original DB share count (before target EK adjustment)
+    db_entry_shares?: number;    // original DB share count
     db_exit_shares?: number;     // original DB exit share count
-    target_ek_shares?: number;   // new shares from EK financing of target acquisition
-    equity_from_sources?: number; // EK amount from Sources & Uses
+    equity_from_sources?: number; // EK amount from Sources & Uses (metadata only)
     // ── Post-dilution breakdown (at exit, per median exit multiple) ──
     exit_eqv_gross?: number;     // total EQV at exit (EV − NIBD)
     exit_preferred_equity?: number; // preferred equity at exit (with PIK accrued)
@@ -532,26 +531,19 @@ export function calculateDealReturns(
   const combinedEntryEV = acquirerEntryEV + (params.price_paid ?? 0);
 
   // ── Share tracking setup ──────────────────────────────────────────
-  // "Equity from sources → new shares" model:
-  //   DB contains base share counts (entry and exit, with budgeted M&A growth).
-  //   When the target acquisition is partly financed with equity (Sources & Uses),
-  //   new shares are issued at FMV per share, ADDITIVE to DB values.
-  //   Entry = DB entry + (equity_from_sources / FMV)
-  //   Exit  = DB exit  + (equity_from_sources / FMV)
+  // DB contains the authoritative share counts (entry and exit, including
+  // budgeted M&A dilution). equity_from_sources is the total equity raised
+  // to finance the deal — it does NOT create additional shares.
+  // The DB share counts already reflect the fully-diluted capital structure.
   const entryPricePerShare = params.entry_price_per_share ?? 0;
   const equityFromSources = params.equity_from_sources ?? 0;
 
   const dbEntryShares = params.entry_shares ?? 0;
   const dbExitShares = params.exit_shares ?? dbEntryShares;
 
-  // New shares issued to finance this target acquisition
-  const targetEkShares = (entryPricePerShare > 0 && equityFromSources > 0)
-    ? equityFromSources / entryPricePerShare
-    : 0;
-
-  // Entry & exit shares: DB values + additive target EK shares
-  const entryShares = dbEntryShares + targetEkShares;
-  const exitSharesBase = dbExitShares + targetEkShares;
+  // Entry & exit shares: directly from DB (no additive equity-to-shares conversion)
+  const entryShares = dbEntryShares;
+  const exitSharesBase = dbExitShares;
 
   const rolloverEquity = params.rollover_equity ?? 0;
   const rolloverShares = params.rollover_shares ??
@@ -768,7 +760,6 @@ export function calculateDealReturns(
     entry_price_per_share: entryPricePerShare,
     db_entry_shares: dbEntryShares,
     db_exit_shares: dbExitShares,
-    target_ek_shares: targetEkShares,
     equity_from_sources: equityFromSources,
     // Post-dilution breakdown (from median exit multiple)
     ...(exitDilutionInfo ? {

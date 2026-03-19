@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { AcquisitionScenario, FinancialPeriod, ShareSummary } from "../../types";
-import { formatNum, formatPct, toNum, getEquityFromSources } from "./helpers";
+import { formatNum, formatPct, toNum } from "./helpers";
 import SectionHeader from "./SectionHeader";
 import { useTranslation } from "react-i18next";
 
@@ -53,40 +53,28 @@ export default function ShareTracker({
     const exitEqv = toNum(lastPeriod.equity_value);
     const exitPPS = toNum(lastPeriod.eqv_post_dilution) || toNum(lastPeriod.per_share_pre);
 
-    // ── "Equity from sources → new shares" model ──
-    // The DB already contains share counts that include budgeted M&A dilution.
-    // When this specific target acquisition is partly financed with equity
-    // (in Sources & Uses), new shares are issued at FMV per share ON TOP of
-    // both entry and exit DB values.
-    //
-    // Entry = DB base (356m) + target EK shares
-    // Exit  = DB exit (441m) + target EK shares  (M&A growth is already in DB)
-    const equityFromSources = getEquityFromSources(scenario.sources);
-    const pricePerShare = entryPPS; // FMV per share (fully diluted)
+    // ── DB share counts are the source of truth ──
+    // equity_from_sources is metadata only — it does NOT create new shares.
+    // The DB already contains share counts that include the fully-diluted
+    // capital structure. Dividing equity_from_sources by PPS and adding
+    // shares would be double-counting.
 
-    // New shares issued to finance this target acquisition
-    const targetEkShares = (pricePerShare > 0 && equityFromSources > 0)
-      ? equityFromSources / pricePerShare
-      : 0;
-
-    // Entry & exit shares: DB values + additive target EK shares
-    const baseShares = dbBaseShares + targetEkShares;
-    const exitShares = dbExitShares + targetEkShares;
-    const hasTargetEk = targetEkShares > 0.1;
+    // Entry & exit shares: DB values directly
+    const baseShares = dbBaseShares;
+    const exitShares = dbExitShares;
 
     // M&A shares = growth already in DB model (unchanged by target financing)
     const maShares = dbExitShares - dbBaseShares;
 
     // Rollover from scenario — use fully diluted FMV per share for share conversion
     const rolloverEquity = toNum(scenario.rollover_shareholders);
-    const rolloverShares = pricePerShare > 0 ? rolloverEquity / pricePerShare : 0;
+    const rolloverShares = entryPPS > 0 ? rolloverEquity / entryPPS : 0;
 
     // Total shares including rollover
     const totalShares = exitShares + rolloverShares;
 
     // Dilution from entry base
     const dilutionFromMa = baseShares > 0 ? maShares / baseShares : 0;
-    const dilutionFromTargetEk = dbBaseShares > 0 ? targetEkShares / dbBaseShares : 0;
     const dilutionTotal = baseShares > 0 ? (totalShares - baseShares) / baseShares : 0;
 
     // Build waterfall steps
@@ -98,21 +86,10 @@ export default function ShareTracker({
       value: dbBaseShares,
       delta: dbBaseShares,
       color: "#7A8B6E",
-      annotation: pricePerShare > 0 ? t("shareTracker.pricePerShare", { price: formatNum(pricePerShare, 1) }) : undefined,
+      annotation: entryPPS > 0 ? t("shareTracker.pricePerShare", { price: formatNum(entryPPS, 1) }) : undefined,
     });
 
-    // Step 2: Target equity financing shares (only if EK in sources)
-    if (hasTargetEk) {
-      steps.push({
-        label: t("shareTracker.newSharesTarget"),
-        value: baseShares,
-        delta: targetEkShares,
-        color: "#5B8A72",
-        annotation: `${formatNum(equityFromSources, 0)} @ NOK ${formatNum(pricePerShare, 1)}`,
-      });
-    }
-
-    // Step 3: M&A shares from budgeted acquisitions (if any growth in DB)
+    // Step 2: M&A shares from budgeted acquisitions (if any growth in DB)
     if (maShares > 0) {
       steps.push({
         label: t("shareTracker.maSharesLabel", { range: `${firstWithShares.period_label}\u2013${lastPeriod.period_label}` }),
@@ -142,13 +119,11 @@ export default function ShareTracker({
       totalShares,
       dilutionTotal,
       maShares,
-      targetEkShares,
-      hasTargetEk,
       entryPPS,
       exitPPS,
       entryEqv,
       exitEqv,
-      pricePerShare,
+      pricePerShare: entryPPS,
       firstLabel: firstWithShares.period_label,
       lastLabel: lastPeriod.period_label,
     };
@@ -237,14 +212,6 @@ export default function ShareTracker({
                   {formatNum(tracker.dbBaseShares, 1)}m
                 </div>
               </div>
-              {tracker.hasTargetEk && (
-                <div className="text-center">
-                  <div className="text-xs text-gray-500 mb-1">{t("shareTracker.plusTargetEk")}</div>
-                  <div className="text-sm font-bold text-[#5B8A72]">
-                    +{formatNum(tracker.targetEkShares, 1)}m
-                  </div>
-                </div>
-              )}
               {tracker.maShares > 0 && (
                 <div className="text-center">
                   <div className="text-xs text-gray-500 mb-1">{t("shareTracker.plusMaShares")}</div>
