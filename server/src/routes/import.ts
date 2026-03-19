@@ -3,7 +3,7 @@ import multer from "multer";
 import { parse } from "csv-parse/sync";
 import pool from "../models/db.js";
 import { AuthRequest, authMiddleware } from "../middleware/auth.js";
-import { parseExcelBuffer } from "../services/excelParser.js";
+import { parseExcelBuffer } from "../services/excelParser/index.js";
 import {
   buildPeriodUpsertSQL,
   extractPeriodParams,
