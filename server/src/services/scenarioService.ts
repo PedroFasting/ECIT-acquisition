@@ -118,19 +118,46 @@ export async function compareModels(
     if (existing.rows.length > 0) {
       scenario = existing.rows[0];
     } else {
-      // Auto-create scenario
+      // Auto-create scenario — inherit acquirer-level fields from sibling
       const acqName = acquirerModel.rows[0].company_name;
       const tgtName = targetModel.company_name;
+
+      // Look for a sibling scenario with the same acquirer to inherit S&U,
+      // deal parameters, capital structure, and synergies from.
+      // These fields are acquirer-level and shouldn't need re-entry per target.
+      const sibling = await pool.query(
+        `SELECT sources, uses, deal_parameters, cost_synergies_timeline,
+                ordinary_equity, preferred_equity, preferred_equity_rate,
+                net_debt, rollover_shareholders
+         FROM acquisition_scenarios
+         WHERE acquirer_model_id = $1 AND id != 0
+         ORDER BY updated_at DESC LIMIT 1`,
+        [acquirerModelId]
+      );
+      const s = sibling.rows[0] || {};
+
       const created = await pool.query(
         `INSERT INTO acquisition_scenarios (
-          name, acquirer_model_id, target_model_id, status, created_by
-        ) VALUES ($1, $2, $3, 'active', $4)
+          name, acquirer_model_id, target_model_id, status, created_by,
+          sources, uses, deal_parameters, cost_synergies_timeline,
+          ordinary_equity, preferred_equity, preferred_equity_rate,
+          net_debt, rollover_shareholders
+        ) VALUES ($1, $2, $3, 'active', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         RETURNING *`,
         [
           `${acqName} + ${tgtName}`,
           acquirerModelId,
           targetModelId,
           userId,
+          JSON.stringify(s.sources || []),
+          JSON.stringify(s.uses || []),
+          JSON.stringify(s.deal_parameters || {}),
+          JSON.stringify(s.cost_synergies_timeline || {}),
+          s.ordinary_equity ?? null,
+          s.preferred_equity ?? null,
+          s.preferred_equity_rate ?? null,
+          s.net_debt ?? null,
+          s.rollover_shareholders ?? null,
         ]
       );
       scenario = {
