@@ -451,29 +451,180 @@ export function mergeScenarioParams(
 
 // ── Share Tracking ───────────────────────────────────────────────
 
+/** M&A params needed for dynamic share computation. */
+export interface MAShareParams {
+  acquired_companies_multiple: number;
+  acquired_with_shares_pct: number;
+}
+
+/** Per-period share breakdown from dynamic computation. */
+export interface PeriodShareInfo {
+  year: string;
+  shares: number;         // cumulative shares at end of this period
+  maNewShares: number;    // new shares issued for M&A in this period
+  ppsUsed: number;        // PPS used for pricing new shares (prev year × 1.2)
+}
+
+/** Result of dynamic share computation. */
+export interface DynamicSharesResult {
+  entryShares: number;
+  exitShares: number;
+  equityFromSourcesShares: number;
+  sharesByPeriod: PeriodShareInfo[];
+}
+
+/**
+ * Compute dynamic share counts across acquirer periods.
+ *
+ * M&A dilution formula (for t > entry year):
+ *   new_shares(t) = (revenue_ma(t) × multiple × share_pct) / (pps_post(t-1) × 1.2)
+ *
+ * Entry year shares are fixed from DB. The +20% premium avoids circular
+ * reference (Excel uses same-year PPS with iteration; we use prior-year + premium).
+ *
+ * S&U equity: When equityFromSources > 0, creates additional shares at
+ *   entry_pps_post × 1.2. These shares are added to both entry and exit counts.
+ *
+ * @param acquirerPeriods - Ordered array of DB periods (must have share_count,
+ *   eqv_post_dilution or per_share_pre, revenue_ma)
+ * @param maParams - M&A parameters (multiple, share_pct). Null = fall back to DB share counts.
+ * @param equityFromSources - Ordinary equity from S&U that creates new shares (default 0).
+ */
+export function computeDynamicShares(
+  acquirerPeriods: any[],
+  maParams: MAShareParams | null | undefined,
+  equityFromSources: number = 0,
+): DynamicSharesResult {
+  if (acquirerPeriods.length === 0) {
+    return { entryShares: 0, exitShares: 0, equityFromSourcesShares: 0, sharesByPeriod: [] };
+  }
+
+  const getPPS = (p: any): number => {
+    if (p.eqv_post_dilution != null) return parseFloat(p.eqv_post_dilution);
+    if (p.per_share_pre != null) return parseFloat(p.per_share_pre);
+    return 0;
+  };
+
+  const getYear = (p: any): string =>
+    p.period_label || (p.period_date instanceof Date ? p.period_date.getFullYear().toString() : "");
+
+  const firstPeriod = acquirerPeriods[0];
+  const entryPPS = getPPS(firstPeriod);
+  const dbEntryShares = firstPeriod.share_count != null ? parseFloat(firstPeriod.share_count) : 0;
+
+  // S&U equity shares: priced at entry PPS × 1.2
+  const sharePremium = 1.2;
+  const equitySharePrice = entryPPS * sharePremium;
+  const equityShares = equitySharePrice > 0 && equityFromSources > 0
+    ? equityFromSources / equitySharePrice
+    : 0;
+
+  // If no M&A params, fall back to DB share counts (no dynamic computation)
+  if (!maParams || maParams.acquired_with_shares_pct <= 0) {
+    const sharesByPeriod: PeriodShareInfo[] = acquirerPeriods.map((p) => {
+      const dbShares = p.share_count != null ? parseFloat(p.share_count) : 0;
+      return {
+        year: getYear(p),
+        shares: dbShares + equityShares,
+        maNewShares: 0,
+        ppsUsed: 0,
+      };
+    });
+    const lastDbShares = acquirerPeriods[acquirerPeriods.length - 1].share_count != null
+      ? parseFloat(acquirerPeriods[acquirerPeriods.length - 1].share_count) : 0;
+    return {
+      entryShares: dbEntryShares + equityShares,
+      exitShares: lastDbShares + equityShares,
+      equityFromSourcesShares: equityShares,
+      sharesByPeriod,
+    };
+  }
+
+  const { acquired_companies_multiple: multiple, acquired_with_shares_pct: sharePct } = maParams;
+
+  // Build period-by-period share trajectory
+  const sharesByPeriod: PeriodShareInfo[] = [];
+  let cumShares = dbEntryShares + equityShares; // entry year: DB + equity shares
+
+  for (let i = 0; i < acquirerPeriods.length; i++) {
+    const p = acquirerPeriods[i];
+    const revenueMa = p.revenue_ma != null ? parseFloat(p.revenue_ma) : 0;
+
+    if (i === 0) {
+      // Entry year: fixed from DB (no M&A share computation)
+      sharesByPeriod.push({
+        year: getYear(p),
+        shares: cumShares,
+        maNewShares: 0,
+        ppsUsed: 0,
+      });
+    } else {
+      // Subsequent years: compute new shares from M&A
+      const prevPPS = getPPS(acquirerPeriods[i - 1]);
+      const issuePrice = prevPPS * sharePremium;
+      const maNewShares = issuePrice > 0 && revenueMa > 0
+        ? (revenueMa * multiple * sharePct) / issuePrice
+        : 0;
+      cumShares += maNewShares;
+      sharesByPeriod.push({
+        year: getYear(p),
+        shares: cumShares,
+        maNewShares,
+        ppsUsed: issuePrice,
+      });
+    }
+  }
+
+  return {
+    entryShares: sharesByPeriod[0].shares,
+    exitShares: sharesByPeriod[sharesByPeriod.length - 1].shares,
+    equityFromSourcesShares: equityShares,
+    sharesByPeriod,
+  };
+}
+
 /**
  * Extract entry/exit share data from acquirer periods and apply to deal parameters.
- * Entry shares = first period share_count, exit shares = last period share_count.
+ *
+ * When M&A model parameters are available, computes dynamic share counts
+ * using the formula: new_shares(t) = (revenue_ma × multiple × share_pct) / (pps(t-1) × 1.2).
+ * When equity_from_sources is set on the params, creates additional shares at entry PPS × 1.2.
+ * Otherwise falls back to DB share_count values.
+ *
  * entry_price_per_share = first period eqv_post_dilution (fully diluted FMV per share).
  */
 export function applyShareTracking(
   mergedParams: DealParameters,
   acquirerPeriods: any[],
+  acquirerModelParams?: Record<string, any> | null,
 ): void {
   if (mergedParams.entry_shares || acquirerPeriods.length === 0) return;
 
   const firstPeriod = acquirerPeriods[0];
-  const lastPeriod = acquirerPeriods[acquirerPeriods.length - 1];
-  const entryShares = firstPeriod.share_count != null ? parseFloat(firstPeriod.share_count) : 0;
-  const exitShares = lastPeriod.share_count != null ? parseFloat(lastPeriod.share_count) : 0;
+
   // Use fully diluted value (after MIP/TSO/warrants), fall back to per_share_pre if unavailable
   const entryPricePerShare = firstPeriod.eqv_post_dilution != null
     ? parseFloat(firstPeriod.eqv_post_dilution)
     : (firstPeriod.per_share_pre != null ? parseFloat(firstPeriod.per_share_pre) : 0);
 
-  if (entryShares > 0) {
-    mergedParams.entry_shares = entryShares;
-    mergedParams.exit_shares = exitShares > 0 ? exitShares : entryShares;
+  // Extract M&A params from model_parameters if available
+  const maParams: MAShareParams | null =
+    acquirerModelParams &&
+    acquirerModelParams.acquired_companies_multiple != null &&
+    acquirerModelParams.acquired_with_shares_pct != null
+      ? {
+          acquired_companies_multiple: parseFloat(acquirerModelParams.acquired_companies_multiple),
+          acquired_with_shares_pct: parseFloat(acquirerModelParams.acquired_with_shares_pct),
+        }
+      : null;
+
+  // Compute dynamic shares (M&A dilution + S&U equity)
+  const equityFromSources = mergedParams.equity_from_sources ?? 0;
+  const dynamicResult = computeDynamicShares(acquirerPeriods, maParams, equityFromSources);
+
+  if (dynamicResult.entryShares > 0) {
+    mergedParams.entry_shares = dynamicResult.entryShares;
+    mergedParams.exit_shares = dynamicResult.exitShares > 0 ? dynamicResult.exitShares : dynamicResult.entryShares;
     mergedParams.entry_price_per_share = entryPricePerShare;
   }
 }
@@ -526,7 +677,7 @@ export function prepareFullDealParams(
   synergiesTimeline: Record<string, number>,
 ): DealParameters {
   const merged = mergeScenarioParams(baseDp, scenario);
-  applyShareTracking(merged, acquirerPeriods);
+  applyShareTracking(merged, acquirerPeriods, acquirerModelParams);
   const dilution = extractDilutionParams(acquirerModelParams);
   Object.assign(merged, dilution);
   return merged;

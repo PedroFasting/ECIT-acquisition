@@ -53,18 +53,29 @@ export default function ShareTracker({
     const exitEqv = toNum(lastPeriod.equity_value);
     const exitPPS = toNum(lastPeriod.eqv_post_dilution) || toNum(lastPeriod.per_share_pre);
 
-    // ── DB share counts are the source of truth ──
-    // equity_from_sources is metadata only — it does NOT create new shares.
-    // The DB already contains share counts that include the fully-diluted
-    // capital structure. Dividing equity_from_sources by PPS and adding
-    // shares would be double-counting.
+    // ── Dynamic share computation ──
+    // equity_from_sources creates new shares at entry PPS × 1.2.
+    // M&A shares are dynamically computed: new_shares(t) = (revenue_ma × multiple × share_pct) / (pps(t-1) × 1.2).
+    // When shareSummary is available, use it for accurate totals (computed server-side).
+    // Otherwise fall back to DB values.
 
-    // Entry & exit shares: DB values directly
-    const baseShares = dbBaseShares;
-    const exitShares = dbExitShares;
+    const equityFromSources = shareSummary?.equity_from_sources ?? 0;
+    const sharePremium = 1.2;
+    const equitySharePrice = entryPPS * sharePremium;
+    const equityShares = equitySharePrice > 0 && equityFromSources > 0
+      ? equityFromSources / equitySharePrice
+      : 0;
 
-    // M&A shares = growth already in DB model (unchanged by target financing)
-    const maShares = dbExitShares - dbBaseShares;
+    // When shareSummary is available, use its computed totals
+    const baseShares = shareSummary
+      ? shareSummary.entry_shares
+      : dbBaseShares + equityShares;
+    const exitShares = shareSummary
+      ? shareSummary.exit_shares_base
+      : dbExitShares + equityShares;
+
+    // M&A shares = growth from dynamic computation (exit - entry shares)
+    const maShares = exitShares - baseShares;
 
     // Rollover from scenario — use fully diluted FMV per share for share conversion
     const rolloverEquity = toNum(scenario.rollover_shareholders);
@@ -73,9 +84,8 @@ export default function ShareTracker({
     // Total shares including rollover
     const totalShares = exitShares + rolloverShares;
 
-    // Dilution from entry base
-    const dilutionFromMa = baseShares > 0 ? maShares / baseShares : 0;
-    const dilutionTotal = baseShares > 0 ? (totalShares - baseShares) / baseShares : 0;
+    // Dilution from DB base (before equity shares)
+    const dilutionTotal = dbBaseShares > 0 ? (totalShares - dbBaseShares) / dbBaseShares : 0;
 
     // Build waterfall steps
     const steps: WaterfallStep[] = [];
@@ -89,8 +99,24 @@ export default function ShareTracker({
       annotation: entryPPS > 0 ? t("shareTracker.pricePerShare", { price: formatNum(entryPPS, 1) }) : undefined,
     });
 
-    // Step 2: M&A shares from budgeted acquisitions (if any growth in DB)
+    // Step 2: Equity shares from S&U (if ordinary equity creates new shares)
+    if (equityShares > 0) {
+      steps.push({
+        label: t("shareTracker.equitySharesLabel", { defaultValue: "S&U Equity Shares" }),
+        value: dbBaseShares + equityShares,
+        delta: equityShares,
+        color: "#5B6EAE",
+        annotation: t("shareTracker.equitySharesAnnotation", {
+          defaultValue: "{{amount}} NOKm @ {{price}} NOK/sh",
+          amount: formatNum(equityFromSources, 0),
+          price: formatNum(equitySharePrice, 1),
+        }),
+      });
+    }
+
+    // Step 3: M&A shares from budgeted acquisitions (dynamic computation)
     if (maShares > 0) {
+      const dilutionFromMa = baseShares > 0 ? maShares / baseShares : 0;
       steps.push({
         label: t("shareTracker.maSharesLabel", { range: `${firstWithShares.period_label}\u2013${lastPeriod.period_label}` }),
         value: exitShares,
@@ -127,7 +153,7 @@ export default function ShareTracker({
       firstLabel: firstWithShares.period_label,
       lastLabel: lastPeriod.period_label,
     };
-  }, [acquirerPeriods, scenario, t]);
+  }, [acquirerPeriods, scenario, shareSummary, t]);
 
   if (!tracker) return null;
 

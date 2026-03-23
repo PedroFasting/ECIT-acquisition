@@ -86,8 +86,9 @@ export interface DealParameters {
   // If not set, computed automatically when entry_price_per_share > 0
   rollover_shares?: number;
 
-  // Equity amount from Sources & Uses (metadata only — does NOT create new shares).
-  // DB share counts already reflect the fully-diluted capital structure.
+  // Equity from Sources & Uses — creates new shares at entry PPS × 1.2.
+  // Handled by computeDynamicShares() in proForma.ts, which adds the shares
+  // to entry_shares and exit_shares before they reach dealReturns.
   equity_from_sources?: number;
 
   // ── Dilution: MIP / TSO warrants / Existing warrants ──
@@ -153,9 +154,7 @@ export interface CalculatedReturns {
     total_exit_shares: number;   // exit_shares_base + rollover_shares
     dilution_pct: number;        // rollover dilution as % of exit shares
     entry_price_per_share: number;
-    db_entry_shares?: number;    // original DB share count
-    db_exit_shares?: number;     // original DB exit share count
-    equity_from_sources?: number; // EK amount from Sources & Uses (metadata only)
+    equity_from_sources?: number; // EK amount from S&U (creates shares upstream at PPS × 1.2)
     // ── Post-dilution breakdown (at exit, per median exit multiple) ──
     exit_eqv_gross?: number;     // total EQV at exit (EV − NIBD)
     exit_preferred_equity?: number; // preferred equity at exit (with PIK accrued)
@@ -531,19 +530,17 @@ export function calculateDealReturns(
   const combinedEntryEV = acquirerEntryEV + (params.price_paid ?? 0);
 
   // ── Share tracking setup ──────────────────────────────────────────
-  // DB contains the authoritative share counts (entry and exit, including
-  // budgeted M&A dilution). equity_from_sources is the total equity raised
-  // to finance the deal — it does NOT create additional shares.
-  // The DB share counts already reflect the fully-diluted capital structure.
+  // Entry/exit share counts come pre-computed from applyShareTracking()
+  // which includes: (a) DB base shares, (b) dynamic M&A dilution
+  // (revenue_ma × multiple × share_pct / prev_pps × 1.2), and
+  // (c) equity_from_sources shares (ordinary equity / entry_pps × 1.2).
   const entryPricePerShare = params.entry_price_per_share ?? 0;
   const equityFromSources = params.equity_from_sources ?? 0;
 
-  const dbEntryShares = params.entry_shares ?? 0;
-  const dbExitShares = params.exit_shares ?? dbEntryShares;
+  const entryShares = params.entry_shares ?? 0;
+  const exitSharesBase = params.exit_shares ?? entryShares;
 
-  // Entry & exit shares: directly from DB (no additive equity-to-shares conversion)
-  const entryShares = dbEntryShares;
-  const exitSharesBase = dbExitShares;
+  // Entry & exit shares: from dynamic computation (includes M&A dilution + S&U equity)
 
   const rolloverEquity = params.rollover_equity ?? 0;
   const rolloverShares = params.rollover_shares ??
@@ -565,8 +562,8 @@ export function calculateDealReturns(
   // Base shares for PPS_pre calculation (ordinary shares before M&A dilution)
   // This drives how dilution amounts (MIP/TSO/warrants) are computed:
   //   PPS_pre = (EQV − pref) / dilutionBaseShares
-  // Falls back to dbEntryShares if not set.
-  const dilutionBaseShares = params.dilution_base_shares ?? dbEntryShares;
+  // Falls back to entryShares if not set.
+  const dilutionBaseShares = params.dilution_base_shares ?? entryShares;
   const hasDilutionParams = mipSharePct > 0 || tsoCount > 0 || warCount > 0;
 
   const cases: CaseReturn[] = [];
@@ -758,8 +755,6 @@ export function calculateDealReturns(
     total_exit_shares: totalExitShares,
     dilution_pct: totalExitShares > 0 ? rolloverShares / totalExitShares : 0,
     entry_price_per_share: entryPricePerShare,
-    db_entry_shares: dbEntryShares,
-    db_exit_shares: dbExitShares,
     equity_from_sources: equityFromSources,
     // Post-dilution breakdown (from median exit multiple)
     ...(exitDilutionInfo ? {

@@ -83,8 +83,9 @@ export default function KeyMetricsCards({
   const dbExitShares = lastAcq ? toNum(lastAcq.share_count) : 0;
   const fmvPerShare = firstAcq ? toNum(firstAcq.eqv_post_dilution) : 0;
 
-  // Share count: DB share counts are the source of truth.
-  // equity_from_sources is metadata only — it does NOT create new shares.
+  // Share count: DB share counts used for quick card display.
+  // Dynamic shares (S&U equity + M&A dilution) are computed server-side
+  // and shown in ShareTracker — this is an approximation for the cards.
   const entryShares = dbEntryShares;
   const exitShares = dbExitShares;
   const dilutionPct =

@@ -16,6 +16,7 @@ import {
   mergeScenarioParams,
   sensitivityParamSetters,
   applyShareTracking,
+  computeDynamicShares,
   buildSynergiesArray,
   extractPeriodLabels,
   prepareFullDealParams,
@@ -678,6 +679,257 @@ describe("applyShareTracking", () => {
     const periods = [makePeriod(2025, { share_count: "356.1", per_share_pre: "30" })];
     applyShareTracking(params, periods);
     expect(params.entry_price_per_share).toBe(30);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════
+// DYNAMIC SHARE COMPUTATION
+// ══════════════════════════════════════════════════════════════════
+
+describe("computeDynamicShares", () => {
+  // Entry year is fixed; subsequent years compute new shares from M&A
+  // Formula: new_shares(t) = (revenue_ma(t) × multiple × share_pct) / (pps_post(t-1) × 1.2)
+
+  it("computes M&A dilution shares for subsequent years using prior-year PPS × 1.2", () => {
+    const periods = [
+      makePeriod(2025, { share_count: "356.1", eqv_post_dilution: "13.6", revenue_ma: "1205" }),
+      makePeriod(2026, { share_count: "999", eqv_post_dilution: "14.4", revenue_ma: "350" }),
+      makePeriod(2027, { share_count: "999", eqv_post_dilution: "18.8", revenue_ma: "485" }),
+    ];
+    const maParams = { acquired_companies_multiple: 1, acquired_with_shares_pct: 0.1 };
+
+    const result = computeDynamicShares(periods, maParams);
+
+    // Entry year (2025): fixed from DB
+    expect(result.entryShares).toBe(356.1);
+
+    // 2026: new_shares = (350 × 1 × 0.1) / (13.6 × 1.2) = 35 / 16.32 ≈ 2.1446
+    // exit shares = 356.1 + 2.1446 ≈ 358.2446
+    // 2027: new_shares = (485 × 1 × 0.1) / (14.4 × 1.2) = 48.5 / 17.28 ≈ 2.8067
+    // exit shares = 358.2446 + 2.8067 ≈ 361.0513
+    expect(result.exitShares).toBeCloseTo(361.0513, 1);
+    expect(result.sharesByPeriod.length).toBe(3);
+    expect(result.sharesByPeriod[0].shares).toBe(356.1); // entry year fixed
+    expect(result.sharesByPeriod[1].maNewShares).toBeCloseTo(2.1446, 2);
+    expect(result.sharesByPeriod[2].maNewShares).toBeCloseTo(2.8067, 2);
+  });
+
+  it("entry year shares are always fixed from DB (no M&A computation)", () => {
+    const periods = [
+      makePeriod(2025, { share_count: "356.1", eqv_post_dilution: "13.6", revenue_ma: "1205" }),
+      makePeriod(2026, { share_count: "999", eqv_post_dilution: "14.4", revenue_ma: "350" }),
+    ];
+    const maParams = { acquired_companies_multiple: 1, acquired_with_shares_pct: 0.1 };
+
+    const result = computeDynamicShares(periods, maParams);
+
+    // Entry shares = DB value, NOT computed from revenue_ma
+    expect(result.entryShares).toBe(356.1);
+    expect(result.sharesByPeriod[0].maNewShares).toBe(0);
+  });
+
+  it("uses eqv_post_dilution from DB periods for PPS", () => {
+    // When pps_post changes, new shares change inversely
+    const periodsLowPPS = [
+      makePeriod(2025, { share_count: "100", eqv_post_dilution: "10", revenue_ma: "500" }),
+      makePeriod(2026, { share_count: "999", eqv_post_dilution: "15", revenue_ma: "200" }),
+    ];
+    const periodsHighPPS = [
+      makePeriod(2025, { share_count: "100", eqv_post_dilution: "20", revenue_ma: "500" }),
+      makePeriod(2026, { share_count: "999", eqv_post_dilution: "25", revenue_ma: "200" }),
+    ];
+    const maParams = { acquired_companies_multiple: 1, acquired_with_shares_pct: 0.1 };
+
+    const resultLow = computeDynamicShares(periodsLowPPS, maParams);
+    const resultHigh = computeDynamicShares(periodsHighPPS, maParams);
+
+    // Low PPS → more new shares; High PPS → fewer new shares
+    expect(resultLow.sharesByPeriod[1].maNewShares).toBeGreaterThan(
+      resultHigh.sharesByPeriod[1].maNewShares
+    );
+    // Low: 200 * 0.1 / (10 * 1.2) = 20 / 12 = 1.6667
+    expect(resultLow.sharesByPeriod[1].maNewShares).toBeCloseTo(1.6667, 3);
+    // High: 200 * 0.1 / (20 * 1.2) = 20 / 24 = 0.8333
+    expect(resultHigh.sharesByPeriod[1].maNewShares).toBeCloseTo(0.8333, 3);
+  });
+
+  it("years with zero revenue_ma produce zero new shares", () => {
+    const periods = [
+      makePeriod(2025, { share_count: "356.1", eqv_post_dilution: "13.6", revenue_ma: "1205" }),
+      makePeriod(2026, { share_count: "999", eqv_post_dilution: "14.4", revenue_ma: "350" }),
+      makePeriod(2027, { share_count: "999", eqv_post_dilution: "18.8", revenue_ma: "0" }),
+    ];
+    const maParams = { acquired_companies_multiple: 1, acquired_with_shares_pct: 0.1 };
+
+    const result = computeDynamicShares(periods, maParams);
+
+    expect(result.sharesByPeriod[2].maNewShares).toBe(0);
+    // Exit shares = entry + 2026 dilution only
+    const shares2026 = result.sharesByPeriod[1].shares;
+    expect(result.sharesByPeriod[2].shares).toBe(shares2026);
+  });
+
+  it("returns DB values unchanged when no M&A params provided", () => {
+    const periods = [
+      makePeriod(2025, { share_count: "356.1", eqv_post_dilution: "13.6", revenue_ma: "1205" }),
+      makePeriod(2026, { share_count: "400", eqv_post_dilution: "14.4", revenue_ma: "350" }),
+    ];
+
+    const result = computeDynamicShares(periods, null);
+
+    // Falls back to DB values
+    expect(result.entryShares).toBe(356.1);
+    expect(result.exitShares).toBe(400);
+    expect(result.sharesByPeriod[0].maNewShares).toBe(0);
+    expect(result.sharesByPeriod[1].maNewShares).toBe(0);
+  });
+
+  it("handles missing eqv_post_dilution by falling back to per_share_pre", () => {
+    const periods = [
+      makePeriod(2025, { share_count: "100", per_share_pre: "15", revenue_ma: "500" }),
+      makePeriod(2026, { share_count: "999", per_share_pre: "20", revenue_ma: "200" }),
+    ];
+    const maParams = { acquired_companies_multiple: 1, acquired_with_shares_pct: 0.1 };
+
+    const result = computeDynamicShares(periods, maParams);
+
+    // Uses per_share_pre as PPS fallback
+    // 2026: 200 * 0.1 / (15 * 1.2) = 20 / 18 ≈ 1.1111
+    expect(result.sharesByPeriod[1].maNewShares).toBeCloseTo(1.1111, 3);
+  });
+
+  it("respects acquired_companies_multiple > 1", () => {
+    const periods = [
+      makePeriod(2025, { share_count: "100", eqv_post_dilution: "10", revenue_ma: "500" }),
+      makePeriod(2026, { share_count: "999", eqv_post_dilution: "15", revenue_ma: "200" }),
+    ];
+    // Multiple = 2 means acquisitions cost 2× revenue (not 1×)
+    const maParams = { acquired_companies_multiple: 2, acquired_with_shares_pct: 0.1 };
+
+    const result = computeDynamicShares(periods, maParams);
+
+    // 2026: 200 * 2 * 0.1 / (10 * 1.2) = 40 / 12 = 3.3333
+    expect(result.sharesByPeriod[1].maNewShares).toBeCloseTo(3.3333, 3);
+  });
+
+  it("respects acquired_with_shares_pct variation", () => {
+    const periods = [
+      makePeriod(2025, { share_count: "100", eqv_post_dilution: "10", revenue_ma: "500" }),
+      makePeriod(2026, { share_count: "999", eqv_post_dilution: "15", revenue_ma: "200" }),
+    ];
+    // 20% paid in shares instead of 10%
+    const maParams = { acquired_companies_multiple: 1, acquired_with_shares_pct: 0.2 };
+
+    const result = computeDynamicShares(periods, maParams);
+
+    // 2026: 200 * 1 * 0.2 / (10 * 1.2) = 40 / 12 = 3.3333
+    expect(result.sharesByPeriod[1].maNewShares).toBeCloseTo(3.3333, 3);
+  });
+
+  it("S&U equity creates shares at entry PPS × 1.2", () => {
+    const periods = [
+      makePeriod(2025, { share_count: "100", eqv_post_dilution: "10", revenue_ma: "0" }),
+      makePeriod(2026, { share_count: "100", eqv_post_dilution: "15", revenue_ma: "0" }),
+    ];
+
+    const result = computeDynamicShares(periods, null, 120);
+
+    // equity shares = 120 / (10 * 1.2) = 120 / 12 = 10
+    expect(result.equityFromSourcesShares).toBeCloseTo(10, 4);
+    // Entry shares: DB value + equity shares = 100 + 10 = 110
+    expect(result.entryShares).toBeCloseTo(110, 4);
+    // Exit shares should also include the equity shares
+    expect(result.exitShares).toBeCloseTo(110, 4);
+  });
+
+  it("S&U equity shares are added to both entry and exit share counts", () => {
+    const periods = [
+      makePeriod(2025, { share_count: "200", eqv_post_dilution: "20", revenue_ma: "0" }),
+      makePeriod(2026, { share_count: "200", eqv_post_dilution: "25", revenue_ma: "300" }),
+    ];
+    const maParams = { acquired_companies_multiple: 1, acquired_with_shares_pct: 0.1 };
+
+    const result = computeDynamicShares(periods, maParams, 240);
+
+    // Equity shares: 240 / (20 * 1.2) = 240 / 24 = 10
+    expect(result.equityFromSourcesShares).toBeCloseTo(10, 4);
+    // Entry: 200 + 10 = 210
+    expect(result.entryShares).toBeCloseTo(210, 4);
+    // 2026 M&A: 300 * 0.1 / (20 * 1.2) = 30 / 24 = 1.25
+    // Exit: 210 + 1.25 = 211.25
+    expect(result.exitShares).toBeCloseTo(211.25, 2);
+  });
+
+  it("zero equity_from_sources creates no additional shares", () => {
+    const periods = [
+      makePeriod(2025, { share_count: "100", eqv_post_dilution: "10", revenue_ma: "0" }),
+    ];
+
+    const result = computeDynamicShares(periods, null, 0);
+
+    expect(result.equityFromSourcesShares).toBe(0);
+    expect(result.entryShares).toBe(100);
+  });
+
+  it("single-period model has entry = exit", () => {
+    const periods = [
+      makePeriod(2025, { share_count: "356.1", eqv_post_dilution: "13.6", revenue_ma: "1205" }),
+    ];
+    const maParams = { acquired_companies_multiple: 1, acquired_with_shares_pct: 0.1 };
+
+    const result = computeDynamicShares(periods, maParams);
+
+    expect(result.entryShares).toBe(356.1);
+    expect(result.exitShares).toBe(356.1);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════
+// DYNAMIC SHARES + DEAL RETURNS INTEGRATION
+// ══════════════════════════════════════════════════════════════════
+
+describe("applyShareTracking with dynamic shares", () => {
+  it("uses dynamic shares when M&A model params are provided", () => {
+    const params: DealParameters = {
+      price_paid: 600,
+      tax_rate: 0.22,
+      exit_multiples: [10, 12],
+    };
+    const periods = [
+      makePeriod(2025, { share_count: "100", eqv_post_dilution: "10", revenue_ma: "0" }),
+      makePeriod(2026, { share_count: "999", eqv_post_dilution: "15", revenue_ma: "200" }),
+    ];
+    const modelParams = {
+      acquired_companies_multiple: 1,
+      acquired_with_shares_pct: 0.1,
+    };
+
+    applyShareTracking(params, periods, modelParams);
+
+    // Dynamic shares override DB values
+    expect(params.entry_shares).toBe(100);
+    // 2026: 200 * 0.1 / (10 * 1.2) = 20/12 ≈ 1.6667
+    expect(params.exit_shares).toBeCloseTo(101.6667, 2);
+    expect(params.entry_price_per_share).toBe(10);
+  });
+
+  it("S&U equity creates shares when equity_from_sources is set on params", () => {
+    const params: DealParameters = {
+      price_paid: 600,
+      tax_rate: 0.22,
+      exit_multiples: [10],
+      equity_from_sources: 120,
+    };
+    const periods = [
+      makePeriod(2025, { share_count: "100", eqv_post_dilution: "10", revenue_ma: "0" }),
+      makePeriod(2026, { share_count: "100", eqv_post_dilution: "15", revenue_ma: "0" }),
+    ];
+
+    applyShareTracking(params, periods);
+
+    // equity shares = 120 / (10 * 1.2) = 10
+    expect(params.entry_shares).toBeCloseTo(110, 4);
+    expect(params.exit_shares).toBeCloseTo(110, 4);
   });
 });
 

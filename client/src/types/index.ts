@@ -260,9 +260,7 @@ export interface ShareSummary {
   total_exit_shares: number;
   dilution_pct: number;
   entry_price_per_share: number;
-  db_entry_shares?: number;
-  db_exit_shares?: number;
-  equity_from_sources?: number;   // EK amount from Sources & Uses (metadata only)
+  equity_from_sources?: number;   // EK amount from Sources & Uses (creates shares at PPS × 1.2)
   // Post-dilution breakdown (at exit)
   exit_eqv_gross?: number;
   exit_preferred_equity?: number;

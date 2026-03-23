@@ -431,13 +431,17 @@ describe("calculateDealReturns", () => {
       expect(result.share_summary).toBeUndefined();
     });
 
-    it("equity_from_sources is metadata only — does NOT create new shares", () => {
+    it("equity_from_sources does not create shares inside dealReturns (handled upstream)", () => {
+      // Note: equity_from_sources DOES create new shares, but this is handled by
+      // computeDynamicShares() in proForma.ts, which adds them to entry_shares/exit_shares
+      // BEFORE they reach calculateDealReturns. Inside dealReturns, the share counts
+      // are taken as-is from the pre-computed params.
       const params = level2Params({
         acquirer_entry_ev: 2000,
         entry_shares: 356.1,
         exit_shares: 400,
         entry_price_per_share: 25,
-        equity_from_sources: 250, // metadata only, no share creation
+        equity_from_sources: 250, // shares already included in entry_shares/exit_shares by upstream
       });
       const result = calculateDealReturns(
         acquirerPeriods, proFormaPeriods, params,

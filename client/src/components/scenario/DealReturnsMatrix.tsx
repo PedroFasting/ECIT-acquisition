@@ -931,17 +931,6 @@ export default function DealReturnsMatrix({
                   {/* Share summary callout */}
                   {shareSummary && (
                     <div className="mt-3 bg-purple-50 border border-purple-200 rounded-lg px-4 py-3 text-sm text-purple-900">
-                      {shareSummary.oe_implied && (
-                        <div className="text-xs text-purple-600 font-medium mb-2">
-                          {shareSummary.db_entry_shares
-                            ? t("returns.shareCountAdjusted", {
-                                from: nbFmt1.format(shareSummary.db_entry_shares),
-                                to: nbFmt1.format(shareSummary.entry_shares),
-                                price: nbFmt1.format(shareSummary.entry_price_per_share),
-                              })
-                            : t("returns.shareCountImplied", { count: nbFmt1.format(shareSummary.entry_shares) })}
-                        </div>
-                      )}
                       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-x-6 gap-y-1 text-xs">
                         <div>
                           <span className="font-medium">{t("returns.sharesAtEntry")}</span>{" "}
