@@ -179,10 +179,9 @@ export default function CapitalStructure({
     await onSaveSU(classifiedSources, cleanUses);
 
     // Save capital structure fields
-    // IMPORTANT: S&U sources represent only NEW acquisition financing.
-    // scenario.ordinary_equity / preferred_equity are the BASE (existing) values.
-    // We do NOT overwrite them with source-derived values.
-    // Only save PIK rate (which is always editable).
+    // Persist the COMPUTED Pro Forma capital (base + acquisition financing)
+    // so that the Excel export, Deal Returns, and other consumers all use
+    // the same values the user sees in this component.
     if (onSaveCapitalFields) {
       const peRateVal = editPERate ? Number(editPERate) / 100 : null;
       const cashSweepVal = editCashSweep ? Number(editCashSweep) / 100 : 1.0;
@@ -197,10 +196,10 @@ export default function CapitalStructure({
       };
 
       await onSaveCapitalFields({
-        ordinary_equity: scenario.ordinary_equity ?? null,
-        preferred_equity: scenario.preferred_equity ?? null,
+        ordinary_equity: oe,
+        preferred_equity: pe,
         preferred_equity_rate: peRateVal,
-        net_debt: scenario.net_debt ?? null,
+        net_debt: totalDebt,
         deal_parameters: updatedDp,
       });
     }
