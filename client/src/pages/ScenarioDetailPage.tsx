@@ -10,7 +10,7 @@ import type {
   DebtScheduleRow,
   ShareSummary,
 } from "../types";
-import { ArrowLeft, RefreshCw, Download } from "lucide-react";
+import { ArrowLeft, RefreshCw, Download, Presentation } from "lucide-react";
 import { formatNum } from "../components/scenario/helpers";
 
 // Extracted sub-components
@@ -36,6 +36,7 @@ export default function ScenarioDetailPage() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportingPpt, setExportingPpt] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
@@ -110,6 +111,20 @@ export default function ScenarioDetailPage() {
       setError(getErrorMessage(err));
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleExportPpt = async () => {
+    if (!id) return;
+    setExportingPpt(true);
+    setError("");
+    try {
+      await api.exportPpt(Number(id), scenario?.name);
+      showSuccess(t("scenarios.pptExported"));
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setExportingPpt(false);
     }
   };
 
@@ -254,6 +269,14 @@ export default function ScenarioDetailPage() {
             </div>
           </div>
           <div className="flex gap-3 flex-shrink-0">
+            <button
+              onClick={handleExportPpt}
+              disabled={exportingPpt}
+              className="flex items-center gap-2 px-4 py-2.5 bg-[#C9A84C] text-white rounded-lg hover:bg-[#b8973f] transition-colors text-sm font-medium disabled:opacity-50 shadow-sm"
+            >
+              <Presentation size={16} className={exportingPpt ? "animate-bounce" : ""} />
+              {exportingPpt ? t("common.exporting") : t("scenarios.pptExport")}
+            </button>
             <button
               onClick={handleExportExcel}
               disabled={exporting}

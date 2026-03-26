@@ -8,6 +8,7 @@
 import pool from "../models/db.js";
 import { calculateDealReturns, type DealParameters, type CaseReturn, type CalculatedReturns } from "./dealReturns.js";
 import { generateExcelModel, type ExportData } from "./excelExport/index.js";
+import { generatePptModel } from "./pptExport/generatePptModel.js";
 import {
   buildProFormaPeriods,
   applySynergies,
@@ -709,6 +710,87 @@ export async function buildExcelExportData(id: ParamId) {
   const fileName = `${(scenario.name || "scenario").replace(/[^a-zA-Z0-9\-_ ]/g, "")}_${id}.xlsx`;
 
   return { workbook, fileName };
+}
+
+// ── Build PPT export data ─────────────────────────────────────────
+
+export async function buildPptExportData(id: ParamId) {
+  // Reuse the same data assembly as Excel export
+  const loaded = await loadScenarioContext(id, { withNames: true, withStoredProForma: true });
+  if (!loaded) return null;
+  const { ctx, storedProFormaPeriods } = loaded;
+  const scenario = ctx.scenario;
+
+  const baseDp: DealParameters = (scenario.deal_parameters &&
+    Object.keys(scenario.deal_parameters).length > 0)
+    ? scenario.deal_parameters
+    : {
+        price_paid: 0,
+        exit_multiples: [10, 11, 12, 13, 14],
+        acquirer_entry_ev: 0,
+        tax_rate: 0.22,
+        da_pct_revenue: 0.01,
+      };
+
+  let calculatedReturns: CalculatedReturns;
+  let mergedDp: DealParameters;
+  try {
+    const calc = runFullCalculation(ctx, baseDp, storedProFormaPeriods);
+    calculatedReturns = calc.result;
+    mergedDp = calc.mergedDp;
+  } catch (calcErr) {
+    console.error("Deal returns calculation failed for PPT export:", calcErr);
+    calculatedReturns = { cases: [], standalone_by_multiple: {}, level: 1 as const, level_label: "Level 1" };
+    mergedDp = baseDp;
+  }
+
+  let proFormaPeriods: any[] = storedProFormaPeriods || [];
+  if (proFormaPeriods.length === 0 && ctx.acquirerPeriods.length > 0) {
+    const pfRows = buildProFormaPeriods(ctx.acquirerPeriods, ctx.targetPeriods, mergedDp);
+    applySynergies(pfRows, ctx.synergiesTimeline);
+    proFormaPeriods = pfRows;
+  }
+
+  const baseCapital = deriveBaseCapitalFromPeriods(ctx.acquirerPeriods);
+  const srcOE = getEquityFromSources(scenario.sources);
+  const srcPE = getPreferredFromSources(scenario.sources);
+  const srcND = getDebtFromSources(scenario.sources);
+
+  const safeParse = (v: any): number => {
+    if (v == null) return 0;
+    const n = parseFloat(v);
+    return Number.isNaN(n) ? 0 : n;
+  };
+  const scenarioOE = safeParse(scenario.ordinary_equity);
+  const scenarioPE = safeParse(scenario.preferred_equity);
+  const scenarioND = safeParse(scenario.net_debt);
+
+  const finalOE = (scenarioOE || baseCapital.ordinary_equity) + srcOE;
+  const finalPE = (scenarioPE || baseCapital.preferred_equity) + srcPE;
+  const finalND = (scenarioND || baseCapital.net_debt) + srcND;
+
+  const exportData: ExportData = {
+    scenarioName: scenario.name || `Scenario ${id}`,
+    acquirerName: scenario.acquirer_company_name || "Acquirer",
+    targetName: scenario.target_company_name || "Target",
+    acquirerPeriods: ctx.acquirerPeriods,
+    targetPeriods: ctx.targetPeriods,
+    proFormaPeriods,
+    dealParams: mergedDp,
+    sources: scenario.sources || [],
+    uses: scenario.uses || [],
+    ordinaryEquity: finalOE,
+    preferredEquity: finalPE,
+    preferredEquityRate: mergedDp.preferred_equity_rate ?? 0.095,
+    netDebt: finalND,
+    calculatedReturns,
+    synergiesTimeline: ctx.synergiesTimeline,
+  };
+
+  const pres = await generatePptModel(exportData);
+  const fileName = `${(scenario.name || "scenario").replace(/[^a-zA-Z0-9\-_ ]/g, "")}_${id}.pptx`;
+
+  return { pres, fileName };
 }
 
 // ── Delete scenario ───────────────────────────────────────────────

@@ -331,6 +331,35 @@ class ApiService {
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
   }
+
+  /**
+   * Export scenario as PowerPoint (.pptx) and trigger browser download.
+   */
+  async exportPpt(scenarioId: number, scenarioName?: string): Promise<void> {
+    const headers: Record<string, string> = {};
+    if (this.token) {
+      headers["Authorization"] = `Bearer ${this.token}`;
+    }
+
+    const res = await fetch(`${API_BASE}/scenarios/${scenarioId}/export-ppt`, {
+      headers,
+    });
+
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(error.error || `Export failed: ${res.status}`);
+    }
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(scenarioName || "scenario").replace(/[^a-zA-Z0-9\-_ ]/g, "")}_${scenarioId}.pptx`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }
 }
 
 export const api = new ApiService();

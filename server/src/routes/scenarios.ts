@@ -20,6 +20,7 @@ import {
   bulkUpsertReturns,
   generateAndPersistProForma,
   buildExcelExportData,
+  buildPptExportData,
   deleteScenario,
 } from "../services/scenarioService.js";
 
@@ -204,6 +205,29 @@ router.get(
     } catch (err) {
       console.error("Error exporting Excel:", err);
       res.status(500).json({ error: "Failed to export Excel file" });
+    }
+  }
+);
+
+// Export scenario as PowerPoint (.pptx) — IC presentation deck
+router.get(
+  "/:id/export-ppt",
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const result = await buildPptExportData(req.params.id);
+      if (!result) {
+        res.status(404).json({ error: "Scenario not found" });
+        return;
+      }
+      const { pres, fileName } = result;
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.presentationml.presentation");
+      res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+      // PptxGenJS write() returns a promise with the data
+      const pptxData = await pres.write({ outputType: "nodebuffer" });
+      res.send(pptxData);
+    } catch (err) {
+      console.error("Error exporting PPT:", err);
+      res.status(500).json({ error: "Failed to export PowerPoint file" });
     }
   }
 );

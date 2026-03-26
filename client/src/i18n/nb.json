@@ -249,6 +249,8 @@
     "loadingAnalysis": "Laster analyse...",
     "excelExport": "Excel Export",
     "excelExported": "Excel-fil lastet ned",
+    "pptExport": "PPT Export",
+    "pptExported": "PowerPoint-fil lastet ned",
     "suSaved": "Sources & Uses lagret",
     "capitalSaved": "Kapitalstruktur lagret",
     "synergiesSaved": "Synergier lagret",

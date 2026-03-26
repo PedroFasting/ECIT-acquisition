@@ -249,6 +249,8 @@
     "loadingAnalysis": "Loading analysis...",
     "excelExport": "Excel Export",
     "excelExported": "Excel file downloaded",
+    "pptExport": "PPT Export",
+    "pptExported": "PowerPoint file downloaded",
     "suSaved": "Sources & Uses saved",
     "capitalSaved": "Capital structure saved",
     "synergiesSaved": "Synergies saved",
