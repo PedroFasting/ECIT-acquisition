@@ -107,6 +107,44 @@ export function getUsesTotal(uses: SourceItem[] | null | undefined): number {
   return uses.reduce((sum, u) => sum + (parseFloat(u.amount) || 0), 0);
 }
 
+/**
+ * Derive base capital structure from acquirer financial periods.
+ *
+ * This replicates the frontend logic in CapitalStructure.tsx:
+ *   - OE = equity_value - preferred_equity  (from earliest/2025 period)
+ *   - PE = preferred_equity                 (from earliest/2025 period)
+ *   - NIBD = |nibd|                         (from earliest/2025 period)
+ *
+ * These represent the EXISTING capital of the acquirer BEFORE any
+ * acquisition financing (S&U) is layered on top.
+ */
+export function deriveBaseCapitalFromPeriods(
+  acquirerPeriods: any[],
+): { ordinary_equity: number; preferred_equity: number; net_debt: number } {
+  const zero = { ordinary_equity: 0, preferred_equity: 0, net_debt: 0 };
+  if (!acquirerPeriods || acquirerPeriods.length === 0) return zero;
+
+  // Prefer 2025 period (standard closing year), fall back to first period
+  const p2025 = acquirerPeriods.find(
+    (p: any) => new Date(p.period_date).getFullYear() === 2025,
+  );
+  const period = p2025 || acquirerPeriods[0];
+  if (!period) return zero;
+
+  const toNum = (v: any): number => {
+    if (v == null) return 0;
+    const n = parseFloat(v);
+    return Number.isNaN(n) ? 0 : n;
+  };
+
+  const pe = toNum(period.preferred_equity);
+  const eqv = toNum(period.equity_value);
+  const oe = eqv > 0 && pe > 0 ? eqv - pe : eqv;
+  const nibd = Math.abs(toNum(period.nibd));
+
+  return { ordinary_equity: oe, preferred_equity: pe, net_debt: nibd };
+}
+
 // ── Dilution Parameters ──────────────────────────────────────────
 
 /**

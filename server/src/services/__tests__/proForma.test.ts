@@ -20,6 +20,7 @@ import {
   buildSynergiesArray,
   extractPeriodLabels,
   prepareFullDealParams,
+  deriveBaseCapitalFromPeriods,
   type SourceItem,
   type ProFormaPeriodRaw,
 } from "../proForma.js";
@@ -527,6 +528,66 @@ describe("buildProFormaPeriodData", () => {
 });
 
 // ══════════════════════════════════════════════════════════════════
+// DERIVE BASE CAPITAL FROM ACQUIRER PERIODS
+// ══════════════════════════════════════════════════════════════════
+
+describe("deriveBaseCapitalFromPeriods", () => {
+  it("returns zero when no periods", () => {
+    expect(deriveBaseCapitalFromPeriods([])).toEqual({
+      ordinary_equity: 0, preferred_equity: 0, net_debt: 0,
+    });
+    expect(deriveBaseCapitalFromPeriods(null as any)).toEqual({
+      ordinary_equity: 0, preferred_equity: 0, net_debt: 0,
+    });
+  });
+
+  it("derives OE = equity_value - preferred_equity from 2025 period", () => {
+    const periods = [
+      { period_date: "2025-12-31", equity_value: 5000, preferred_equity: 1600, nibd: -1780 },
+      { period_date: "2026-12-31", equity_value: 6000, preferred_equity: 1700, nibd: -1500 },
+    ];
+    const result = deriveBaseCapitalFromPeriods(periods);
+    expect(result.ordinary_equity).toBe(3400); // 5000 - 1600
+    expect(result.preferred_equity).toBe(1600);
+    expect(result.net_debt).toBe(1780); // |nibd|
+  });
+
+  it("uses first period when no 2025 period exists", () => {
+    const periods = [
+      { period_date: "2024-12-31", equity_value: 4000, preferred_equity: 1000, nibd: 900 },
+    ];
+    const result = deriveBaseCapitalFromPeriods(periods);
+    expect(result.ordinary_equity).toBe(3000); // 4000 - 1000
+    expect(result.preferred_equity).toBe(1000);
+    expect(result.net_debt).toBe(900);
+  });
+
+  it("handles nibd as positive (abs applied)", () => {
+    const periods = [
+      { period_date: "2025-06-30", equity_value: 2000, preferred_equity: 500, nibd: -800 },
+    ];
+    expect(deriveBaseCapitalFromPeriods(periods).net_debt).toBe(800);
+  });
+
+  it("OE = equity_value when no preferred_equity", () => {
+    const periods = [
+      { period_date: "2025-12-31", equity_value: 3000, preferred_equity: 0, nibd: 500 },
+    ];
+    const result = deriveBaseCapitalFromPeriods(periods);
+    expect(result.ordinary_equity).toBe(3000); // eqv > 0 && pe > 0 is false, so OE = eqv
+    expect(result.preferred_equity).toBe(0);
+  });
+
+  it("handles null/undefined period fields gracefully", () => {
+    const periods = [
+      { period_date: "2025-12-31", equity_value: null, preferred_equity: undefined, nibd: null },
+    ];
+    expect(deriveBaseCapitalFromPeriods(periods)).toEqual({
+      ordinary_equity: 0, preferred_equity: 0, net_debt: 0,
+    });
+  });
+});
+
 // CAPITAL STRUCTURE MERGING
 // ══════════════════════════════════════════════════════════════════
 

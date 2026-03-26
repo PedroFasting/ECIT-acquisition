@@ -15,6 +15,10 @@ import {
   computeNibdFcf,
   prepareFullDealParams,
   sensitivityParamSetters,
+  deriveBaseCapitalFromPeriods,
+  getEquityFromSources,
+  getPreferredFromSources,
+  getDebtFromSources,
 } from "./proForma.js";
 import {
   loadScenarioContext,
@@ -654,6 +658,33 @@ export async function buildExcelExportData(id: ParamId) {
   }
 
   // Build export data
+  //
+  // Capital structure: mergedDp often has 0 for OE/PE/ND because
+  // the scenario-level DB columns are NULL (the frontend intentionally
+  // does NOT persist computed PF capital back to these columns).
+  //
+  // Replicate frontend CapitalStructure.tsx logic:
+  //   PF Capital = Base (from acquirer periods) + Acquisition financing (S&U)
+  const baseCapital = deriveBaseCapitalFromPeriods(ctx.acquirerPeriods);
+  const srcOE = getEquityFromSources(scenario.sources);
+  const srcPE = getPreferredFromSources(scenario.sources);
+  const srcND = getDebtFromSources(scenario.sources);
+
+  // Scenario-level columns override period-derived values when set
+  const safeParse = (v: any): number => {
+    if (v == null) return 0;
+    const n = parseFloat(v);
+    return Number.isNaN(n) ? 0 : n;
+  };
+  const scenarioOE = safeParse(scenario.ordinary_equity);
+  const scenarioPE = safeParse(scenario.preferred_equity);
+  const scenarioND = safeParse(scenario.net_debt);
+
+  // Priority: scenario column (if non-zero) > period-derived base; then add S&U on top
+  const finalOE = (scenarioOE || baseCapital.ordinary_equity) + srcOE;
+  const finalPE = (scenarioPE || baseCapital.preferred_equity) + srcPE;
+  const finalND = (scenarioND || baseCapital.net_debt) + srcND;
+
   const exportData: ExportData = {
     scenarioName: scenario.name || `Scenario ${id}`,
     acquirerName: scenario.acquirer_company_name || "Acquirer",
@@ -664,10 +695,10 @@ export async function buildExcelExportData(id: ParamId) {
     dealParams: mergedDp,
     sources: scenario.sources || [],
     uses: scenario.uses || [],
-    ordinaryEquity: mergedDp.ordinary_equity ?? 0,
-    preferredEquity: mergedDp.preferred_equity ?? 0,
+    ordinaryEquity: finalOE,
+    preferredEquity: finalPE,
     preferredEquityRate: mergedDp.preferred_equity_rate ?? 0.095,
-    netDebt: mergedDp.net_debt ?? 0,
+    netDebt: finalND,
     calculatedReturns,
     synergiesTimeline: ctx.synergiesTimeline,
   };
