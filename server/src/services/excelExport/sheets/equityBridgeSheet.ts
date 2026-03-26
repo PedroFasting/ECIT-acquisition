@@ -1,5 +1,5 @@
 import type ExcelJS from "exceljs";
-import type { ExportData, ProFormaRowMap, EquityBridgeRowMap } from "../types.js";
+import type { ExportData, ProFormaRowMap, DebtScheduleRowMap, EquityBridgeRowMap } from "../types.js";
 import {
   COLORS, HEADER_FONT, LABEL_FONT, VALUE_FONT, THIN_BORDER,
   NUM_FORMAT, NUM_FORMAT_1, NUM_FORMAT_2, PCT_FORMAT, MULT_FORMAT,
@@ -12,7 +12,14 @@ import { colLetter } from "../helpers.js";
  *
  * Revenue and EBITDA reference the Pro Forma P&L sheet.
  * EV = EBITDA × user-selected multiple (from Inputs named ranges).
- * NIBD, Option Debt, Preferred Equity come from acquirer period data (static).
+ *
+ * For NIBD and Preferred Equity we use a dual-row approach:
+ *   - "Modelled" row: Year 1 from Inputs named range, Year 2+ from Debt Schedule
+ *     closing balance. These respond to capital structure changes in Inputs.
+ *   - "Imported (ref)" row: static values from the acquirer's uploaded Excel,
+ *     shown in grey italics for comparison/audit purposes.
+ *
+ * Option Debt and Adjustments are imported static values (no model for these).
  * Share Count is static (imported from acquirer).
  * All computed rows (EQV, PPS, dilution) are Excel formulas.
  */
@@ -21,7 +28,8 @@ export function buildEquityBridgeSheet(
   data: ExportData,
   periodLabels: string[],
   nPeriods: number,
-  pfRowMap: ProFormaRowMap
+  pfRowMap: ProFormaRowMap,
+  dsRowMap: DebtScheduleRowMap | null
 ): EquityBridgeRowMap {
   const ws = wb.addWorksheet("Equity Bridge", { properties: { tabColor: { argb: "5B9BD5" } } });
 
@@ -52,6 +60,7 @@ export function buildEquityBridgeSheet(
 
   // Pro Forma P&L sheet name for cross-references
   const pfSheet = "'Pro Forma P&L'";
+  const dsSheet = "'Debt Schedule'";
 
   // ── Helper: add a data row from acquirer periods ──
   function addDataRow(label: string, field: string, format: string, isTotal = false): number {
@@ -69,6 +78,26 @@ export function buildEquityBridgeSheet(
       cell.alignment = { horizontal: "right" };
     }
     if (isTotal) styleTotalRow(row, totalCols);
+    const rowNum = r;
+    r++;
+    return rowNum;
+  }
+
+  // ── Helper: add a reference/imported data row (greyed out, italic) ──
+  function addReferenceRow(label: string, field: string, format: string): number {
+    const row = ws.getRow(r);
+    row.getCell(1).value = label;
+    row.getCell(1).font = { ...VALUE_FONT, italic: true, color: { argb: "808080" } };
+    row.getCell(1).border = THIN_BORDER;
+    for (let i = 0; i < nPeriods; i++) {
+      const cell = row.getCell(i + 2);
+      const val = periods[i]?.[field];
+      cell.value = val != null ? parseFloat(val) : null;
+      cell.numFmt = format;
+      cell.border = THIN_BORDER;
+      cell.font = { ...VALUE_FONT, italic: true, color: { argb: "808080" } };
+      cell.alignment = { horizontal: "right" };
+    }
     const rowNum = r;
     r++;
     return rowNum;
@@ -92,6 +121,15 @@ export function buildEquityBridgeSheet(
     const rowNum = r;
     r++;
     return rowNum;
+  }
+
+  // ── Helper: add a note row (merged, grey italic text) ──
+  function addNoteRow(text: string): void {
+    const row = ws.getRow(r);
+    row.getCell(1).value = text;
+    row.getCell(1).font = { ...VALUE_FONT, size: 9, italic: true, color: { argb: "808080" } };
+    ws.mergeCells(r, 1, r, totalCols);
+    r++;
   }
 
   // ── Revenue & EBITDA context — cross-reference Pro Forma P&L ──
@@ -123,8 +161,9 @@ export function buildEquityBridgeSheet(
   const ebitdaRowNum = addFormulaRow("EBITDA (PF incl. Synergies)", (cl) =>
     `${pfSheet}!${cl}${pfRowMap.ebitdaIncl}`, NUM_FORMAT, true);
 
-  // Adjustments from acquirer data (static — these are company-specific)
+  // Adjustments from acquirer data (static — company-specific accounting adjustments)
   const adjRow = addDataRow("Adjustments", "adjustments", NUM_FORMAT);
+  addNoteRow("  ↳ Adjustments imported from acquirer's Excel (company-specific accounting adj.)");
 
   // Adjusted EBITDA = EBITDA + Adjustments (formula)
   const adjEbitdaRow = addFormulaRow("Adjusted EBITDA", (cl) =>
@@ -132,14 +171,11 @@ export function buildEquityBridgeSheet(
   r++;
 
   // ── Enterprise Value = Adjusted EBITDA × Exit Multiple ──
-  // Use the median exit multiple from Inputs as the default bridge multiple
-  // We'll add a named range for bridge multiple
   const multiples = data.dealParams.exit_multiples ?? [10, 11, 12, 13, 14];
   const medianMultIdx = Math.floor(multiples.length / 2);
   const bridgeMultiple = multiples[medianMultIdx] ?? 13;
 
   // Add bridge multiple as named range on this sheet
-  const bridgeMultRow = r;
   const bmRow = ws.getRow(r);
   bmRow.getCell(1).value = "Exit Multiple (bridge)";
   bmRow.getCell(1).font = LABEL_FONT;
@@ -162,7 +198,7 @@ export function buildEquityBridgeSheet(
     `IF(${cl}${ebitdaRowNum}>0,${cl}${evRowNum}/${cl}${ebitdaRowNum},0)`, MULT_FORMAT);
 
   // Imported EV for comparison (static from acquirer)
-  const importedEvRow = addDataRow("  Imported EV (reference)", "enterprise_value", NUM_FORMAT);
+  addDataRow("  Imported EV (reference)", "enterprise_value", NUM_FORMAT);
   r++;
 
   // ── Bridge: EV → EQV → Per Share ──
@@ -171,16 +207,39 @@ export function buildEquityBridgeSheet(
   styleSectionRow(sectionRow2, totalCols);
   r++;
 
-  // NIBD from acquirer periods (static — this is balance sheet data)
-  const nibdRow = addDataRow("NIBD", "nibd", NUM_FORMAT);
+  // ── NIBD: dual-row pattern (modelled + imported reference) ──
+  // If Debt Schedule exists, use modelled values: Year 1 = net_debt (Inputs), Year 2+ = DS closing_debt
+  // If no Debt Schedule, fall back to imported static values
+  let nibdRow: number;
+  if (dsRowMap) {
+    nibdRow = addFormulaRow("NIBD (modelled)", (cl, idx) => {
+      if (idx === 0) return "net_debt";
+      return `${dsSheet}!${cl}${dsRowMap.closingDebt}`;
+    }, NUM_FORMAT);
+    addReferenceRow("  NIBD (imported, ref)", "nibd", NUM_FORMAT);
+  } else {
+    nibdRow = addDataRow("NIBD", "nibd", NUM_FORMAT);
+  }
+
+  // ── Option Debt: imported static with documentation ──
   const optRow = addDataRow("Option Debt", "option_debt", NUM_FORMAT);
+  addNoteRow("  ↳ Option Debt incl. Management Holding — imported from acquirer's Excel (no model)");
+
+  // ── Preferred Equity: dual-row pattern ──
+  let prefRow: number;
+  if (dsRowMap) {
+    prefRow = addFormulaRow("Preferred Equity (modelled)", (cl, idx) => {
+      if (idx === 0) return "preferred_equity";
+      return `${dsSheet}!${cl}${dsRowMap.closingPref}`;
+    }, NUM_FORMAT);
+    addReferenceRow("  Pref. Equity (imported, ref)", "preferred_equity", NUM_FORMAT);
+  } else {
+    prefRow = addDataRow("Preferred Equity", "preferred_equity", NUM_FORMAT);
+  }
 
   // EQV = EV - NIBD - Option Debt (formula)
   const eqvRow = addFormulaRow("Equity Value (EQV)", (cl) =>
     `${cl}${evRowNum}-${cl}${nibdRow}-${cl}${optRow}`, NUM_FORMAT, true);
-
-  // Preferred equity from acquirer periods
-  const prefRow = addDataRow("Preferred Equity", "preferred_equity", NUM_FORMAT);
 
   // Share count from acquirer periods (static — imported from Excel)
   const scRow = addDataRow("Share Count (m)", "share_count", NUM_FORMAT_1);

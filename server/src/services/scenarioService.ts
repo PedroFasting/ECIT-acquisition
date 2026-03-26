@@ -640,6 +640,19 @@ export async function buildExcelExportData(id: ParamId) {
     mergedDp = baseDp;
   }
 
+  // Ensure pro forma periods are available — compute on-the-fly if not stored
+  let proFormaPeriods: any[] = storedProFormaPeriods || [];
+  if (proFormaPeriods.length === 0 && ctx.acquirerPeriods.length > 0) {
+    // No stored pro forma — compute from acquirer + target periods
+    const pfRows = buildProFormaPeriods(
+      ctx.acquirerPeriods,
+      ctx.targetPeriods,
+      mergedDp,
+    );
+    applySynergies(pfRows, ctx.synergiesTimeline);
+    proFormaPeriods = pfRows;
+  }
+
   // Build export data
   const exportData: ExportData = {
     scenarioName: scenario.name || `Scenario ${id}`,
@@ -647,7 +660,7 @@ export async function buildExcelExportData(id: ParamId) {
     targetName: scenario.target_company_name || "Target",
     acquirerPeriods: ctx.acquirerPeriods,
     targetPeriods: ctx.targetPeriods,
-    proFormaPeriods: storedProFormaPeriods || [],
+    proFormaPeriods,
     dealParams: mergedDp,
     sources: scenario.sources || [],
     uses: scenario.uses || [],

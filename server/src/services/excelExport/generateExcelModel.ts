@@ -58,8 +58,8 @@ export async function generateExcelModel(data: ExportData): Promise<ExcelJS.Work
   // 4. Debt Schedule — references PF P&L for EBITDA/FCF; returns row map
   const dsRowMap = buildDebtScheduleSheet(wb, data, periodLabels, nPeriods, pfRowMap);
 
-  // 5. Equity Bridge — references PF P&L for Revenue/EBITDA; returns row map
-  const ebRowMap = buildEquityBridgeSheet(wb, data, periodLabels, nPeriods, pfRowMap);
+  // 5. Equity Bridge — references PF P&L for Revenue/EBITDA + Debt Schedule for modelled NIBD/PE
+  const ebRowMap = buildEquityBridgeSheet(wb, data, periodLabels, nPeriods, pfRowMap, dsRowMap);
 
   // 6. Dilution — references Equity Bridge exit-year values
   buildDilutionSheet(wb, data, ebRowMap, nPeriods);

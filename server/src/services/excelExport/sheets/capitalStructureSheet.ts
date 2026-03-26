@@ -93,4 +93,25 @@ export function buildCapitalStructureSheet(wb: ExcelJS.Workbook, data: ExportDat
   addEvRow("OE % of EV", "IF(ordinary_equity+preferred_equity+net_debt>0,ordinary_equity/(ordinary_equity+preferred_equity+net_debt),0)", PCT_FORMAT, true);
   addEvRow("PE % of EV", "IF(ordinary_equity+preferred_equity+net_debt>0,preferred_equity/(ordinary_equity+preferred_equity+net_debt),0)", PCT_FORMAT, true);
   addEvRow("ND % of EV", "IF(ordinary_equity+preferred_equity+net_debt>0,net_debt/(ordinary_equity+preferred_equity+net_debt),0)", PCT_FORMAT, true);
+
+  // Warning when OE/PE/ND are all zero but Sources & Uses exist
+  const totalSU = data.sources.reduce((s, x) => s + (x.amount || 0), 0)
+    + data.uses.reduce((s, x) => s + (x.amount || 0), 0);
+  if (data.ordinaryEquity === 0 && data.preferredEquity === 0 && data.netDebt === 0 && totalSU > 0) {
+    r++;
+    const warnRow = ws.getRow(r);
+    warnRow.getCell(1).value = "OE, PE og ND er alle 0 — kapitalstruktur er ikke fylt ut.";
+    warnRow.getCell(1).font = { ...VALUE_FONT, bold: true, color: { argb: "CC0000" } };
+    ws.mergeCells(r, 1, r, 4);
+    r++;
+    const hintRow = ws.getRow(r);
+    hintRow.getCell(1).value = "Fyll inn OE/PE/ND i Inputs-arket for at Debt Schedule og Equity Bridge skal beregne korrekt.";
+    hintRow.getCell(1).font = { ...VALUE_FONT, size: 9, italic: true, color: { argb: "808080" } };
+    ws.mergeCells(r, 1, r, 4);
+    r++;
+    const hint2Row = ws.getRow(r);
+    hint2Row.getCell(1).value = `Sources & Uses totalt: ${totalSU.toFixed(0)} NOKm — fordelingsforslag: fordel dette mellom OE, PE og ND.`;
+    hint2Row.getCell(1).font = { ...VALUE_FONT, size: 9, italic: true, color: { argb: "808080" } };
+    ws.mergeCells(r, 1, r, 4);
+  }
 }

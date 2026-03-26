@@ -103,7 +103,14 @@ export function buildDealReturnsSheet(
     r += 2;
   }
 
-  // ── Standalone (static — these are based on standalone EBITDA, not editable) ──
+  // ── Standalone (static — pre-computed on the server from standalone EBITDA) ──
+  // Note row explaining these are not formula-driven
+  const noteRow = ws.getRow(r);
+  noteRow.getCell(1).value = "NB: Standalone returns are pre-computed from the acquirer's standalone EBITDA trajectory (not editable here).";
+  noteRow.getCell(1).font = { ...VALUE_FONT, size: 9, italic: true, color: { argb: "808080" } };
+  ws.mergeCells(r, 1, r, totalGridCols);
+  r++;
+
   addStaticReturnMatrix("Standalone IRR", standaloneResults, "irr", PCT_FORMAT);
   addStaticReturnMatrix("Standalone MoM", standaloneResults, "mom", NUM_FORMAT_1 + "x");
 
