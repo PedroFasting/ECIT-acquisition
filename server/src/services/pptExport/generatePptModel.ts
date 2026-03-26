@@ -14,8 +14,15 @@
  * Uses the same ExportData object as the Excel export.
  */
 
-import PptxGenJS from "pptxgenjs";
+import _PptxGenJS from "pptxgenjs";
+import type PptxGenJSType from "pptxgenjs";
 import type { ExportData } from "../excelExport/types.js";
+
+// Handle CJS/ESM interop — tsx watch may wrap `module.exports = X` differently
+const PptxGenJS: typeof PptxGenJSType =
+  typeof _PptxGenJS === "function"
+    ? _PptxGenJS
+    : (_PptxGenJS as any).default;
 
 import { buildTitleSlide } from "./slides/titleSlide.js";
 import { buildTransactionOverviewSlide } from "./slides/transactionOverview.js";
@@ -26,7 +33,7 @@ import { buildEquityBridgeSlide } from "./slides/equityBridgeSlide.js";
 import { buildDealReturnsSlide } from "./slides/dealReturnsSlide.js";
 import { buildSensitivitySlide } from "./slides/sensitivitySlide.js";
 
-export async function generatePptModel(data: ExportData): Promise<PptxGenJS> {
+export async function generatePptModel(data: ExportData): Promise<PptxGenJSType> {
   const pres = new PptxGenJS();
 
   // Presentation metadata

@@ -3,7 +3,7 @@
  *
  * Side-by-side S&U tables + EV composition donut chart.
  */
-import PptxGenJS from "pptxgenjs";
+import type PptxGenJS from "pptxgenjs";
 import type { ExportData } from "../../excelExport/types.js";
 import {
   COLORS, addSlideTitle, addSlideFooter,

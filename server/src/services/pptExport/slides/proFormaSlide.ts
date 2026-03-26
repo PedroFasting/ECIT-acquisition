@@ -3,7 +3,7 @@
  *
  * Clustered bar chart for Revenue + EBITDA, plus a compact margin table.
  */
-import PptxGenJS from "pptxgenjs";
+import type PptxGenJS from "pptxgenjs";
 import type { ExportData } from "../../excelExport/types.js";
 import {
   COLORS, addSlideTitle, addSlideFooter,

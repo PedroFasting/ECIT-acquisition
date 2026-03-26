@@ -3,7 +3,7 @@
  *
  * Key deal parameters table + entry EV summary.
  */
-import PptxGenJS from "pptxgenjs";
+import type PptxGenJS from "pptxgenjs";
 import type { ExportData } from "../../excelExport/types.js";
 import {
   COLORS, addSlideTitle, addSlideFooter,

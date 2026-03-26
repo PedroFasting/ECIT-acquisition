@@ -3,7 +3,7 @@
  *
  * Scenario name, acquirer + target, date, ECIT branding.
  */
-import PptxGenJS from "pptxgenjs";
+import type PptxGenJS from "pptxgenjs";
 import type { ExportData } from "../../excelExport/types.js";
 import { COLORS, FONTS, SLIDE_WIDTH, SLIDE_HEIGHT } from "../styles.js";
 

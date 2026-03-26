@@ -3,7 +3,7 @@
  *
  * Stacked bars for debt composition + line for leverage ratio.
  */
-import PptxGenJS from "pptxgenjs";
+import type PptxGenJS from "pptxgenjs";
 import type { ExportData } from "../../excelExport/types.js";
 import type { DebtScheduleRow } from "../../dealReturns.js";
 import {

@@ -4,7 +4,7 @@
  * Compact heatmap grid across exit multiples, showing IRR/MoM
  * with color coding. Also shows synergies timeline if available.
  */
-import PptxGenJS from "pptxgenjs";
+import type PptxGenJS from "pptxgenjs";
 import type { ExportData } from "../../excelExport/types.js";
 import {
   COLORS, addSlideTitle, addSlideFooter,
