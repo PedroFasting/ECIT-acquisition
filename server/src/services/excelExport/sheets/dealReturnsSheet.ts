@@ -394,39 +394,102 @@ export function buildDealReturnsSheet(
       momRefCell.numFmt = NUM_FORMAT_1 + "x";
       styleFormulaCell(momRefCell);
 
-      // Per-share IRR/MoM (if available)
+      // Per-share IRR/MoM — formula-driven via dilution waterfall
       if (hasPerShare && perShareIrrRow > 0 && perShareMomRow > 0) {
-        // Per-share IRR: use entry PPS and exit PPS
-        // Simple per-share: IRR based on entry PPS -> exit PPS over N years
-        // Entry PPS = fmv_per_share (from Inputs)
-        // Exit PPS = Equity Bridge post-dilution PPS at exit, but with this multiple's EV
-        // For simplicity, use: per-share MoM = exit_pps / entry_pps, IRR = MoM^(1/N) - 1
+        // Build per-exit-multiple dilution waterfall helper rows
+        // These compute exit PPS at each multiple, then derive IRR/MoM
+        const exitCol = colLetter(nPeriods + 1); // last period col in DS/EB sheets
 
-        // The accurate approach: build a per-share CF schedule
-        // Year 0: -entry_pps, Year N: exit_pps
-        // Exit PPS at this multiple: (Exit_EV - closing_debt - closing_pref - pref - mip - tso - war) / shares
+        // Helper function: add a labeled formula row in the CF schedule area
+        const addHelperRow = (label: string, formula: string, fmt: string): number => {
+          const hRow = ws.getRow(r);
+          hRow.getCell(1).value = label;
+          hRow.getCell(1).font = { ...VALUE_FONT, color: { argb: "808080" } };
+          const hCell = hRow.getCell(2);
+          hCell.value = { formula };
+          hCell.numFmt = fmt;
+          styleFormulaCell(hCell);
+          r++;
+          return r - 1; // return the row number we just wrote
+        };
 
-        // For now, reference pre-computed values (they're already accurate from server)
-        const psIrrResult = combinedResults.find(c => c.exit_multiple === mult)?.per_share_irr;
-        const psMomResult = combinedResults.find(c => c.exit_multiple === mult)?.per_share_mom;
+        // Exit EV at this multiple
+        const exitEvRow = addHelperRow(
+          `Exit EV @${mult}x`,
+          `${dsSheet}!${exitCol}${dsRowMap.ebitda}*${multNamedRange}`,
+          NUM_FORMAT,
+        );
+        // EQV gross = Exit EV - Closing Debt
+        const eqvGrossRow = addHelperRow(
+          "EQV Gross",
+          `B${exitEvRow}-${dsSheet}!${exitCol}${dsRowMap.closingDebt}`,
+          NUM_FORMAT,
+        );
+        // MIP = mip_share_pct * EQV_gross
+        const mipRow = addHelperRow(
+          "MIP Amount",
+          `mip_share_pct*B${eqvGrossRow}`,
+          NUM_FORMAT,
+        );
+        // PPS post MIP = (EQV_gross - MIP) / dilution_base_shares
+        const ppsPostMipRow = addHelperRow(
+          "PPS post MIP",
+          `IF(dilution_base_shares>0,(B${eqvGrossRow}-B${mipRow})/dilution_base_shares,0)`,
+          NUM_FORMAT_2,
+        );
+        // TSO = tso_warrants_count * MAX(PPS_post_MIP - tso_strike, 0)
+        const tsoRow = addHelperRow(
+          "TSO Amount",
+          `tso_warrants_count*MAX(B${ppsPostMipRow}-tso_warrants_price,0)`,
+          NUM_FORMAT,
+        );
+        // PPS post TSO = (EQV_gross - MIP - TSO) / dilution_base_shares
+        const ppsPostTsoRow = addHelperRow(
+          "PPS post TSO",
+          `IF(dilution_base_shares>0,(B${eqvGrossRow}-B${mipRow}-B${tsoRow})/dilution_base_shares,0)`,
+          NUM_FORMAT_2,
+        );
+        // Warrants = existing_warrants_count * MAX(PPS_post_TSO - existing_warrants_price, 0)
+        const warRow = addHelperRow(
+          "Warrants Amount",
+          `existing_warrants_count*MAX(B${ppsPostTsoRow}-existing_warrants_price,0)`,
+          NUM_FORMAT,
+        );
+        // EQV post dilution = EQV_gross - Closing Pref - MIP - TSO - Warrants
+        const eqvPostRow = addHelperRow(
+          "EQV Post Dilution",
+          `B${eqvGrossRow}-${dsSheet}!${exitCol}${dsRowMap.closingPref}-B${mipRow}-B${tsoRow}-B${warRow}`,
+          NUM_FORMAT,
+        );
+        // Exit PPS = EQV_post_dilution / total_exit_shares
+        const exitPpsRow = addHelperRow(
+          "Exit PPS",
+          `IF(total_exit_shares>0,B${eqvPostRow}/total_exit_shares,0)`,
+          NUM_FORMAT_2,
+        );
+        // Per-Share MoM = Exit PPS / Entry PPS
+        const psMomFormulaRow = addHelperRow(
+          "Per-Share MoM",
+          `IF(fmv_per_share>0,B${exitPpsRow}/fmv_per_share,0)`,
+          NUM_FORMAT_1 + "x",
+        );
+        // Per-Share IRR = (Exit PPS / Entry PPS)^(1/N) - 1
+        const psIrrFormulaRow = addHelperRow(
+          "Per-Share IRR",
+          `IF(AND(fmv_per_share>0,B${exitPpsRow}>0),(B${exitPpsRow}/fmv_per_share)^(1/${nPeriods})-1,0)`,
+          PCT_FORMAT,
+        );
 
+        // Link per-share matrices to these formula rows
         const psIrrCell = ws.getRow(perShareIrrRow).getCell(m + 2);
-        if (psIrrResult != null) {
-          psIrrCell.value = psIrrResult;
-          psIrrCell.fill = {
-            type: "pattern", pattern: "solid",
-            fgColor: { argb: psIrrResult >= 0.20 ? "C6EFCE" : psIrrResult >= 0.10 ? "FFEB9C" : "FFC7CE" },
-          };
-        }
+        psIrrCell.value = { formula: `B${psIrrFormulaRow}` };
         psIrrCell.numFmt = PCT_FORMAT;
-        psIrrCell.font = VALUE_FONT;
+        styleFormulaCell(psIrrCell);
 
         const psMomCell = ws.getRow(perShareMomRow).getCell(m + 2);
-        if (psMomResult != null) {
-          psMomCell.value = psMomResult;
-        }
+        psMomCell.value = { formula: `B${psMomFormulaRow}` };
         psMomCell.numFmt = NUM_FORMAT_1 + "x";
-        psMomCell.font = VALUE_FONT;
+        styleFormulaCell(psMomCell);
       }
 
       r++;

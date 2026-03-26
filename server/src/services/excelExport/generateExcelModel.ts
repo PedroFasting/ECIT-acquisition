@@ -64,8 +64,8 @@ export async function generateExcelModel(data: ExportData): Promise<ExcelJS.Work
   // 6. Dilution — references Equity Bridge exit-year values
   buildDilutionSheet(wb, data, ebRowMap, nPeriods);
 
-  // 7. Share Tracker — mostly references Inputs named ranges
-  buildShareTrackerSheet(wb, data);
+  // 7. Share Tracker — references Inputs named ranges + Equity Bridge for dilution %
+  buildShareTrackerSheet(wb, data, ebRowMap, nPeriods);
 
   // 8. Deal Returns — references Equity Bridge + Debt Schedule for combined IRR/MoM
   const drRowMap = buildDealReturnsSheet(wb, data, ebRowMap, dsRowMap, nPeriods);

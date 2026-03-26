@@ -399,7 +399,8 @@
     "typeBadgePref": "Pref",
     "balancedWithAmount": "Sources and uses are balanced ({{amount}} NOKm)",
     "imbalanceDetail": "Imbalance: Sources {{sources}} vs Uses {{uses}} (diff: {{diff}} NOKm)",
-    "namePlaceholder": "Name"
+    "namePlaceholder": "Name",
+    "autoFromPeriods": "Auto from periods"
   },
   "returns": {
     "title": "Deal Returns (IRR / MoM)",

@@ -399,7 +399,8 @@
     "typeBadgePref": "Pref",
     "balancedWithAmount": "Kilder og anvendelser er i balanse ({{amount}} NOKm)",
     "imbalanceDetail": "Ubalanse: Kilder {{sources}} vs Anvendelser {{uses}} (diff: {{diff}} NOKm)",
-    "namePlaceholder": "Navn"
+    "namePlaceholder": "Navn",
+    "autoFromPeriods": "Auto fra perioder"
   },
   "returns": {
     "title": "Deal Returns (IRR / MoM)",

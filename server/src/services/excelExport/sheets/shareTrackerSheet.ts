@@ -1,12 +1,18 @@
 import type ExcelJS from "exceljs";
-import type { ExportData } from "../types.js";
+import type { ExportData, EquityBridgeRowMap } from "../types.js";
 import {
   COLORS, HEADER_FONT, LABEL_FONT, VALUE_FONT, THIN_BORDER,
   NUM_FORMAT, NUM_FORMAT_1, NUM_FORMAT_2, PCT_FORMAT,
   styleHeader, styleSectionRow, styleTotalRow, styleFormulaCell,
 } from "../styles.js";
+import { colLetter } from "../helpers.js";
 
-export function buildShareTrackerSheet(wb: ExcelJS.Workbook, data: ExportData) {
+export function buildShareTrackerSheet(
+  wb: ExcelJS.Workbook,
+  data: ExportData,
+  ebRowMap: EquityBridgeRowMap | null,
+  nPeriods: number,
+) {
   const ws = wb.addWorksheet("Share Tracker", { properties: { tabColor: { argb: "00B0F0" } } });
   ws.columns = [{ width: 35 }, { width: 20 }, { width: 15 }];
 
@@ -91,6 +97,18 @@ export function buildShareTrackerSheet(wb: ExcelJS.Workbook, data: ExportData) {
 
   // Rollover Dilution: formula referencing Rollover Shares cell and total_exit_shares named range
   addRow("Rollover Dilution %", `IF(total_exit_shares>0,B${rolloverSharesRow}/total_exit_shares,0)`, PCT_FORMAT, "", true);
-  // Value Dilution: server-computed (requires Equity Bridge MIP/TSO/Warrants data)
-  addRow("Value Dilution % (MIP/TSO/War)", ss.dilution_value_pct ?? 0, PCT_FORMAT, "");
+  // Value Dilution: formula referencing Equity Bridge MIP/TSO/Warrants at exit year
+  if (ebRowMap && nPeriods > 0) {
+    const exitCol = colLetter(nPeriods + 1); // last period column in EB
+    const ebSheet = "'Equity Bridge'";
+    // dilution_value_pct = (MIP + TSO + Warrants) / EQV_gross
+    const formula =
+      `IF(${ebSheet}!${exitCol}${ebRowMap.eqv}>0,` +
+      `(${ebSheet}!${exitCol}${ebRowMap.mipAmount}+${ebSheet}!${exitCol}${ebRowMap.tsoAmount}+${ebSheet}!${exitCol}${ebRowMap.warrantsAmount})` +
+      `/${ebSheet}!${exitCol}${ebRowMap.eqv},0)`;
+    addRow("Value Dilution % (MIP/TSO/War)", formula, PCT_FORMAT, "", true);
+  } else {
+    // Fallback: static value when Equity Bridge data unavailable
+    addRow("Value Dilution % (MIP/TSO/War)", ss.dilution_value_pct ?? 0, PCT_FORMAT, "");
+  }
 }

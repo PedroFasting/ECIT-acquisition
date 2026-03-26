@@ -657,14 +657,14 @@ export async function buildExcelExportData(id: ParamId) {
     proFormaPeriods = pfRows;
   }
 
-  // Build export data
-  //
-  // Capital structure: mergedDp often has 0 for OE/PE/ND because
-  // the scenario-level DB columns are NULL (the frontend intentionally
-  // does NOT persist computed PF capital back to these columns).
-  //
-  // Replicate frontend CapitalStructure.tsx logic:
-  //   PF Capital = Base (from acquirer periods) + Acquisition financing (S&U)
+   // Build export data
+   //
+   // Capital structure: scenario-level DB columns store BASE capital
+   // (existing acquirer equity/debt before acquisition financing).
+   // The frontend persists base values on save; they may also be NULL
+   // if never saved, in which case we derive from acquirer periods.
+   //
+   // PF Capital = Base (scenario column || period-derived) + S&U financing
   const baseCapital = deriveBaseCapitalFromPeriods(ctx.acquirerPeriods);
   const srcOE = getEquityFromSources(scenario.sources);
   const srcPE = getPreferredFromSources(scenario.sources);

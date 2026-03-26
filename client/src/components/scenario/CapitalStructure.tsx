@@ -41,7 +41,10 @@ export default function CapitalStructure({
   const [uses, setUses] = useState<SourceUseItem[]>(scenario.uses || []);
 
   // ─── Editable capital structure fields ─────────────────────
-  // OE and PE are now auto-derived from source types. Only PIK rate is editable.
+  // Base OE/PE/NIBD can be overridden when period data is missing or wrong
+  const [editBaseOE, setEditBaseOE] = useState<string>("");
+  const [editBasePE, setEditBasePE] = useState<string>("");
+  const [editBaseNibd, setEditBaseNibd] = useState<string>("");
   const [editPERate, setEditPERate] = useState<string>(
     scenario.preferred_equity_rate != null
       ? String(scenario.preferred_equity_rate * 100)
@@ -123,15 +126,21 @@ export default function CapitalStructure({
     return { ordinary_equity: oe, preferred_equity: pe };
   })();
 
-  // Scenario-level fields take priority over period-derived defaults
-  const baseOE = toNum(scenario.ordinary_equity) || baseCapital.ordinary_equity;
-  const basePE = toNum(scenario.preferred_equity) || baseCapital.preferred_equity;
+  // Derived base values (from scenario columns or periods)
+  const derivedBaseOE = toNum(scenario.ordinary_equity) || baseCapital.ordinary_equity;
+  const derivedBasePE = toNum(scenario.preferred_equity) || baseCapital.preferred_equity;
+  const derivedBaseNibd = acquirerNibd;
+
+  // In edit mode, user overrides take precedence
+  const baseOE = editing && editBaseOE !== "" ? toNum(editBaseOE) : derivedBaseOE;
+  const basePE = editing && editBasePE !== "" ? toNum(editBasePE) : derivedBasePE;
+  const effectiveNibd = editing && editBaseNibd !== "" ? toNum(editBaseNibd) : derivedBaseNibd;
 
   // ─── PF Capital = Base + Acquisition financing ─────────────
   const oe = baseOE + acquisitionEquity;
   const pe = basePE + acquisitionPreferred;
   const peRate = scenario.preferred_equity_rate ?? 0.095;
-  const totalDebt = acquirerNibd + acquisitionDebt;
+  const totalDebt = effectiveNibd + acquisitionDebt;
   const pfEV = oe + pe + totalDebt;
   const hasCapData = oe > 0 || pe > 0 || totalDebt > 0;
 
@@ -179,9 +188,9 @@ export default function CapitalStructure({
     await onSaveSU(classifiedSources, cleanUses);
 
     // Save capital structure fields
-    // Persist the COMPUTED Pro Forma capital (base + acquisition financing)
-    // so that the Excel export, Deal Returns, and other consumers all use
-    // the same values the user sees in this component.
+    // Persist the BASE capital (before acquisition financing from S&U).
+    // PF capital is always recomputed as: base + S&U financing.
+    // Storing the base avoids double-counting S&U on the next load.
     if (onSaveCapitalFields) {
       const peRateVal = editPERate ? Number(editPERate) / 100 : null;
       const cashSweepVal = editCashSweep ? Number(editCashSweep) / 100 : 1.0;
@@ -196,10 +205,10 @@ export default function CapitalStructure({
       };
 
       await onSaveCapitalFields({
-        ordinary_equity: oe,
-        preferred_equity: pe,
+        ordinary_equity: baseOE,
+        preferred_equity: basePE,
         preferred_equity_rate: peRateVal,
-        net_debt: totalDebt,
+        net_debt: effectiveNibd,
         deal_parameters: updatedDp,
       });
     }
@@ -214,6 +223,10 @@ export default function CapitalStructure({
     }));
     setSources(initialSources);
     setUses(scenario.uses || []);
+    // Base capital overrides: empty string = use derived value
+    setEditBaseOE("");
+    setEditBasePE("");
+    setEditBaseNibd("");
     setEditPERate(
       scenario.preferred_equity_rate != null
         ? String(scenario.preferred_equity_rate * 100)
@@ -408,9 +421,23 @@ export default function CapitalStructure({
                     <div className="w-full px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-right tabular-nums text-gray-700">
                       {formatNum(baseOE + getEquityFromSources(sources), 1) || "0"}
                     </div>
-                    <div className="text-[10px] text-gray-400 mt-0.5">
-                      {t("capital.base")} {formatNum(baseOE, 1)} + {t("capital.suLabel")} {formatNum(getEquityFromSources(sources), 1)}
+                    <div className="flex items-center gap-1 mt-1">
+                      <span className="text-[10px] text-gray-400">{t("capital.base")}:</span>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={editBaseOE}
+                        onChange={(e) => setEditBaseOE(e.target.value)}
+                        className="w-20 px-1.5 py-0.5 border border-gray-300 rounded text-[11px] text-right tabular-nums"
+                        placeholder={formatNum(derivedBaseOE, 1)}
+                      />
+                      <span className="text-[10px] text-gray-400">+ {t("capital.suLabel")} {formatNum(getEquityFromSources(sources), 1)}</span>
                     </div>
+                    {derivedBaseOE > 0 && (
+                      <div className="text-[10px] text-gray-400 mt-0.5">
+                        {t("capital.autoFromPeriods")}: {formatNum(derivedBaseOE, 1)}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">
@@ -419,20 +446,48 @@ export default function CapitalStructure({
                     <div className="w-full px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-right tabular-nums text-gray-700">
                       {formatNum(basePE + getPreferredFromSources(sources), 1) || "0"}
                     </div>
-                    <div className="text-[10px] text-gray-400 mt-0.5">
-                      {t("capital.base")} {formatNum(basePE, 1)} + {t("capital.suLabel")} {formatNum(getPreferredFromSources(sources), 1)}
+                    <div className="flex items-center gap-1 mt-1">
+                      <span className="text-[10px] text-gray-400">{t("capital.base")}:</span>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={editBasePE}
+                        onChange={(e) => setEditBasePE(e.target.value)}
+                        className="w-20 px-1.5 py-0.5 border border-gray-300 rounded text-[11px] text-right tabular-nums"
+                        placeholder={formatNum(derivedBasePE, 1)}
+                      />
+                      <span className="text-[10px] text-gray-400">+ {t("capital.suLabel")} {formatNum(getPreferredFromSources(sources), 1)}</span>
                     </div>
+                    {derivedBasePE > 0 && (
+                      <div className="text-[10px] text-gray-400 mt-0.5">
+                        {t("capital.autoFromPeriods")}: {formatNum(derivedBasePE, 1)}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">
                       {t("capital.netDebt")}
                     </label>
                     <div className="w-full px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-right tabular-nums text-gray-700">
-                      {formatNum(acquirerNibd + getDebtFromSources(sources), 1) || "0"}
+                      {formatNum(effectiveNibd + getDebtFromSources(sources), 1) || "0"}
                     </div>
-                    <div className="text-[10px] text-gray-400 mt-0.5">
-                      {t("capital.nibd")} {formatNum(acquirerNibd, 1)} + {t("capital.suLabel")} {formatNum(getDebtFromSources(sources), 1)}
+                    <div className="flex items-center gap-1 mt-1">
+                      <span className="text-[10px] text-gray-400">{t("capital.nibd")}:</span>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={editBaseNibd}
+                        onChange={(e) => setEditBaseNibd(e.target.value)}
+                        className="w-20 px-1.5 py-0.5 border border-gray-300 rounded text-[11px] text-right tabular-nums"
+                        placeholder={formatNum(derivedBaseNibd, 1)}
+                      />
+                      <span className="text-[10px] text-gray-400">+ {t("capital.suLabel")} {formatNum(getDebtFromSources(sources), 1)}</span>
                     </div>
+                    {derivedBaseNibd > 0 && (
+                      <div className="text-[10px] text-gray-400 mt-0.5">
+                        {t("capital.autoFromPeriods")}: {formatNum(derivedBaseNibd, 1)}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">
