@@ -14,7 +14,7 @@ import type {
   DebtScheduleRow,
   ShareSummary,
 } from "../types";
-import { GitMerge, ChevronDown, Download } from "lucide-react";
+import { GitMerge, ChevronDown, Download, Presentation } from "lucide-react";
 
 // Reuse analysis components from scenario detail
 import KeyMetricsCards from "../components/scenario/KeyMetricsCards";
@@ -84,6 +84,7 @@ export default function ScenariosPage() {
 
   // ─── Excel export (uses current scenario) ─────────────────
   const [exporting, setExporting] = useState(false);
+  const [exportingPpt, setExportingPpt] = useState(false);
 
   const handleExportExcel = async () => {
     const scenarioId = compareResult?.scenario?.id;
@@ -97,6 +98,21 @@ export default function ScenariosPage() {
       setError(getErrorMessage(err));
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleExportPpt = async () => {
+    const scenarioId = compareResult?.scenario?.id;
+    if (!scenarioId) return;
+    setExportingPpt(true);
+    setError("");
+    try {
+      await api.exportPpt(scenarioId, compareResult?.scenario?.name);
+      showSuccess(t("scenarios.pptExported"));
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setExportingPpt(false);
     }
   };
 
@@ -366,6 +382,14 @@ export default function ScenariosPage() {
         </div>
         {compareResult?.scenario && compareResult.scenario.id > 0 && (
           <div className="flex gap-3 flex-shrink-0">
+            <button
+              onClick={handleExportPpt}
+              disabled={exportingPpt}
+              className="flex items-center gap-2 px-4 py-2.5 bg-[#C9A84C] text-white rounded-lg hover:bg-[#b8973f] transition-colors text-sm font-medium disabled:opacity-50 shadow-sm"
+            >
+              <Presentation size={16} className={exportingPpt ? "animate-bounce" : ""} />
+              {exportingPpt ? t("common.exporting") : t("scenarios.pptExport")}
+            </button>
             <button
               onClick={handleExportExcel}
               disabled={exporting}
