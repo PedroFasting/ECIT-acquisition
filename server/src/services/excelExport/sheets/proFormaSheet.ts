@@ -1,5 +1,5 @@
 import type ExcelJS from "exceljs";
-import type { ExportData } from "../types.js";
+import type { ExportData, ProFormaRowMap } from "../types.js";
 import {
   COLORS, HEADER_FONT, LABEL_FONT, VALUE_FONT, SECTION_FONT, THIN_BORDER,
   NUM_FORMAT, PCT_FORMAT,
@@ -7,7 +7,7 @@ import {
 } from "../styles.js";
 import { colLetter } from "../helpers.js";
 
-export function buildProFormaSheet(wb: ExcelJS.Workbook, data: ExportData, periodLabels: string[], nPeriods: number) {
+export function buildProFormaSheet(wb: ExcelJS.Workbook, data: ExportData, periodLabels: string[], nPeriods: number): ProFormaRowMap {
   const ws = wb.addWorksheet("Pro Forma P&L", { properties: { tabColor: { argb: "70AD47" } } });
   const colW: Partial<ExcelJS.Column>[] = [{ width: 40 }];
   for (let i = 0; i < nPeriods; i++) colW.push({ width: 16 });
@@ -34,7 +34,7 @@ export function buildProFormaSheet(wb: ExcelJS.Workbook, data: ExportData, perio
   r++;
 
   // Helper to add a data row
-  function addDataRow(label: string, values: (number | null)[], format: string, isSection = false, isTotal = false) {
+  function addDataRow(label: string, values: (number | null)[], format: string, isSection = false, isTotal = false): number {
     const row = ws.getRow(r);
     row.getCell(1).value = label;
     row.getCell(1).font = isSection ? SECTION_FONT : (isTotal ? LABEL_FONT : VALUE_FONT);
@@ -51,11 +51,13 @@ export function buildProFormaSheet(wb: ExcelJS.Workbook, data: ExportData, perio
 
     if (isSection) styleSectionRow(row, totalCols);
     if (isTotal) styleTotalRow(row, totalCols);
+    const rowNum = r;
     r++;
+    return rowNum;
   }
 
   // Helper to add formula row (formulas referencing cells in this sheet)
-  function addFormulaRow(label: string, formula: (col: string, rowNum: number) => string, format: string, isTotal = false) {
+  function addFormulaRow(label: string, formula: (col: string, rowNum: number) => string, format: string, isTotal = false): number {
     const row = ws.getRow(r);
     row.getCell(1).value = label;
     row.getCell(1).font = isTotal ? LABEL_FONT : VALUE_FONT;
@@ -71,79 +73,81 @@ export function buildProFormaSheet(wb: ExcelJS.Workbook, data: ExportData, perio
     }
 
     if (isTotal) styleTotalRow(row, totalCols);
+    const rowNum = r;
     r++;
+    return rowNum;
   }
 
   const pf = data.proFormaPeriods;
 
   // ── Revenue Section ──
   addDataRow("REVENUE", [], "", true);
-  const acqRevRow = r;
-  addDataRow(`  ${data.acquirerName} Revenue`, pf.map((p: any) => p.acquirer_revenue), NUM_FORMAT);
-  const tgtRevRow = r;
-  addDataRow(`  ${data.targetName} Revenue`, pf.map((p: any) => p.target_revenue), NUM_FORMAT);
-  const otherRevRow = r;
-  addDataRow("  Other Revenue", pf.map((p: any) => p.other_revenue), NUM_FORMAT);
+  const acqRevRow = addDataRow(`  ${data.acquirerName} Revenue`, pf.map((p: any) => p.acquirer_revenue), NUM_FORMAT);
+  const tgtRevRow = addDataRow(`  ${data.targetName} Revenue`, pf.map((p: any) => p.target_revenue), NUM_FORMAT);
+  const otherRevRow = addDataRow("  Other Revenue", pf.map((p: any) => p.other_revenue), NUM_FORMAT);
   // Total Revenue = sum of 3 above
-  const totalRevRow = r;
-  addFormulaRow("Total Revenue", (cl) => `${cl}${acqRevRow}+${cl}${tgtRevRow}+${cl}${otherRevRow}`, NUM_FORMAT, true);
+  const totalRevRow = addFormulaRow("Total Revenue", (cl) => `${cl}${acqRevRow}+${cl}${tgtRevRow}+${cl}${otherRevRow}`, NUM_FORMAT, true);
 
-  // Revenue growth
-  const revGrowthRow = r;
-  const revGrowthVals = pf.map((p: any, i: number) => {
-    if (i === 0) return null;
-    const prev = pf[i - 1]?.total_revenue;
-    const curr = p.total_revenue;
-    return prev && prev > 0 ? (curr - prev) / prev : null;
-  });
-  addDataRow("  Revenue Growth", revGrowthVals, PCT_FORMAT);
+  // Revenue growth — formula based
+  addFormulaRow("  Revenue Growth", (cl, _rn) => {
+    const colIdx = cl.charCodeAt(0) - 64; // B=2, C=3, ...
+    if (colIdx <= 2) return '""'; // First period: no growth
+    const prevCl = colLetter(colIdx - 1);
+    return `IF(${prevCl}${totalRevRow}>0,(${cl}${totalRevRow}-${prevCl}${totalRevRow})/${prevCl}${totalRevRow},"")`;
+  }, PCT_FORMAT);
   r++;
 
   // ── EBITDA Section ──
   addDataRow("EBITDA", [], "", true);
-  const acqEbitdaRow = r;
-  addDataRow(`  ${data.acquirerName} EBITDA`, pf.map((p: any) => p.acquirer_ebitda), NUM_FORMAT);
-  const tgtEbitdaRow = r;
-  addDataRow(`  ${data.targetName} EBITDA`, pf.map((p: any) => p.target_ebitda), NUM_FORMAT);
-  const otherEbitdaRow = r;
-  addDataRow("  Other / M&A EBITDA", pf.map((p: any) => p.ma_ebitda ?? p.other_ebitda ?? 0), NUM_FORMAT);
+  const acqEbitdaRow = addDataRow(`  ${data.acquirerName} EBITDA`, pf.map((p: any) => p.acquirer_ebitda), NUM_FORMAT);
+  const tgtEbitdaRow = addDataRow(`  ${data.targetName} EBITDA`, pf.map((p: any) => p.target_ebitda), NUM_FORMAT);
+  const otherEbitdaRow = addDataRow("  Other / M&A EBITDA", pf.map((p: any) => p.ma_ebitda ?? p.other_ebitda ?? 0), NUM_FORMAT);
   // Total EBITDA excl synergies
-  const ebitdaExclRow = r;
-  addFormulaRow("Total EBITDA excl. Synergies", (cl) => `${cl}${acqEbitdaRow}+${cl}${tgtEbitdaRow}+${cl}${otherEbitdaRow}`, NUM_FORMAT, true);
+  const ebitdaExclRow = addFormulaRow("Total EBITDA excl. Synergies", (cl) => `${cl}${acqEbitdaRow}+${cl}${tgtEbitdaRow}+${cl}${otherEbitdaRow}`, NUM_FORMAT, true);
 
   // EBITDA margin excl synergies
   addFormulaRow("  EBITDA Margin excl. Syn.", (cl) => `IF(${cl}${totalRevRow}>0,${cl}${ebitdaExclRow}/${cl}${totalRevRow},0)`, PCT_FORMAT);
 
   // Cost synergies
-  const synRow = r;
-  addDataRow("Cost Synergies", pf.map((p: any) => p.cost_synergies ?? 0), NUM_FORMAT);
+  const synRow = addDataRow("Cost Synergies", pf.map((p: any) => p.cost_synergies ?? 0), NUM_FORMAT);
 
   // Total EBITDA incl synergies
-  const ebitdaInclRow = r;
-  addFormulaRow("Total EBITDA incl. Synergies", (cl) => `${cl}${ebitdaExclRow}+${cl}${synRow}`, NUM_FORMAT, true);
+  const ebitdaInclRow = addFormulaRow("Total EBITDA incl. Synergies", (cl) => `${cl}${ebitdaExclRow}+${cl}${synRow}`, NUM_FORMAT, true);
   addFormulaRow("  EBITDA Margin incl. Syn.", (cl) => `IF(${cl}${totalRevRow}>0,${cl}${ebitdaInclRow}/${cl}${totalRevRow},0)`, PCT_FORMAT);
   r++;
 
   // ── Cash Flow Section ──
   addDataRow("CASH FLOW", [], "", true);
-  const capexRow = r;
-  addDataRow("  Capex", pf.map((p: any) => p.total_capex), NUM_FORMAT);
-  const nwcRow = r;
-  addDataRow("  Change in NWC", pf.map((p: any) => p.total_change_nwc), NUM_FORMAT);
-  const otherCfRow = r;
-  addDataRow("  Other Cash Flow Items", pf.map((p: any) => p.total_other_cash_flow ?? 0), NUM_FORMAT);
+  const capexRow = addDataRow("  Capex", pf.map((p: any) => p.total_capex), NUM_FORMAT);
+  const nwcRow = addDataRow("  Change in NWC", pf.map((p: any) => p.total_change_nwc), NUM_FORMAT);
+  const otherCfRow = addDataRow("  Other Cash Flow Items", pf.map((p: any) => p.total_other_cash_flow ?? 0), NUM_FORMAT);
 
   // Operating FCF = EBITDA incl syn + capex + NWC + other
-  const ofcfRow = r;
-  addFormulaRow("Operating FCF", (cl) => `${cl}${ebitdaInclRow}+${cl}${capexRow}+${cl}${nwcRow}+${cl}${otherCfRow}`, NUM_FORMAT, true);
+  const ofcfRow = addFormulaRow("Operating FCF", (cl) => `${cl}${ebitdaInclRow}+${cl}${capexRow}+${cl}${nwcRow}+${cl}${otherCfRow}`, NUM_FORMAT, true);
 
   // Minority interest
-  const minRow = r;
-  addDataRow("  Minority Interest", pf.map((p: any) => p.minority_interest ?? 0), NUM_FORMAT);
+  const minRow = addDataRow("  Minority Interest", pf.map((p: any) => p.minority_interest ?? 0), NUM_FORMAT);
 
   // Operating FCF excl minorities
-  addFormulaRow("Operating FCF excl. Minorities", (cl) => `${cl}${ofcfRow}+${cl}${minRow}`, NUM_FORMAT, true);
+  const fcfExclRow = addFormulaRow("Operating FCF excl. Minorities", (cl) => `${cl}${ofcfRow}+${cl}${minRow}`, NUM_FORMAT, true);
 
   // Cash conversion
   addFormulaRow("  Cash Conversion", (cl) => `IF(${cl}${ebitdaInclRow}<>0,${cl}${ofcfRow}/${cl}${ebitdaInclRow},0)`, PCT_FORMAT);
+
+  return {
+    totalRevenue: totalRevRow,
+    acqRevenue: acqRevRow,
+    tgtRevenue: tgtRevRow,
+    ebitdaExcl: ebitdaExclRow,
+    ebitdaIncl: ebitdaInclRow,
+    operatingFcf: ofcfRow,
+    capex: capexRow,
+    changeNwc: nwcRow,
+    otherCashFlow: otherCfRow,
+    costSynergies: synRow,
+    acqEbitda: acqEbitdaRow,
+    tgtEbitda: tgtEbitdaRow,
+    minority: minRow,
+    fcfExclMinorities: fcfExclRow,
+  };
 }

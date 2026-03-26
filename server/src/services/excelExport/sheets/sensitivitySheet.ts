@@ -1,12 +1,26 @@
 import type ExcelJS from "exceljs";
-import type { ExportData } from "../types.js";
+import type { ExportData, DealReturnsRowMap } from "../types.js";
 import {
   COLORS, HEADER_FONT, LABEL_FONT, VALUE_FONT, THIN_BORDER,
   NUM_FORMAT_1, PCT_FORMAT,
-  styleHeader, styleSectionRow,
+  styleHeader, styleSectionRow, styleFormulaCell,
 } from "../styles.js";
+import { colLetter } from "../helpers.js";
 
-export function buildSensitivitySheet(wb: ExcelJS.Workbook, data: ExportData) {
+/**
+ * Sensitivity Analysis sheet — formula-driven when possible.
+ *
+ * When a DealReturnsRowMap is available, the IRR/MoM cells reference the
+ * Deal Returns sheet directly. This means that if a user edits any Inputs
+ * assumption the sensitivity table auto-recalculates.
+ *
+ * Falls back to static pre-computed values when no row map is provided.
+ */
+export function buildSensitivitySheet(
+  wb: ExcelJS.Workbook,
+  data: ExportData,
+  drRowMap: DealReturnsRowMap | null = null,
+) {
   const ws = wb.addWorksheet("Sensitivity", { properties: { tabColor: { argb: "A5A5A5" } } });
   ws.columns = [{ width: 20 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }];
 
@@ -20,13 +34,13 @@ export function buildSensitivitySheet(wb: ExcelJS.Workbook, data: ExportData) {
   ws.mergeCells(r, 1, r, 6);
   r += 2;
 
-  // We'll output pre-computed IRR/MoM matrices from the calculated returns
   const cases = data.calculatedReturns.cases;
   const combinedResults = cases.filter(c => c.return_case === "Kombinert");
   const multiples = data.dealParams.exit_multiples ?? [10, 11, 12, 13, 14];
+  const drSheet = "'Deal Returns'";
 
   if (combinedResults.length > 0) {
-    // IRR sensitivity by exit multiple
+    // ── Combined IRR by Exit Multiple ──
     const sectionRow = ws.getRow(r);
     sectionRow.getCell(1).value = "IRR by Exit Multiple";
     styleSectionRow(sectionRow, multiples.length + 1);
@@ -46,11 +60,23 @@ export function buildSensitivitySheet(wb: ExcelJS.Workbook, data: ExportData) {
     irrRow.getCell(1).border = THIN_BORDER;
     for (let i = 0; i < multiples.length; i++) {
       const cell = irrRow.getCell(i + 2);
-      const result = combinedResults.find(c => c.exit_multiple === multiples[i]);
-      cell.value = result?.irr ?? null;
+      const mult = multiples[i];
+      const drIrrRow = drRowMap?.combinedIrrByMult[mult];
+      if (drIrrRow) {
+        // Formula referencing Deal Returns sheet
+        const cl = colLetter(i + 2);
+        cell.value = { formula: `${drSheet}!${cl}${drIrrRow}` };
+        styleFormulaCell(cell);
+      } else {
+        // Static fallback
+        const result = combinedResults.find(c => c.exit_multiple === mult);
+        cell.value = result?.irr ?? null;
+      }
       cell.numFmt = PCT_FORMAT;
       cell.border = THIN_BORDER;
       cell.alignment = { horizontal: "right" };
+      // Color coding from pre-computed values for initial display
+      const result = combinedResults.find(c => c.exit_multiple === mult);
       if (result?.irr != null) {
         cell.fill = {
           type: "pattern", pattern: "solid",
@@ -60,14 +86,23 @@ export function buildSensitivitySheet(wb: ExcelJS.Workbook, data: ExportData) {
     }
     r++;
 
+    // Combined MoM
     const momRow = ws.getRow(r);
     momRow.getCell(1).value = "Combined MoM";
     momRow.getCell(1).font = LABEL_FONT;
     momRow.getCell(1).border = THIN_BORDER;
     for (let i = 0; i < multiples.length; i++) {
       const cell = momRow.getCell(i + 2);
-      const result = combinedResults.find(c => c.exit_multiple === multiples[i]);
-      cell.value = result?.mom ?? null;
+      const mult = multiples[i];
+      const drMomRow = drRowMap?.combinedMomByMult[mult];
+      if (drMomRow) {
+        const cl = colLetter(i + 2);
+        cell.value = { formula: `${drSheet}!${cl}${drMomRow}` };
+        styleFormulaCell(cell);
+      } else {
+        const result = combinedResults.find(c => c.exit_multiple === mult);
+        cell.value = result?.mom ?? null;
+      }
       cell.numFmt = NUM_FORMAT_1 + "x";
       cell.border = THIN_BORDER;
       cell.alignment = { horizontal: "right" };
@@ -90,17 +125,27 @@ export function buildSensitivitySheet(wb: ExcelJS.Workbook, data: ExportData) {
       styleHeader(psHeader, multiples.length + 1);
       r++;
 
+      // Per-Share IRR
       const psIrr = ws.getRow(r);
       psIrr.getCell(1).value = "Per-Share IRR";
       psIrr.getCell(1).font = LABEL_FONT;
       psIrr.getCell(1).border = THIN_BORDER;
       for (let i = 0; i < multiples.length; i++) {
         const cell = psIrr.getCell(i + 2);
-        const result = combinedResults.find(c => c.exit_multiple === multiples[i]);
-        cell.value = result?.per_share_irr ?? null;
+        const mult = multiples[i];
+        const drPsIrrRow = drRowMap?.perShareIrrByMult[mult];
+        if (drPsIrrRow) {
+          const cl = colLetter(i + 2);
+          cell.value = { formula: `${drSheet}!${cl}${drPsIrrRow}` };
+          styleFormulaCell(cell);
+        } else {
+          const result = combinedResults.find(c => c.exit_multiple === mult);
+          cell.value = result?.per_share_irr ?? null;
+        }
         cell.numFmt = PCT_FORMAT;
         cell.border = THIN_BORDER;
         cell.alignment = { horizontal: "right" };
+        const result = combinedResults.find(c => c.exit_multiple === mult);
         if (result?.per_share_irr != null) {
           cell.fill = {
             type: "pattern", pattern: "solid",
@@ -110,14 +155,23 @@ export function buildSensitivitySheet(wb: ExcelJS.Workbook, data: ExportData) {
       }
       r++;
 
+      // Per-Share MoM
       const psMom = ws.getRow(r);
       psMom.getCell(1).value = "Per-Share MoM";
       psMom.getCell(1).font = LABEL_FONT;
       psMom.getCell(1).border = THIN_BORDER;
       for (let i = 0; i < multiples.length; i++) {
         const cell = psMom.getCell(i + 2);
-        const result = combinedResults.find(c => c.exit_multiple === multiples[i]);
-        cell.value = result?.per_share_mom ?? null;
+        const mult = multiples[i];
+        const drPsMomRow = drRowMap?.perShareMomByMult[mult];
+        if (drPsMomRow) {
+          const cl = colLetter(i + 2);
+          cell.value = { formula: `${drSheet}!${cl}${drPsMomRow}` };
+          styleFormulaCell(cell);
+        } else {
+          const result = combinedResults.find(c => c.exit_multiple === mult);
+          cell.value = result?.per_share_mom ?? null;
+        }
         cell.numFmt = NUM_FORMAT_1 + "x";
         cell.border = THIN_BORDER;
         cell.alignment = { horizontal: "right" };

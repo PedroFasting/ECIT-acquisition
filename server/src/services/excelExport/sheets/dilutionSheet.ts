@@ -1,27 +1,49 @@
 import type ExcelJS from "exceljs";
-import type { ExportData } from "../types.js";
+import type { ExportData, EquityBridgeRowMap } from "../types.js";
 import {
   COLORS, HEADER_FONT, LABEL_FONT, VALUE_FONT, THIN_BORDER,
   NUM_FORMAT, NUM_FORMAT_1, NUM_FORMAT_2, PCT_FORMAT,
   styleHeader, styleSectionRow, styleTotalRow, styleFormulaCell,
 } from "../styles.js";
 
-export function buildDilutionSheet(wb: ExcelJS.Workbook, data: ExportData) {
+/**
+ * Dilution Waterfall sheet — formula-driven.
+ *
+ * References the Equity Bridge sheet for EQV, MIP, TSO, warrants values
+ * at the last period (exit). Also uses Inputs named ranges for dilution parameters.
+ */
+export function buildDilutionSheet(
+  wb: ExcelJS.Workbook,
+  data: ExportData,
+  ebRowMap: EquityBridgeRowMap | null,
+  nPeriods: number
+) {
   const ws = wb.addWorksheet("Dilution", { properties: { tabColor: { argb: "7030A0" } } });
   ws.columns = [{ width: 35 }, { width: 20 }, { width: 15 }];
 
   const ss = data.calculatedReturns.share_summary;
-  if (!ss) {
-    ws.getRow(1).getCell(1).value = "Dilution data not available (share data missing)";
+  if (!ebRowMap || nPeriods === 0) {
+    ws.getRow(1).getCell(1).value = "Dilution data not available (no equity bridge data)";
     ws.getRow(1).getCell(1).font = { ...VALUE_FONT, italic: true };
     return;
   }
 
   let r = 1;
+  // Last period column in Equity Bridge
+  const ebSheet = "'Equity Bridge'";
+  // We reference the last period column (exit year)
+  // Columns: A=label, B=period1, C=period2, ... so last period = colLetter(nPeriods + 1)
+  const exitColFn = () => {
+    let s = "";
+    let c = nPeriods + 1;
+    while (c > 0) { c--; s = String.fromCharCode(65 + (c % 26)) + s; c = Math.floor(c / 26); }
+    return s;
+  };
+  const exitCol = exitColFn();
 
   // Title
   const titleRow = ws.getRow(r);
-  titleRow.getCell(1).value = "Dilution Waterfall (at median exit multiple)";
+  titleRow.getCell(1).value = "Dilution Waterfall (at exit)";
   titleRow.getCell(1).font = { ...HEADER_FONT, size: 13 };
   titleRow.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLORS.headerBg } };
   ws.mergeCells(r, 1, r, 3);
@@ -35,52 +57,76 @@ export function buildDilutionSheet(wb: ExcelJS.Workbook, data: ExportData) {
   styleHeader(headerRow, 3);
   r++;
 
-  function addDilRow(label: string, value: number, pctOfEqv: number | null, isTotal = false) {
+  function addFormulaRow(label: string, formula: string, pctFormula: string | null, isTotal = false): number {
     const row = ws.getRow(r);
     row.getCell(1).value = label;
     row.getCell(1).font = isTotal ? LABEL_FONT : VALUE_FONT;
     row.getCell(1).border = THIN_BORDER;
-    row.getCell(2).value = value;
-    row.getCell(2).numFmt = NUM_FORMAT;
-    row.getCell(2).border = THIN_BORDER;
-    row.getCell(2).alignment = { horizontal: "right" };
-    if (pctOfEqv != null) {
-      row.getCell(3).value = pctOfEqv;
-      row.getCell(3).numFmt = PCT_FORMAT;
+
+    const cell = row.getCell(2);
+    cell.value = { formula };
+    cell.numFmt = NUM_FORMAT;
+    styleFormulaCell(cell);
+
+    if (pctFormula) {
+      const pctCell = row.getCell(3);
+      pctCell.value = { formula: pctFormula };
+      pctCell.numFmt = PCT_FORMAT;
+      styleFormulaCell(pctCell);
     }
     row.getCell(3).border = THIN_BORDER;
     row.getCell(3).alignment = { horizontal: "right" };
+
     if (isTotal) styleTotalRow(row, 3);
+    const rowNum = r;
     r++;
-    return r - 1;
+    return rowNum;
   }
 
-  const eqvGross = ss.exit_eqv_gross ?? 0;
-  const pref = ss.exit_preferred_equity ?? 0;
-  const mip = ss.exit_mip_amount ?? 0;
-  const tso = ss.exit_tso_amount ?? 0;
-  const war = ss.exit_warrants_amount ?? 0;
-  const post = ss.exit_eqv_post_dilution ?? 0;
+  // Exit EQV (gross) from Equity Bridge
+  const eqvGrossRow = addFormulaRow(
+    "Exit EQV (gross)",
+    `${ebSheet}!${exitCol}${ebRowMap.eqv}`,
+    null,
+    true
+  );
 
-  const eqvGrossRow = addDilRow("Exit EQV (gross)", eqvGross, 1, true);
-  addDilRow("  Less: Preferred Equity", -pref, eqvGross > 0 ? -pref / eqvGross : null);
-  addDilRow("  Less: MIP", -mip, eqvGross > 0 ? -mip / eqvGross : null);
-  addDilRow("  Less: TSO Warrants", -tso, eqvGross > 0 ? -tso / eqvGross : null);
-  addDilRow("  Less: Existing Warrants", -war, eqvGross > 0 ? -war / eqvGross : null);
+  // Less: Preferred Equity
+  const prefRow = addFormulaRow(
+    "  Less: Preferred Equity",
+    `-${ebSheet}!${exitCol}${ebRowMap.preferredEquity}`,
+    `IF(B${eqvGrossRow}<>0,B${r}/B${eqvGrossRow},0)`
+  );
 
-  // Post-dilution EQV with formula
-  const postRow = ws.getRow(r);
-  postRow.getCell(1).value = "EQV Post-Dilution";
-  postRow.getCell(1).font = LABEL_FONT;
-  postRow.getCell(1).border = THIN_BORDER;
-  // Formula: sum of rows above
-  postRow.getCell(2).value = { formula: `SUM(B${eqvGrossRow}:B${r - 1})` };
-  postRow.getCell(2).numFmt = NUM_FORMAT;
-  styleFormulaCell(postRow.getCell(2));
-  postRow.getCell(3).value = { formula: `IF(B${eqvGrossRow}>0,B${r}/B${eqvGrossRow},0)` };
-  postRow.getCell(3).numFmt = PCT_FORMAT;
-  styleFormulaCell(postRow.getCell(3));
-  styleTotalRow(postRow, 3);
+  // Less: MIP
+  const mipRow = addFormulaRow(
+    "  Less: MIP",
+    `-${ebSheet}!${exitCol}${ebRowMap.mipAmount}`,
+    `IF(B${eqvGrossRow}<>0,B${r}/B${eqvGrossRow},0)`
+  );
+
+  // Less: TSO Warrants
+  const tsoRow = addFormulaRow(
+    "  Less: TSO Warrants",
+    `-${ebSheet}!${exitCol}${ebRowMap.tsoAmount}`,
+    `IF(B${eqvGrossRow}<>0,B${r}/B${eqvGrossRow},0)`
+  );
+
+  // Less: Existing Warrants
+  const warRow = addFormulaRow(
+    "  Less: Existing Warrants",
+    `-${ebSheet}!${exitCol}${ebRowMap.warrantsAmount}`,
+    `IF(B${eqvGrossRow}<>0,B${r}/B${eqvGrossRow},0)`
+  );
+
+  // EQV Post-Dilution = sum of all items above
+  const postRow = addFormulaRow(
+    "EQV Post-Dilution",
+    `SUM(B${eqvGrossRow}:B${r - 1})`,
+    `IF(B${eqvGrossRow}<>0,B${r}/B${eqvGrossRow},0)`,
+    true
+  );
+
   r += 2;
 
   // Per-share section
@@ -89,20 +135,25 @@ export function buildDilutionSheet(wb: ExcelJS.Workbook, data: ExportData) {
   styleSectionRow(ppsHeader, 3);
   r++;
 
-  function addPpsRow(label: string, value: number | null, fmt: string) {
+  function addPpsFormulaRow(label: string, formula: string, fmt: string) {
     const row = ws.getRow(r);
     row.getCell(1).value = label;
     row.getCell(1).font = VALUE_FONT;
     row.getCell(1).border = THIN_BORDER;
-    row.getCell(2).value = value ?? 0;
-    row.getCell(2).numFmt = fmt;
-    row.getCell(2).border = THIN_BORDER;
+    const cell = row.getCell(2);
+    cell.value = { formula };
+    cell.numFmt = fmt;
+    styleFormulaCell(cell);
     row.getCell(2).alignment = { horizontal: "right" };
     r++;
   }
 
-  addPpsRow("PPS Pre-Dilution", ss.exit_per_share_pre ?? null, NUM_FORMAT_2);
-  addPpsRow("PPS Post-Dilution", ss.exit_per_share_post ?? null, NUM_FORMAT_2);
-  addPpsRow("Total Dilution (% of EQV)", ss.dilution_value_pct ?? null, PCT_FORMAT);
-  addPpsRow("Total Exit Shares (m)", ss.total_exit_shares ?? null, NUM_FORMAT_1);
+  // PPS Pre from Equity Bridge
+  addPpsFormulaRow("PPS Pre-Dilution", `${ebSheet}!${exitCol}${ebRowMap.perSharePre}`, NUM_FORMAT_2);
+  // PPS Post from Equity Bridge
+  addPpsFormulaRow("PPS Post-Dilution", `${ebSheet}!${exitCol}${ebRowMap.perSharePost}`, NUM_FORMAT_2);
+  // Total Dilution % = 1 - (post / gross)
+  addPpsFormulaRow("Total Dilution (% of EQV)", `IF(B${eqvGrossRow}<>0,1-B${postRow}/B${eqvGrossRow},0)`, PCT_FORMAT);
+  // Total Exit Shares from Inputs
+  addPpsFormulaRow("Total Exit Shares (m)", "total_exit_shares", NUM_FORMAT_1);
 }

@@ -43,16 +43,35 @@ export async function generateExcelModel(data: ExportData): Promise<ExcelJS.Work
   );
   const nPeriods = periodLabels.length;
 
-  // Build all sheets
+  // Build all sheets — order matters: downstream sheets receive row maps
+  // from upstream sheets so they can create cross-sheet formula references.
+
+  // 1. Inputs — defines all named ranges
   buildInputsSheet(wb, data);
-  buildProFormaSheet(wb, data, periodLabels, nPeriods);
+
+  // 2. Pro Forma P&L — returns row map for EBITDA, Revenue, FCF, etc.
+  const pfRowMap = buildProFormaSheet(wb, data, periodLabels, nPeriods);
+
+  // 3. Capital Structure — S&U table, OE/PE/ND breakdown
   buildCapitalStructureSheet(wb, data);
-  buildDebtScheduleSheet(wb, data, periodLabels, nPeriods);
-  buildEquityBridgeSheet(wb, data, periodLabels, nPeriods);
-  buildDilutionSheet(wb, data);
+
+  // 4. Debt Schedule — references PF P&L for EBITDA/FCF; returns row map
+  const dsRowMap = buildDebtScheduleSheet(wb, data, periodLabels, nPeriods, pfRowMap);
+
+  // 5. Equity Bridge — references PF P&L for Revenue/EBITDA; returns row map
+  const ebRowMap = buildEquityBridgeSheet(wb, data, periodLabels, nPeriods, pfRowMap);
+
+  // 6. Dilution — references Equity Bridge exit-year values
+  buildDilutionSheet(wb, data, ebRowMap, nPeriods);
+
+  // 7. Share Tracker — mostly references Inputs named ranges
   buildShareTrackerSheet(wb, data);
-  buildDealReturnsSheet(wb, data);
-  buildSensitivitySheet(wb, data);
+
+  // 8. Deal Returns — references Equity Bridge + Debt Schedule for combined IRR/MoM
+  const drRowMap = buildDealReturnsSheet(wb, data, ebRowMap, dsRowMap, nPeriods);
+
+  // 9. Sensitivity — references Deal Returns formulas
+  buildSensitivitySheet(wb, data, drRowMap);
 
   return wb;
 }
