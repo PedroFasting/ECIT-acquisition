@@ -60,7 +60,7 @@ export default function RevenueChart({
             <XAxis dataKey="year" fontSize={12} />
             <YAxis fontSize={12} />
             <Tooltip
-              formatter={(value: any, name: string) => [
+              formatter={(value: any, name?: string) => [
                 formatTooltip(value, "NOKm"),
                 name,
               ]}

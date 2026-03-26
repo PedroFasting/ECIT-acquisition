@@ -1,11 +1,13 @@
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
+import swaggerUi from "swagger-ui-express";
 import pool from "./models/db.js";
 import authRoutes from "./routes/auth.js";
 import companyRoutes from "./routes/companies.js";
 import modelRoutes from "./routes/models.js";
 import scenarioRoutes from "./routes/scenarios.js";
 import importRoutes from "./routes/import.js";
+import { openApiSpec } from "./docs/openapi.js";
 
 const app = express();
 
@@ -46,6 +48,12 @@ app.use("/api/companies", companyRoutes);
 app.use("/api/models", modelRoutes);
 app.use("/api/scenarios", scenarioRoutes);
 app.use("/api/import", importRoutes);
+
+// API documentation
+app.get("/api/docs/openapi.json", (_req, res) => res.json(openApiSpec));
+app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openApiSpec, {
+  customSiteTitle: "ECIT Acquisition API",
+}));
 
 // Global error handler — catches unhandled errors in route handlers
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {

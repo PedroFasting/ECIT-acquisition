@@ -1,16 +1,14 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import api from "../services/api";
-import type { Company, FinancialModel, FinancialPeriod } from "../types";
+import type { Company, FinancialModel } from "../types";
 import { fmt, pct } from "../components/scenario/helpers";
 import {
   Target,
   Eye,
   GitCompare,
   Building2,
-  TrendingUp,
-  BarChart3,
   ChevronRight,
   Check,
 } from "lucide-react";
@@ -32,7 +30,7 @@ interface TargetSummary {
 export default function TargetsListPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [companies, setCompanies] = useState<Company[]>([]);
+  const [_companies, setCompanies] = useState<Company[]>([]);
   const [targetSummaries, setTargetSummaries] = useState<TargetSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

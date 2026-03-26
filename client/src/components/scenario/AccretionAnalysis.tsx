@@ -294,7 +294,7 @@ export default function AccretionAnalysis({
                         <XAxis dataKey="group" fontSize={10} interval={0} angle={0} />
                         <YAxis fontSize={12} />
                         <Tooltip
-                          formatter={(value: any, name: string) => [
+                          formatter={(value: any, name?: string) => [
                             formatTooltip(value, "NOKm"),
                             name,
                           ]}

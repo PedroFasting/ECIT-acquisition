@@ -9,16 +9,6 @@ interface Props {
   companyId: number;
 }
 
-// Number formatting helpers (nb-NO)
-const fmtNum = (v: number | null | undefined, decimals = 1): string => {
-  if (v == null) return "—";
-  return v.toLocaleString("nb-NO", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-};
-
-const fmtPct = (v: number | null | undefined): string => {
-  if (v == null) return "—";
-  return (v * 100).toFixed(2) + " %";
-};
 
 interface FieldDef {
   key: keyof CompanyAssumptionsType;

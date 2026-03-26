@@ -97,7 +97,7 @@ const DEFAULT_PARAMS: DealParameters = {
 export default function DealReturnsMatrix({
   scenario,
   acquirerPeriods,
-  targetPeriods,
+  targetPeriods: _targetPeriods,
   acquirerName,
   targetName,
   expanded,
@@ -112,7 +112,7 @@ export default function DealReturnsMatrix({
   const [calculating, setCalculating] = useState(false);
   const [error, setError] = useState("");
   const [level, setLevel] = useState<1 | 2>(1);
-  const [levelLabel, setLevelLabel] = useState("");
+  const [_levelLabel, setLevelLabel] = useState("");
   const [shareSummary, setShareSummary] = useState<ShareSummary | undefined>(undefined);
 
   // Initialize params from scenario or defaults

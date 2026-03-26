@@ -202,7 +202,7 @@ export default function ModelDetailPage() {
               </tr>
             </thead>
             <tbody>
-              {lineItems.map((item, idx) => {
+              {lineItems.map((item, _idx) => {
                 // Check if any period has data for this line
                 const hasData = periods.some(
                   (p) =>

@@ -119,7 +119,7 @@ export default function ProFormaTable({
             </tr>
           </thead>
           <tbody>
-            {lineItems.map((item, idx) => (
+            {lineItems.map((item, _idx) => (
               <tr
                 key={item.key}
                 className={item.bold ? "!bg-[#F4EDDC]" : ""}

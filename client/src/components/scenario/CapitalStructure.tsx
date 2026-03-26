@@ -305,7 +305,7 @@ export default function CapitalStructure({
         color: "#7A8B6E",
         label: t("capital.ordinaryEquity"),
         detail: pricePerShare > 0
-          ? t("capital.sharesAnnotation", { count: formatNum(nonRollover / pricePerShare, 1) })
+          ? t("capital.sharesAnnotation", { shareCount: formatNum(nonRollover / pricePerShare, 1) })
           : null,
       });
       barSegments.push({
@@ -313,7 +313,7 @@ export default function CapitalStructure({
         color: "#3D8B8B",
         label: t("capital.rolloverEquity"),
         detail: pricePerShare > 0
-          ? t("capital.sharesAnnotation", { count: formatNum(rollover / pricePerShare, 1) })
+          ? t("capital.sharesAnnotation", { shareCount: formatNum(rollover / pricePerShare, 1) })
           : null,
       });
     } else {
@@ -322,7 +322,7 @@ export default function CapitalStructure({
         color: "#7A8B6E",
         label: t("capital.ordinaryEquity"),
         detail: pricePerShare > 0
-          ? t("capital.sharesAtPrice", { count: formatNum(baseOE / pricePerShare, 1), price: formatNum(pricePerShare, 1) })
+          ? t("capital.sharesAtPrice", { shareCount: formatNum(baseOE / pricePerShare, 1), price: formatNum(pricePerShare, 1) })
           : null,
       });
     }
@@ -334,7 +334,7 @@ export default function CapitalStructure({
       color: "#98AE8B",
       label: t("capital.newEquity"),
       detail: pricePerShare > 0
-        ? t("capital.newSharesAtPrice", { count: formatNum(newShares, 1), price: formatNum(pricePerShare, 1) })
+        ? t("capital.newSharesAtPrice", { shareCount: formatNum(newShares, 1), price: formatNum(pricePerShare, 1) })
         : null,
     });
   }

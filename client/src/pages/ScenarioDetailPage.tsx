@@ -11,7 +11,7 @@ import type {
   ShareSummary,
 } from "../types";
 import { ArrowLeft, RefreshCw, Download } from "lucide-react";
-import { formatNum, toNum } from "../components/scenario/helpers";
+import { formatNum } from "../components/scenario/helpers";
 
 // Extracted sub-components
 import KeyMetricsCards from "../components/scenario/KeyMetricsCards";

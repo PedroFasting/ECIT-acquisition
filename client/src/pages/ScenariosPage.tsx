@@ -14,7 +14,7 @@ import type {
   DebtScheduleRow,
   ShareSummary,
 } from "../types";
-import { GitMerge, ChevronDown, Download, RefreshCw } from "lucide-react";
+import { GitMerge, ChevronDown, Download } from "lucide-react";
 
 // Reuse analysis components from scenario detail
 import KeyMetricsCards from "../components/scenario/KeyMetricsCards";

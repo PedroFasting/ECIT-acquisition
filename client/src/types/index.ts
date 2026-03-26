@@ -169,6 +169,7 @@ export interface AcquisitionScenario {
   deal_parameters?: DealParameters | null;
   status: "draft" | "active" | "archived";
   deal_returns?: DealReturn[];
+  calculated_returns?: CalculatedReturn[] | null;
   pro_forma_periods?: ProFormaPeriod[];
   acquirer_periods?: FinancialPeriod[];
   target_periods?: FinancialPeriod[];

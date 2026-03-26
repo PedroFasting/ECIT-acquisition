@@ -8,12 +8,6 @@ import {
   ArrowLeft,
   Building2,
   ChevronDown,
-  TrendingUp,
-  TrendingDown,
-  BarChart3,
-  DollarSign,
-  Layers,
-  Activity,
   Trophy,
 } from "lucide-react";
 import { getErrorMessage } from "../utils/errors";

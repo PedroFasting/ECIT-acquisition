@@ -157,7 +157,7 @@ export default function ShareTracker({
 
   if (!tracker) return null;
 
-  const { steps, baseShares, totalShares, dilutionTotal } = tracker;
+  const { steps, baseShares: _baseShares, totalShares, dilutionTotal } = tracker;
   const maxVal = Math.max(...steps.map((s) => s.value));
 
   return (
@@ -343,7 +343,6 @@ function DilutionWaterfall({ shareSummary }: { shareSummary: ShareSummary }) {
 
   if (eqvGross <= 0) return null;
 
-  const totalDeductions = pref + mip + tso + warrants;
 
   // Build waterfall steps
   const steps: DilutionStep[] = [

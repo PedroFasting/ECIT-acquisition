@@ -426,8 +426,6 @@ function computePfBridge(
 
     // EBITDA basis
     const ebitdaIncl = toNum(pf.total_ebitda_incl_synergies);
-    const ebitdaExcl = toNum(pf.total_ebitda_excl_synergies);
-    const synergies = toNum(pf.cost_synergies);
     const pfRevenue = toNum(pf.total_revenue);
 
     let basisEbitda: number;
