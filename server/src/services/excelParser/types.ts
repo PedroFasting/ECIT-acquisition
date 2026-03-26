@@ -9,6 +9,8 @@ export interface ParsedModelBlock {
   unmappedRows: string[];
   /** Source info for debugging */
   source?: string;
+  /** Detected sheet type for multi-sheet merge */
+  sheetType?: SheetType;
 }
 
 export interface PeriodYear {
@@ -41,6 +43,8 @@ export interface PeriodYear {
   capex: number | null;
   capex_pct_revenue: number | null;
   change_nwc: number | null;
+  tax: number | null;
+  net_cashflow: number | null;
   other_cash_flow_items: number | null;
   operating_fcf: number | null;
   minority_interest: number | null;
@@ -60,7 +64,12 @@ export interface PeriodYear {
   warrants_amount: number | null;
   eqv_post_dilution: number | null;
   per_share_post: number | null;
+  /** Unmapped rows stored as key-value pairs for extra_data JSONB */
+  extra_data: Record<string, number> | null;
 }
+
+/** Recognized sheet types for multi-sheet merge */
+export type SheetType = "pnl" | "balance" | "cashflow" | "equity" | "dcf" | "unknown";
 
 export interface InputParameters {
   shares_completion?: number;

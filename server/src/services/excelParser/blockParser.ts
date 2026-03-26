@@ -39,6 +39,8 @@ export function createEmptyPeriod(year: number): PeriodYear {
     capex: null,
     capex_pct_revenue: null,
     change_nwc: null,
+    tax: null,
+    net_cashflow: null,
     other_cash_flow_items: null,
     operating_fcf: null,
     minority_interest: null,
@@ -57,6 +59,7 @@ export function createEmptyPeriod(year: number): PeriodYear {
     warrants_amount: null,
     eqv_post_dilution: null,
     per_share_post: null,
+    extra_data: null,
   };
 }
 
@@ -154,6 +157,15 @@ export function parseBlockWithYears(
       const hasData = yearCols.some((yc) => cellNum(row.getCell(yc.col)) !== null);
       if (hasData && rawLabel.length > 1) {
         unmappedRows.push(rawLabel);
+        // Store unmapped numeric data in extra_data per period
+        const sanitizedKey = normalizeLabel(rawLabel).replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_");
+        for (let pi = 0; pi < yearCols.length; pi++) {
+          const val = cellNum(row.getCell(yearCols[pi].col));
+          if (val !== null) {
+            if (!periods[pi].extra_data) periods[pi].extra_data = {};
+            periods[pi].extra_data![sanitizedKey] = val;
+          }
+        }
       }
       continue;
     }
@@ -175,7 +187,11 @@ export function parseBlockWithYears(
       p.enterprise_value !== null ||
       p.equity_value !== null ||
       p.nibd !== null ||
-      p.share_count !== null
+      p.share_count !== null ||
+      p.capex !== null ||
+      p.operating_fcf !== null ||
+      p.net_cashflow !== null ||
+      p.tax !== null
   );
 
   if (!hasAnyData) {

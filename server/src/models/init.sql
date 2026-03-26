@@ -86,6 +86,8 @@ CREATE TABLE IF NOT EXISTS financial_periods (
   capex NUMERIC(15,1),
   capex_pct_revenue NUMERIC(8,4),
   change_nwc NUMERIC(15,1),
+  tax NUMERIC(15,1),                       -- Tax expense
+  net_cashflow NUMERIC(15,1),              -- Net cash flow (after tax, capex, NWC)
   other_cash_flow_items NUMERIC(15,1),
   operating_fcf NUMERIC(15,1),
   minority_interest NUMERIC(15,1),

@@ -85,7 +85,7 @@ export function findLabelColumn(
   startRow: number,
   endRow: number
 ): number {
-  const knownLabels = /revenue|omsetning|ebitda|driftsinntekt|turnover|inntekt|resultat|nibd|fcf|capex|gjeld|aksjer/i;
+  const knownLabels = /revenue|omsetning|ebitda|driftsinntekt|turnover|inntekt|resultat|nibd|fcf|capex|gjeld|aksjer|shares?|debt|tax|skatt|nwc|cashflow/i;
   const colScores = new Map<number, number>();
 
   const maxCol = Math.min(10, ws.columnCount);

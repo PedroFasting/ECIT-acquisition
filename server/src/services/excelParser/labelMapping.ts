@@ -40,10 +40,10 @@ export const LABEL_MAPPINGS: [RegExp, FieldKey][] = [
   [/(other|annen|øvrig)\s*(revenue|omsetning|inntekt)/, "revenue_other"],
   [/organic\s*(revenue|omsetning)/, "revenue_organic"],
   [/organisk\s*(omsetning|inntekt)/, "revenue_organic"],
-  [/(m&a|ma|acquired)\s*(revenue|omsetning)/, "revenue_ma"],
+  [/(m&a|ma)\s*(revenue|omsetning)/, "revenue_ma"],
   [/oppkjøpt\s*(omsetning|inntekt)/, "revenue_ma"],
 
-  // Acquired revenue
+  // Acquired revenue (the specific amount in MNOK from input parameters)
   [/acquired\s+revenue/, "acquired_revenue"],
   [/oppkjøpt\s+omsetning/, "acquired_revenue"],
 
@@ -80,6 +80,7 @@ export const LABEL_MAPPINGS: [RegExp, FieldKey][] = [
   [/^capex$/, "capex"],
   [/^(total\s+)?capex/, "capex"],
   [/^investering(er)?$/, "capex"],
+  [/^investments?$/, "capex"],
   [/capex.*%\s*(of\s+)?rev/, "capex_pct_revenue"],
   [/capex\s*%/, "capex_pct_revenue"],
 
@@ -87,15 +88,31 @@ export const LABEL_MAPPINGS: [RegExp, FieldKey][] = [
   [/^endring\s*(i\s+)?arbeidskapital/, "change_nwc"],
   [/^δ?\s*nwc/, "change_nwc"],
   [/^working\s*capital\s*(change)?/, "change_nwc"],
+  [/^nwc\s*effect/, "change_nwc"],
+  [/^nwc\s*effekt/, "change_nwc"],
+
+  // Tax
+  [/^(income\s+)?tax$/, "tax"],
+  [/^skatt$/, "tax"],
+  [/^(total\s+)?tax\s*(expense)?$/, "tax"],
+  [/^skattekostnad$/, "tax"],
+
+  // Net cashflow / free cash flow variants
+  // "Cashflow net" is a specific format from Herjedal-style files
+  [/^(net\s+)?cashflow\s*net$/, "net_cashflow"],
+  [/^cashflow\s+net$/, "net_cashflow"],
+  [/^netto\s*(kontant)?strøm/, "net_cashflow"],
 
   [/^other\s*(cash\s*flow|cf)\s*(items)?/, "other_cash_flow_items"],
   [/^andre\s*(kontantstrøm|cf)\s*(poster)?/, "other_cash_flow_items"],
   [/^øvrige\s*(poster|kontantstrøm)/, "other_cash_flow_items"],
 
+  // Operating FCF — "Free cashflow" and "Fri kontantstrøm" map here
   [/^operating\s*(fcf|free\s*cash\s*flow)$/, "operating_fcf"],
   [/^operasjonell\s*(fcf|fri\s*kontantstrøm)/, "operating_fcf"],
   [/^op\.?\s*fcf/, "operating_fcf"],
   [/^(total\s+)?fcf$/, "operating_fcf"],
+  [/^free\s+cashflow$/, "operating_fcf"],
   [/^fri\s*kontantstrøm/, "operating_fcf"],
 
   [/^minority\s*(interest)?$/, "minority_interest"],
@@ -112,6 +129,7 @@ export const LABEL_MAPPINGS: [RegExp, FieldKey][] = [
   [/^aksjer\s*(utestående)?$/, "share_count"],
 
   [/^nibd/, "nibd"],
+  [/^nibd\s*\(?(incl|inkl)/, "nibd"],
   [/^net(to)?\s*(interest\s+bearing\s+)?debt/, "nibd"],
   [/^netto\s*(rente(bærende)?\s*)?gjeld/, "nibd"],
 
@@ -147,13 +165,14 @@ export const LABEL_MAPPINGS: [RegExp, FieldKey][] = [
   [/^ex(isting)?\s*warr(a|e)nts?/, "warrants_amount"],
   [/^eksisterende\s*warrants?/, "warrants_amount"],
 
-  [/eqv.*post/, "eqv_post_dilution"],
-  [/post\s*(mip|dilution)/, "eqv_post_dilution"],
-  [/egenkapital.*etter\s*(utvanning)?/, "eqv_post_dilution"],
-
+  // Per-share labels must come BEFORE eqv_post_dilution to avoid false matches
   [/per\s+share.*post/, "per_share_post"],
   [/per\s+aksje.*etter/, "per_share_post"],
   [/^verdi\s*per\s*aksje\s*\(?(post|etter)/, "per_share_post"],
+
+  [/eqv.*post/, "eqv_post_dilution"],
+  [/^post\s*(mip|dilution)/, "eqv_post_dilution"],
+  [/egenkapital.*etter\s*(utvanning)?/, "eqv_post_dilution"],
 ];
 
 /**

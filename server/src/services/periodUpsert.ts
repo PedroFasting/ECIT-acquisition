@@ -41,6 +41,8 @@ export const PERIOD_COLUMNS = [
   "capex",
   "capex_pct_revenue",
   "change_nwc",
+  "tax",
+  "net_cashflow",
   "other_cash_flow_items",
   "operating_fcf",
   "minority_interest",
@@ -78,9 +80,9 @@ export const COLUMNS_JSON: readonly PeriodColumn[] = PERIOD_COLUMNS.filter(
   (c) => !["managed_services_growth", "professional_services_growth", "ebitda_incl_synergies", "cost_synergies"].includes(c),
 );
 
-/** import.ts Excel — omits growth sub-fields, synergies, and extra_data */
+/** import.ts Excel — omits growth sub-fields and synergies; includes extra_data for unmapped rows */
 export const COLUMNS_EXCEL: readonly PeriodColumn[] = PERIOD_COLUMNS.filter(
-  (c) => !["managed_services_growth", "professional_services_growth", "ebitda_incl_synergies", "cost_synergies", "extra_data"].includes(c),
+  (c) => !["managed_services_growth", "professional_services_growth", "ebitda_incl_synergies", "cost_synergies"].includes(c),
 );
 
 /** import.ts CSV — minimal subset */

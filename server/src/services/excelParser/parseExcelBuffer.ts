@@ -16,6 +16,7 @@ import type { ParsedModelBlock, InputParameters, ExcelParseResult } from "./type
 import { cellStr } from "./cellUtils.js";
 import { findYearHeader, findLabelColumn, findNameBlocks, findSectionBlocks } from "./sheetDetection.js";
 import { parseBlock, parseInputParameters, enrichInputParameters } from "./blockParser.js";
+import { detectSheetType, mergeMultiSheetModels } from "./sheetMerge.js";
 
 export async function parseExcelBuffer(
   buffer: Buffer | ArrayBuffer,
@@ -45,6 +46,9 @@ export async function parseExcelBuffer(
       continue;
     }
 
+    // Detect sheet type for multi-sheet merge
+    const sheetType = detectSheetType(ws.name);
+
     // Strategy 1: Look for "Name:" blocks
     const nameBlocks = findNameBlocks(ws);
 
@@ -64,6 +68,7 @@ export async function parseExcelBuffer(
         const result = parseBlock(ws, block.startRow, block.endRow, block.name);
         warnings.push(...result.warnings);
         if (result.model) {
+          result.model.sheetType = sheetType;
           allModels.push(result.model);
         }
       }
@@ -77,6 +82,7 @@ export async function parseExcelBuffer(
         const result = parseBlock(ws, block.startRow, block.endRow, block.name);
         warnings.push(...result.warnings);
         if (result.model) {
+          result.model.sheetType = sheetType;
           allModels.push(result.model);
         }
       }
@@ -106,11 +112,19 @@ export async function parseExcelBuffer(
     const result = parseBlock(ws, 1, ws.rowCount + 1, sheetModelName);
     warnings.push(...result.warnings);
     if (result.model) {
+      result.model.sheetType = sheetType;
       allModels.push(result.model);
     }
   }
 
-  if (allModels.length === 0) {
+  // ─── Multi-sheet merge ──────────────────────────────────
+  // If multiple sheets were parsed, try to merge complementary ones
+  // (e.g., P&L + Balance + Cash Flow → single model per year range)
+  const mergedModels = sheetNames.length > 1
+    ? mergeMultiSheetModels(allModels, warnings)
+    : allModels;
+
+  if (mergedModels.length === 0) {
     // Provide a helpful diagnostic message
     const diagLines: string[] = [];
     for (const ws of workbook.worksheets) {
@@ -138,5 +152,5 @@ export async function parseExcelBuffer(
     );
   }
 
-  return { models: allModels, inputParameters, warnings };
+  return { models: mergedModels, inputParameters, warnings };
 }
