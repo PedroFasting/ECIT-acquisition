@@ -78,6 +78,7 @@ export function buildShareTrackerSheet(wb: ExcelJS.Workbook, data: ExportData) {
   addRow("Exit Shares (base)", "exit_shares_db", NUM_FORMAT_1, "m shares", true);
 
   const rolloverShares = ss.rollover_shares ?? 0;
+  const rolloverSharesRow = r; // track row for formula reference
   addRow("Rollover Shares", rolloverShares, NUM_FORMAT_1, "m shares");
   addRow("Total Exit Shares", "total_exit_shares", NUM_FORMAT_1, "m shares", true, true);
   r++;
@@ -88,6 +89,8 @@ export function buildShareTrackerSheet(wb: ExcelJS.Workbook, data: ExportData) {
   styleSectionRow(dilSection, 3);
   r++;
 
-  addRow("Rollover Dilution %", ss.dilution_pct ?? 0, PCT_FORMAT, "");
+  // Rollover Dilution: formula referencing Rollover Shares cell and total_exit_shares named range
+  addRow("Rollover Dilution %", `IF(total_exit_shares>0,B${rolloverSharesRow}/total_exit_shares,0)`, PCT_FORMAT, "", true);
+  // Value Dilution: server-computed (requires Equity Bridge MIP/TSO/Warrants data)
   addRow("Value Dilution % (MIP/TSO/War)", ss.dilution_value_pct ?? 0, PCT_FORMAT, "");
 }

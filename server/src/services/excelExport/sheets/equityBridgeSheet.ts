@@ -138,12 +138,15 @@ export function buildEquityBridgeSheet(
   styleSectionRow(sectionRow1, totalCols);
   r++;
 
+  // Structural note
+  addNoteRow("Formeldrevne rader (blå bakgrunn) refererer P&L/Debt Schedule. Grå kursiv = importert fra finansmodell.");
+
   // Revenue (formula referencing PF P&L)
   const revenueRow = addFormulaRow("Revenue (PF Total)", (cl) =>
     `${pfSheet}!${cl}${pfRowMap.totalRevenue}`, NUM_FORMAT);
 
   // Revenue M&A (from acquirer periods — static, not in PF P&L)
-  addDataRow("Revenue (M&A)", "revenue_ma", NUM_FORMAT);
+  addReferenceRow("Revenue M&A (importert)", "revenue_ma", NUM_FORMAT);
 
   // Revenue Growth (formula)
   addFormulaRow("Revenue Growth", (cl) => {
@@ -154,7 +157,7 @@ export function buildEquityBridgeSheet(
   }, PCT_FORMAT);
 
   // Organic Growth from acquirer periods
-  addDataRow("Organic Growth", "organic_growth", PCT_FORMAT);
+  addReferenceRow("Organic Growth (importert)", "organic_growth", PCT_FORMAT);
   r++;
 
   // EBITDA — reference PF P&L
@@ -162,8 +165,8 @@ export function buildEquityBridgeSheet(
     `${pfSheet}!${cl}${pfRowMap.ebitdaIncl}`, NUM_FORMAT, true);
 
   // Adjustments from acquirer data (static — company-specific accounting adjustments)
-  const adjRow = addDataRow("Adjustments", "adjustments", NUM_FORMAT);
-  addNoteRow("  ↳ Adjustments imported from acquirer's Excel (company-specific accounting adj.)");
+  const adjRow = addDataRow("Adjustments (importert)", "adjustments", NUM_FORMAT);
+  addNoteRow("  ↳ Selskapsspesifikke regnskapsjusteringer importert fra kjøpers Excel.");
 
   // Adjusted EBITDA = EBITDA + Adjustments (formula)
   const adjEbitdaRow = addFormulaRow("Adjusted EBITDA", (cl) =>
@@ -195,7 +198,7 @@ export function buildEquityBridgeSheet(
     `IF(${cl}${ebitdaRowNum}>0,${cl}${evRowNum}/${cl}${ebitdaRowNum},0)`, MULT_FORMAT);
 
   // Imported EV for comparison (static from acquirer)
-  addDataRow("  Imported EV (reference)", "enterprise_value", NUM_FORMAT);
+  addReferenceRow("  EV (importert, ref)", "enterprise_value", NUM_FORMAT);
   r++;
 
   // ── Bridge: EV → EQV → Per Share ──
@@ -213,14 +216,14 @@ export function buildEquityBridgeSheet(
       if (idx === 0) return "net_debt";
       return `${dsSheet}!${cl}${dsRowMap.closingDebt}`;
     }, NUM_FORMAT);
-    addReferenceRow("  NIBD (imported, ref)", "nibd", NUM_FORMAT);
+    addReferenceRow("  NIBD (importert, ref)", "nibd", NUM_FORMAT);
   } else {
     nibdRow = addDataRow("NIBD", "nibd", NUM_FORMAT);
   }
 
   // ── Option Debt: imported static with documentation ──
-  const optRow = addDataRow("Option Debt", "option_debt", NUM_FORMAT);
-  addNoteRow("  ↳ Option Debt incl. Management Holding — imported from acquirer's Excel (no model)");
+  const optRow = addDataRow("Option Debt (importert)", "option_debt", NUM_FORMAT);
+  addNoteRow("  ↳ Opsjonsgjeld inkl. Management Holding — importert fra kjøpers Excel (ingen modell).");
 
   // ── Preferred Equity: dual-row pattern ──
   let prefRow: number;
@@ -229,7 +232,7 @@ export function buildEquityBridgeSheet(
       if (idx === 0) return "preferred_equity";
       return `${dsSheet}!${cl}${dsRowMap.closingPref}`;
     }, NUM_FORMAT);
-    addReferenceRow("  Pref. Equity (imported, ref)", "preferred_equity", NUM_FORMAT);
+    addReferenceRow("  Pref. Equity (importert, ref)", "preferred_equity", NUM_FORMAT);
   } else {
     prefRow = addDataRow("Preferred Equity", "preferred_equity", NUM_FORMAT);
   }
@@ -239,7 +242,7 @@ export function buildEquityBridgeSheet(
     `${cl}${evRowNum}-${cl}${nibdRow}-${cl}${optRow}`, NUM_FORMAT, true);
 
   // Share count from acquirer periods (static — imported from Excel)
-  const scRow = addDataRow("Share Count (m)", "share_count", NUM_FORMAT_1);
+  const scRow = addDataRow("Aksjeantall (importert, m)", "share_count", NUM_FORMAT_1);
 
   // Per share pre = (EQV - pref) / shares (formula)
   const ppPreRow = addFormulaRow("Per Share (pre-dilution)", (cl) =>

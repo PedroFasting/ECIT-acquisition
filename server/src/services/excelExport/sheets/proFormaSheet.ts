@@ -80,11 +80,19 @@ export function buildProFormaSheet(wb: ExcelJS.Workbook, data: ExportData, perio
 
   const pf = data.proFormaPeriods;
 
+  // Explanatory note about sheet structure
+  const structNoteRow = ws.getRow(r);
+  structNoteRow.getCell(1).value =
+    "Komponentrader (innrykket) er importert fra finansmodellene. Totalrader (uthevet) er formelbasert.";
+  structNoteRow.getCell(1).font = { ...VALUE_FONT, size: 9, italic: true, color: { argb: "808080" } };
+  ws.mergeCells(r, 1, r, totalCols);
+  r++;
+
   // ── Revenue Section ──
   addDataRow("REVENUE", [], "", true);
   const acqRevRow = addDataRow(`  ${data.acquirerName} Revenue`, pf.map((p: any) => p.acquirer_revenue), NUM_FORMAT);
   const tgtRevRow = addDataRow(`  ${data.targetName} Revenue`, pf.map((p: any) => p.target_revenue), NUM_FORMAT);
-  const otherRevRow = addDataRow("  Other Revenue", pf.map((p: any) => p.other_revenue), NUM_FORMAT);
+  const otherRevRow = addDataRow("  Annen Revenue (importert)", pf.map((p: any) => p.other_revenue), NUM_FORMAT);
   // Total Revenue = sum of 3 above
   const totalRevRow = addFormulaRow("Total Revenue", (cl) => `${cl}${acqRevRow}+${cl}${tgtRevRow}+${cl}${otherRevRow}`, NUM_FORMAT, true);
 
@@ -101,7 +109,7 @@ export function buildProFormaSheet(wb: ExcelJS.Workbook, data: ExportData, perio
   addDataRow("EBITDA", [], "", true);
   const acqEbitdaRow = addDataRow(`  ${data.acquirerName} EBITDA`, pf.map((p: any) => p.acquirer_ebitda), NUM_FORMAT);
   const tgtEbitdaRow = addDataRow(`  ${data.targetName} EBITDA`, pf.map((p: any) => p.target_ebitda), NUM_FORMAT);
-  const otherEbitdaRow = addDataRow("  Other / M&A EBITDA", pf.map((p: any) => p.ma_ebitda ?? p.other_ebitda ?? 0), NUM_FORMAT);
+  const otherEbitdaRow = addDataRow("  Annen / M&A EBITDA (importert)", pf.map((p: any) => p.ma_ebitda ?? p.other_ebitda ?? 0), NUM_FORMAT);
   // Total EBITDA excl synergies
   const ebitdaExclRow = addFormulaRow("Total EBITDA excl. Synergies", (cl) => `${cl}${acqEbitdaRow}+${cl}${tgtEbitdaRow}+${cl}${otherEbitdaRow}`, NUM_FORMAT, true);
 
@@ -139,13 +147,13 @@ export function buildProFormaSheet(wb: ExcelJS.Workbook, data: ExportData, perio
   const nwcRow = addFormulaRow("  Change in NWC", (cl) =>
     `IF(${cl}${nwcImportedRow}<>0,${cl}${nwcImportedRow},-ABS(nwc_investment))`, NUM_FORMAT);
 
-  const otherCfRow = addDataRow("  Other Cash Flow Items", pf.map((p: any) => p.total_other_cash_flow ?? 0), NUM_FORMAT);
+  const otherCfRow = addDataRow("  Andre kontantstrømsposter (importert)", pf.map((p: any) => p.total_other_cash_flow ?? 0), NUM_FORMAT);
 
   // Operating FCF = EBITDA incl syn + capex + NWC + other
   const ofcfRow = addFormulaRow("Operating FCF", (cl) => `${cl}${ebitdaInclRow}+${cl}${capexRow}+${cl}${nwcRow}+${cl}${otherCfRow}`, NUM_FORMAT, true);
 
-  // Minority interest
-  const minRow = addDataRow("  Minority Interest", pf.map((p: any) => p.minority_interest ?? 0), NUM_FORMAT);
+  // Minority interest (computed from minority_pct × FCF)
+  const minRow = addDataRow("  Minority Interest (beregnet)", pf.map((p: any) => p.minority_interest ?? 0), NUM_FORMAT);
 
   // Operating FCF excl minorities
   const fcfExclRow = addFormulaRow("Operating FCF excl. Minorities", (cl) => `${cl}${ofcfRow}+${cl}${minRow}`, NUM_FORMAT, true);
