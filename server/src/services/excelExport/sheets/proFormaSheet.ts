@@ -152,8 +152,9 @@ export function buildProFormaSheet(wb: ExcelJS.Workbook, data: ExportData, perio
   // Operating FCF = EBITDA incl syn + capex + NWC + other
   const ofcfRow = addFormulaRow("Operating FCF", (cl) => `${cl}${ebitdaInclRow}+${cl}${capexRow}+${cl}${nwcRow}+${cl}${otherCfRow}`, NUM_FORMAT, true);
 
-  // Minority interest (computed from minority_pct × FCF)
-  const minRow = addDataRow("  Minority Interest (beregnet)", pf.map((p: any) => p.minority_interest ?? 0), NUM_FORMAT);
+  // Minority interest = -(Operating FCF × minority_pct) — formula-driven from Inputs
+  const minRow = addFormulaRow("  Minority Interest", (cl) =>
+    `IF(minority_pct>0,-${cl}${ofcfRow}*minority_pct,0)`, NUM_FORMAT);
 
   // Operating FCF excl minorities
   const fcfExclRow = addFormulaRow("Operating FCF excl. Minorities", (cl) => `${cl}${ofcfRow}+${cl}${minRow}`, NUM_FORMAT, true);

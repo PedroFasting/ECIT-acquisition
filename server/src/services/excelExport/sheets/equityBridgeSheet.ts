@@ -241,8 +241,17 @@ export function buildEquityBridgeSheet(
   const eqvRow = addFormulaRow("Equity Value (EQV)", (cl) =>
     `${cl}${evRowNum}-${cl}${nibdRow}-${cl}${optRow}`, NUM_FORMAT, true);
 
-  // Share count from acquirer periods (static — imported from Excel)
-  const scRow = addDataRow("Aksjeantall (importert, m)", "share_count", NUM_FORMAT_1);
+  // Share count — formula-driven, linked to Inputs named ranges.
+  // Year 1 = total_entry_shares, last year = total_exit_shares, intermediate = linear interpolation.
+  const scRow = addFormulaRow("Aksjeantall (m)", (_cl, idx) => {
+    if (nPeriods <= 1) return "total_entry_shares";
+    if (idx === 0) return "total_entry_shares";
+    if (idx === nPeriods - 1) return "total_exit_shares";
+    // Linear interpolation: entry + (exit - entry) × idx / (nPeriods - 1)
+    return `total_entry_shares+(total_exit_shares-total_entry_shares)*${idx}/${nPeriods - 1}`;
+  }, NUM_FORMAT_1);
+  // Imported reference row for comparison/audit
+  addReferenceRow("  Aksjeantall (importert, ref)", "share_count", NUM_FORMAT_1);
 
   // Per share pre = (EQV - pref) / shares (formula)
   const ppPreRow = addFormulaRow("Per Share (pre-dilution)", (cl) =>

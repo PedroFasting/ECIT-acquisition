@@ -19,13 +19,13 @@ import { colLetter } from "../helpers.js";
  *   Year 1..N-1: FCF to Equity (from Debt Schedule)
  *   Year N (exit): FCF to Equity + Exit Equity Value
  *
- * Exit Equity = Exit EV - Closing Debt - Closing Pref
+ * Exit Equity = Exit EV - Closing Debt - Closing Pref - Option Debt
  * Exit EV = Exit EBITDA × exit_multiple (for each multiple in the grid)
- *
- * IRR is computed with Excel's IRR() function on this cash flow range.
- * MoM = sum(positive CFs) / abs(negative CFs)
- *
- * Per-share: Entry PPS from Inputs, Exit PPS from Equity Bridge.
+  *
+  * IRR is computed with Excel's IRR() function on this cash flow range.
+  * MoM = sum(positive CFs) / abs(negative CFs)
+  *
+  * Per-share: Entry PPS from Inputs, Exit PPS from Equity Bridge.
  */
 export function buildDealReturnsSheet(
   wb: ExcelJS.Workbook,
@@ -118,6 +118,7 @@ export function buildDealReturnsSheet(
   if (combinedResults.length > 0 && dsRowMap && ebRowMap && nPeriods > 0) {
     const pfSheet = "'Pro Forma P&L'";
     const dsSheet = "'Debt Schedule'";
+    const ebSheet = "'Equity Bridge'";
 
     // For each exit multiple, we build a hidden cash flow schedule area and compute IRR/MoM
     // The schedule lives below the return matrices
@@ -324,14 +325,15 @@ export function buildDealReturnsSheet(
           cell.value = { formula: `${dsSheet}!${periodCol}${dsRowMap.fcfToEquity}` };
         } else {
           // Exit year: FCF to Equity + Exit Equity Value
-          // Exit Equity = Exit EBITDA × exit_mult_N - Closing Debt - Closing Pref
+          // Exit Equity = Exit EBITDA × exit_mult_N - Closing Debt - Closing Pref - Option Debt
           // Uses named range so formula updates when user changes multiples in Inputs
           const periodCol = colLetter(y + 1);
           cell.value = { formula:
             `${dsSheet}!${periodCol}${dsRowMap.fcfToEquity}` +
             `+(${dsSheet}!${periodCol}${dsRowMap.ebitda}*${multNamedRange}` +
             `-${dsSheet}!${periodCol}${dsRowMap.closingDebt}` +
-            `-${dsSheet}!${periodCol}${dsRowMap.closingPref})`
+            `-${dsSheet}!${periodCol}${dsRowMap.closingPref}` +
+            `-${ebSheet}!${periodCol}${ebRowMap.optionDebt})`
           };
         }
         cell.numFmt = NUM_FORMAT;

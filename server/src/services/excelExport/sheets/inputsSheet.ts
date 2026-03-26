@@ -68,6 +68,7 @@ export function buildInputsSheet(wb: ExcelJS.Workbook, data: ExportData) {
   addInput("Acquirer Entry EV", data.dealParams.acquirer_entry_ev ?? 0, NUM_FORMAT, "NOKm", "acquirer_entry_ev");
   addInput("D&A % of Revenue", data.dealParams.da_pct_revenue ?? 0.01, PCT_FORMAT, "", "da_pct_revenue");
   addInput("NWC Investment (fallback)", data.dealParams.nwc_investment ?? 0, NUM_FORMAT, "NOKm/yr", "nwc_investment");
+  addInput("Minority %", data.dealParams.minority_pct ?? 0, PCT_FORMAT, "", "minority_pct", "Applied to Operating FCF");
   r++;
 
   // ── Capital Structure ──
