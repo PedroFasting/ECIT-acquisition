@@ -205,18 +205,19 @@ export function buildProFormaPeriods(
     const targetEbitda = tp ? parseFloat(tp.ebitda_total) || 0 : 0;
     const totalEbitda = acquirerEbitda + targetEbitda;
 
-    // Acquirer capex/NWC: use period data as-is
-    const acqCapex = parseFloat(ap.capex) || 0;
-    const acqNwc = parseFloat(ap.change_nwc) || 0;
+    // Acquirer capex/NWC: DB stores positive values; negate to outflow convention
+    // (FCF = EBITDA + Capex + NWC where Capex/NWC must be negative)
+    const acqCapex = -(Math.abs(parseFloat(ap.capex) || 0));
+    const acqNwc = -(Math.abs(parseFloat(ap.change_nwc) || 0));
 
-    // Target capex/NWC: use period data if available, otherwise apply % assumptions
+    // Target capex/NWC: use period data if available (negated), otherwise apply % assumptions
     const rawTgtCapex = tp ? parseFloat(tp.capex) : NaN;
     const rawTgtNwc = tp ? parseFloat(tp.change_nwc) : NaN;
     const tgtCapex = !isNaN(rawTgtCapex)
-      ? rawTgtCapex
+      ? -(Math.abs(rawTgtCapex))
       : (tgtCapexPct > 0 ? -(targetRevenue * tgtCapexPct) : 0);
     const tgtNwc = !isNaN(rawTgtNwc)
-      ? rawTgtNwc
+      ? -(Math.abs(rawTgtNwc))
       : (tgtNwcPct > 0 ? -(targetRevenue * tgtNwcPct) : 0);
 
     const totalCapex = acqCapex + tgtCapex;
@@ -280,8 +281,8 @@ export function buildAcquirerPeriodData(acquirerPeriods: any[]): PeriodData[] {
   return acquirerPeriods.map((p: any) => ({
     ebitda: parseFloat(p.ebitda_total) || 0,
     revenue: parseFloat(p.revenue_total) || 0,
-    capex: p.capex != null ? parseFloat(p.capex) : undefined,
-    change_nwc: p.change_nwc != null ? parseFloat(p.change_nwc) : undefined,
+    capex: p.capex != null ? -(Math.abs(parseFloat(p.capex))) : undefined,
+    change_nwc: p.change_nwc != null ? -(Math.abs(parseFloat(p.change_nwc))) : undefined,
   }));
 }
 
@@ -290,8 +291,8 @@ export function buildTargetPeriodData(targetPeriods: any[], nibdFcf?: (number | 
   return targetPeriods.map((p: any, i: number) => ({
     ebitda: parseFloat(p.ebitda_total) || 0,
     revenue: parseFloat(p.revenue_total) || 0,
-    capex: p.capex != null ? parseFloat(p.capex) : undefined,
-    change_nwc: p.change_nwc != null ? parseFloat(p.change_nwc) : undefined,
+    capex: p.capex != null ? -(Math.abs(parseFloat(p.capex))) : undefined,
+    change_nwc: p.change_nwc != null ? -(Math.abs(parseFloat(p.change_nwc))) : undefined,
     nibd_fcf: nibdFcf?.[i],
   }));
 }
@@ -339,8 +340,8 @@ export function buildProFormaPeriodData(
       const taxRate = dp.tax_rate ?? 0.22;
       const daPctRevenue = dp.da_pct_revenue ?? 0.01;
       const acqRevenue = parseFloat(ap.revenue_total) || 0;
-      const acqCapex = ap.capex != null ? parseFloat(ap.capex) : 0;
-      const acqNwc = ap.change_nwc != null ? parseFloat(ap.change_nwc) : 0;
+      const acqCapex = ap.capex != null ? -(Math.abs(parseFloat(ap.capex))) : 0;
+      const acqNwc = ap.change_nwc != null ? -(Math.abs(parseFloat(ap.change_nwc))) : 0;
       const daProxy = acqRevenue > 0 ? acqRevenue * daPctRevenue : Math.abs(acqEbitda) * daPctRevenue;
       const ebtProxy = acqEbitda - daProxy;
       const tax = ebtProxy > 0 ? -ebtProxy * taxRate : 0;
@@ -348,19 +349,19 @@ export function buildProFormaPeriodData(
       pfNibdFcf = acqFcf + tgtFcf + synergy;
     }
 
-    // Acquirer capex/NWC: use period data as-is
-    const acqCapex = ap.capex != null ? parseFloat(ap.capex) : undefined;
-    const acqNwc = ap.change_nwc != null ? parseFloat(ap.change_nwc) : undefined;
+    // Acquirer capex/NWC: DB stores positive values; negate to outflow convention
+    const acqCapex = ap.capex != null ? -(Math.abs(parseFloat(ap.capex))) : undefined;
+    const acqNwc = ap.change_nwc != null ? -(Math.abs(parseFloat(ap.change_nwc))) : undefined;
 
-    // Target capex/NWC: use period data if available, otherwise apply target-specific % assumptions
+    // Target capex/NWC: use period data if available (negated), otherwise apply target-specific % assumptions
     // (mirrors buildProFormaPeriods display logic for consistency)
     const rawTgtCapex = tp?.capex != null ? parseFloat(tp.capex) : NaN;
     const rawTgtNwc = tp?.change_nwc != null ? parseFloat(tp.change_nwc) : NaN;
     const tgtCapex = !isNaN(rawTgtCapex)
-      ? rawTgtCapex
+      ? -(Math.abs(rawTgtCapex))
       : (tgtCapexPct > 0 ? -(tgtRevenue * tgtCapexPct) : undefined);
     const tgtNwc = !isNaN(rawTgtNwc)
-      ? rawTgtNwc
+      ? -(Math.abs(rawTgtNwc))
       : (tgtNwcPct > 0 ? -(tgtRevenue * tgtNwcPct) : undefined);
 
     // Combine capex/NWC: only defined if at least one side has a value
@@ -395,8 +396,10 @@ export function buildProFormaPeriodDataFromStored(
     return {
       ebitda: (p.total_ebitda_excl_synergies || 0) + synergy,
       revenue: p.total_revenue || 0,
-      capex: p.total_capex != null ? p.total_capex : undefined,
-      change_nwc: p.total_change_nwc != null ? p.total_change_nwc : undefined,
+      // Ensure outflow convention: negate abs value to handle both old (positive)
+      // and new (negative) stored data consistently
+      capex: p.total_capex != null ? -(Math.abs(p.total_capex)) : undefined,
+      change_nwc: p.total_change_nwc != null ? -(Math.abs(p.total_change_nwc)) : undefined,
     };
   });
 }

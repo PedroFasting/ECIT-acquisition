@@ -34,6 +34,8 @@ import {
   buildProFormaPeriods,
   buildProFormaPeriodData,
   buildProFormaPeriodDataFromStored,
+  buildAcquirerPeriodData,
+  buildTargetPeriodData,
   mergeScenarioParams,
   applySynergies,
   getEquityFromSources,
@@ -133,6 +135,87 @@ describe("zero capex/NWC is a valid value, not missing data", () => {
       const result = buildProFormaPeriodData(acq, tgt, {}, dp);
       // Target NWC is explicitly 0 — combined should be acquirer only: -20
       expect(result[0].change_nwc).toBe(-20);
+    });
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════
+// 1a. POSITIVE DB VALUES — DB stores capex/NWC as positive; code must negate
+// ══════════════════════════════════════════════════════════════════
+
+describe("positive capex/NWC from DB are negated to outflow convention", () => {
+  describe("buildProFormaPeriods — display layer", () => {
+    it("positive acquirer capex is negated", () => {
+      const acq = [makePeriod(2025, { revenue_total: "1000", ebitda_total: "200", capex: "51.5", change_nwc: "38.6" })];
+      const tgt = [makePeriod(2025, { revenue_total: "500", ebitda_total: "55", capex: "5.7", change_nwc: "5.5" })];
+      const dp: DealParameters = { price_paid: 600, tax_rate: 0.22, exit_multiples: [10] };
+      const result = buildProFormaPeriods(acq, tgt, {}, dp);
+
+      // Both should be negative (outflows)
+      expect(result[0].total_capex).toBeCloseTo(-57.2, 1); // -(51.5) + -(5.7)
+      expect(result[0].total_change_nwc).toBeCloseTo(-44.1, 1); // -(38.6) + -(5.5)
+      // FCF should be EBITDA minus capex/NWC (not plus!)
+      expect(result[0].operating_fcf).toBeLessThan(result[0].total_ebitda_excl_synergies);
+      // Cash conversion should be < 100%
+      expect(result[0].cash_conversion).toBeLessThan(1);
+      expect(result[0].cash_conversion).toBeGreaterThan(0);
+    });
+  });
+
+  describe("buildAcquirerPeriodData — computation layer", () => {
+    it("positive capex/NWC from DB are negated", () => {
+      const periods = [makePeriod(2025, { capex: "51.5", change_nwc: "38.6" })];
+      const result = buildAcquirerPeriodData(periods);
+      expect(result[0].capex).toBe(-51.5);
+      expect(result[0].change_nwc).toBe(-38.6);
+    });
+  });
+
+  describe("buildTargetPeriodData — computation layer", () => {
+    it("positive capex/NWC from DB are negated", () => {
+      const periods = [makePeriod(2025, { capex: "5.7", change_nwc: "5.5" })];
+      const result = buildTargetPeriodData(periods);
+      expect(result[0].capex).toBe(-5.7);
+      expect(result[0].change_nwc).toBe(-5.5);
+    });
+  });
+
+  describe("buildProFormaPeriodData — computation layer", () => {
+    it("positive capex/NWC from DB are negated and combined", () => {
+      const acq = [makePeriod(2025, { revenue_total: "1000", ebitda_total: "200", capex: "51.5", change_nwc: "38.6" })];
+      const tgt = [makePeriod(2025, { revenue_total: "500", ebitda_total: "55", capex: "5.7", change_nwc: "5.5" })];
+      const dp: DealParameters = { price_paid: 600, tax_rate: 0.22, exit_multiples: [10] };
+      const result = buildProFormaPeriodData(acq, tgt, {}, dp);
+      expect(result[0].capex).toBeCloseTo(-57.2, 1);
+      expect(result[0].change_nwc).toBeCloseTo(-44.1, 1);
+    });
+  });
+
+  describe("buildProFormaPeriodDataFromStored — stored path", () => {
+    it("positive stored capex/NWC are negated", () => {
+      const stored = [{
+        period_date: new Date("2025-12-31"),
+        total_ebitda_excl_synergies: 255,
+        total_revenue: 1500,
+        total_capex: 57.2,      // old stored positive value
+        total_change_nwc: 44.1, // old stored positive value
+      }];
+      const result = buildProFormaPeriodDataFromStored(stored, {});
+      expect(result[0].capex).toBeCloseTo(-57.2, 1);
+      expect(result[0].change_nwc).toBeCloseTo(-44.1, 1);
+    });
+
+    it("already-negative stored capex/NWC remain negative", () => {
+      const stored = [{
+        period_date: new Date("2025-12-31"),
+        total_ebitda_excl_synergies: 255,
+        total_revenue: 1500,
+        total_capex: -57.2,      // new stored negative value
+        total_change_nwc: -44.1, // new stored negative value
+      }];
+      const result = buildProFormaPeriodDataFromStored(stored, {});
+      expect(result[0].capex).toBeCloseTo(-57.2, 1);
+      expect(result[0].change_nwc).toBeCloseTo(-44.1, 1);
     });
   });
 });
