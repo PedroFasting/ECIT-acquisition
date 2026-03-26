@@ -143,6 +143,9 @@ export function buildInputsSheet(wb: ExcelJS.Workbook, data: ExportData) {
   // ── Exit Multiples ──
   addSection("Exit Multiples");
   const multiples = data.dealParams.exit_multiples ?? [10, 11, 12, 13, 14];
+  const medianMultIdx = Math.floor(multiples.length / 2);
+  const bridgeMultiple = multiples[medianMultIdx] ?? 13;
+  addInput("Bridge Multiple (Equity Bridge)", bridgeMultiple, NUM_FORMAT_1, "x", "bridge_multiple", "Median exit mult. — used for EV in Equity Bridge");
   for (let i = 0; i < multiples.length; i++) {
     addInput(`Exit Multiple ${i + 1}`, multiples[i], NUM_FORMAT_1, "x", `exit_mult_${i + 1}`);
   }

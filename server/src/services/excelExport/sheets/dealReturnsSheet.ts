@@ -287,6 +287,7 @@ export function buildDealReturnsSheet(
 
     for (let m = 0; m < nMults; m++) {
       const mult = multiples[m];
+      const multNamedRange = `exit_mult_${m + 1}`; // references Inputs named range
       const blockStartRow = r;
 
       // Label row
@@ -323,18 +324,12 @@ export function buildDealReturnsSheet(
           cell.value = { formula: `${dsSheet}!${periodCol}${dsRowMap.fcfToEquity}` };
         } else {
           // Exit year: FCF to Equity + Exit Equity Value
-          // Exit Equity = Exit EBITDA × multiple - Closing Debt - Closing Pref
+          // Exit Equity = Exit EBITDA × exit_mult_N - Closing Debt - Closing Pref
+          // Uses named range so formula updates when user changes multiples in Inputs
           const periodCol = colLetter(y + 1);
           cell.value = { formula:
             `${dsSheet}!${periodCol}${dsRowMap.fcfToEquity}` +
-            `+(${pfSheet}!${periodCol}${data.proFormaPeriods.length > 0 ? 0 : 0}*${mult}` + // we need EBITDA incl row
-            `-${dsSheet}!${periodCol}${dsRowMap.closingDebt}` +
-            `-${dsSheet}!${periodCol}${dsRowMap.closingPref})`
-          };
-          // Actually, let me fix this: use the actual PF EBITDA incl synergies row
-          cell.value = { formula:
-            `${dsSheet}!${periodCol}${dsRowMap.fcfToEquity}` +
-            `+(${dsSheet}!${periodCol}${dsRowMap.ebitda}*${mult}` +
+            `+(${dsSheet}!${periodCol}${dsRowMap.ebitda}*${multNamedRange}` +
             `-${dsSheet}!${periodCol}${dsRowMap.closingDebt}` +
             `-${dsSheet}!${periodCol}${dsRowMap.closingPref})`
           };

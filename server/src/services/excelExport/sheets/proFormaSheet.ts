@@ -117,9 +117,28 @@ export function buildProFormaSheet(wb: ExcelJS.Workbook, data: ExportData, perio
   r++;
 
   // ── Cash Flow Section ──
+  // Sign convention: Capex and NWC are NEGATIVE (cash outflows).
+  // Operating FCF = EBITDA + Capex + NWC + Other (where Capex/NWC are negative).
   addDataRow("CASH FLOW", [], "", true);
-  const capexRow = addDataRow("  Capex", pf.map((p: any) => p.total_capex), NUM_FORMAT);
-  const nwcRow = addDataRow("  Change in NWC", pf.map((p: any) => p.total_change_nwc), NUM_FORMAT);
+
+  // Note about sign convention
+  const noteRow = ws.getRow(r);
+  noteRow.getCell(1).value = "NB: Capex og NWC er negative tall (kontantutgifter). FCF = EBITDA + Capex + NWC.";
+  noteRow.getCell(1).font = { ...VALUE_FONT, size: 9, italic: true, color: { argb: "808080" } };
+  ws.mergeCells(r, 1, r, totalCols);
+  r++;
+
+  // Capex — imported values with D&A proxy fallback from Inputs
+  // If imported capex is 0, use -(da_pct_revenue × Revenue) as proxy
+  const capexImportedRow = addDataRow("  Capex (imported)", pf.map((p: any) => p.total_capex), NUM_FORMAT);
+  const capexRow = addFormulaRow("  Capex", (cl) =>
+    `IF(${cl}${capexImportedRow}<>0,${cl}${capexImportedRow},-da_pct_revenue*${cl}${totalRevRow})`, NUM_FORMAT);
+
+  // NWC — imported values with nwc_investment fallback from Inputs
+  const nwcImportedRow = addDataRow("  Change in NWC (imported)", pf.map((p: any) => p.total_change_nwc), NUM_FORMAT);
+  const nwcRow = addFormulaRow("  Change in NWC", (cl) =>
+    `IF(${cl}${nwcImportedRow}<>0,${cl}${nwcImportedRow},-ABS(nwc_investment))`, NUM_FORMAT);
+
   const otherCfRow = addDataRow("  Other Cash Flow Items", pf.map((p: any) => p.total_other_cash_flow ?? 0), NUM_FORMAT);
 
   // Operating FCF = EBITDA incl syn + capex + NWC + other

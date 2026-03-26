@@ -171,22 +171,19 @@ export function buildEquityBridgeSheet(
   r++;
 
   // ── Enterprise Value = Adjusted EBITDA × Exit Multiple ──
-  const multiples = data.dealParams.exit_multiples ?? [10, 11, 12, 13, 14];
-  const medianMultIdx = Math.floor(multiples.length / 2);
-  const bridgeMultiple = multiples[medianMultIdx] ?? 13;
+  // Bridge multiple is defined in Inputs sheet as named range "bridge_multiple"
 
-  // Add bridge multiple as named range on this sheet
+  // Show which multiple is being used (formula referencing Inputs)
   const bmRow = ws.getRow(r);
   bmRow.getCell(1).value = "Exit Multiple (bridge)";
   bmRow.getCell(1).font = LABEL_FONT;
   bmRow.getCell(1).border = THIN_BORDER;
   const bmCell = bmRow.getCell(2);
-  bmCell.value = bridgeMultiple;
+  bmCell.value = { formula: "bridge_multiple" };
   bmCell.numFmt = MULT_FORMAT;
   bmCell.border = THIN_BORDER;
-  bmCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2CC" } }; // input yellow
   bmCell.font = VALUE_FONT;
-  wb.definedNames.add(`'Equity Bridge'!$B$${r}`, "bridge_multiple");
+  styleFormulaCell(bmCell);
   r++;
 
   // EV = Adjusted EBITDA × bridge_multiple (formula)
