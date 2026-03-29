@@ -5,6 +5,7 @@ import api from "../services/api";
 import type { Company } from "../types";
 import { Building2, Plus, Trash2, Target, Crown } from "lucide-react";
 import { getErrorMessage } from "../utils/errors";
+import { Spinner, ConfirmModal } from "../components/ui";
 
 export default function CompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -19,6 +20,7 @@ export default function CompaniesPage() {
     currency: "NOKm",
   });
   const [error, setError] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   const { t } = useTranslation();
 
   const fetchCompanies = async () => {
@@ -55,13 +57,19 @@ export default function CompaniesPage() {
     }
   };
 
-  const handleDelete = async (id: number, name: string) => {
-    if (!confirm(t("companies.confirmDelete", { name }))) return;
+  const handleDeleteClick = (id: number, name: string) => {
+    setDeleteTarget({ id, name });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
     try {
-      await api.deleteCompany(id);
+      await api.deleteCompany(deleteTarget.id);
+      setDeleteTarget(null);
       fetchCompanies();
     } catch (err) {
       setError(getErrorMessage(err));
+      setDeleteTarget(null);
     }
   };
 
@@ -69,15 +77,11 @@ export default function CompaniesPage() {
   const targets = companies.filter((c) => c.company_type === "target");
 
   if (loading) {
-    return (
-      <div className="p-8 flex items-center justify-center h-full">
-        <div className="text-gray-400">{t("common.loading")}</div>
-      </div>
-    );
+    return <Spinner fullPage label={t("common.loading")} />;
   }
 
   return (
-    <div className="p-8 max-w-6xl">
+    <div className="p-8 max-w-7xl">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{t("companies.title")}</h1>
@@ -87,7 +91,7 @@ export default function CompaniesPage() {
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-[#03223F] text-white rounded-lg hover:bg-[#002C55] transition-colors text-sm font-medium"
+          className="flex items-center gap-2 px-4 py-2.5 bg-ecit-dark text-white rounded-lg hover:bg-ecit-navy transition-colors text-sm font-medium"
         >
           <Plus size={16} />
           {t("companies.newCompany")}
@@ -115,7 +119,7 @@ export default function CompaniesPage() {
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#002C55] outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ecit-navy outline-none"
                 placeholder={t("companies.companyNamePlaceholder")}
               />
             </div>
@@ -131,7 +135,7 @@ export default function CompaniesPage() {
                     company_type: e.target.value as "acquirer" | "target",
                   })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#002C55] outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ecit-navy outline-none"
               >
                 <option value="acquirer">{t("companies.acquirerType")}</option>
                 <option value="target">{t("companies.targetType")}</option>
@@ -147,7 +151,7 @@ export default function CompaniesPage() {
                 onChange={(e) =>
                   setFormData({ ...formData, country: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#002C55] outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ecit-navy outline-none"
                 placeholder={t("companies.countryPlaceholder")}
               />
             </div>
@@ -161,7 +165,7 @@ export default function CompaniesPage() {
                 onChange={(e) =>
                   setFormData({ ...formData, sector: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#002C55] outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ecit-navy outline-none"
                 placeholder={t("companies.sectorPlaceholder")}
               />
             </div>
@@ -175,7 +179,7 @@ export default function CompaniesPage() {
                 onChange={(e) =>
                   setFormData({ ...formData, description: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#002C55] outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ecit-navy outline-none"
                 placeholder={t("companies.descriptionPlaceholder")}
               />
             </div>
@@ -183,7 +187,7 @@ export default function CompaniesPage() {
           <div className="flex gap-2 mt-4">
             <button
               onClick={handleCreate}
-              className="px-4 py-2 bg-[#03223F] text-white rounded-lg text-sm font-medium hover:bg-[#002C55]"
+              className="px-4 py-2 bg-ecit-dark text-white rounded-lg text-sm font-medium hover:bg-ecit-navy"
             >
               {t("common.create")}
             </button>
@@ -200,7 +204,7 @@ export default function CompaniesPage() {
       {/* Acquirer section */}
       <section className="mb-8">
         <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <Crown size={20} className="text-[#002C55]" />
+          <Crown size={20} className="text-ecit-navy" />
           {t("companies.acquirerSection")}
         </h2>
         {acquirers.length === 0 ? (
@@ -213,7 +217,7 @@ export default function CompaniesPage() {
               <CompanyCard
                 key={c.id}
                 company={c}
-                onDelete={() => handleDelete(c.id, c.name)}
+                onDelete={() => handleDeleteClick(c.id, c.name)}
               />
             ))}
           </div>
@@ -223,7 +227,7 @@ export default function CompaniesPage() {
       {/* Targets section */}
       <section>
         <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <Target size={20} className="text-[#57A5E4]" />
+          <Target size={20} className="text-ecit-accent" />
           {t("companies.targetSection")}
         </h2>
         {targets.length === 0 ? (
@@ -236,12 +240,21 @@ export default function CompaniesPage() {
               <CompanyCard
                 key={c.id}
                 company={c}
-                onDelete={() => handleDelete(c.id, c.name)}
+                onDelete={() => handleDeleteClick(c.id, c.name)}
               />
             ))}
           </div>
         )}
       </section>
+
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title={t("common.confirmDelete")}
+        message={t("companies.confirmDelete", { name: deleteTarget?.name ?? "" })}
+        variant="danger"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }
@@ -267,8 +280,8 @@ function CompanyCard({
               size={20}
               className={
                 company.company_type === "acquirer"
-                  ? "text-[#002C55]"
-                  : "text-[#57A5E4]"
+? "text-ecit-navy"
+                   : "text-ecit-accent"
               }
             />
           </div>

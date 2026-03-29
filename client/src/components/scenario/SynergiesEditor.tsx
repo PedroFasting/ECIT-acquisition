@@ -135,7 +135,7 @@ export default function SynergiesEditor({
   }
 
   const inputCls =
-    "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-right focus:ring-2 focus:ring-[#002C55] focus:border-[#002C55] outline-none";
+    "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-right focus:ring-2 focus:ring-ecit-navy focus:border-ecit-navy outline-none";
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 mb-8">
@@ -174,7 +174,7 @@ export default function SynergiesEditor({
               type="number"
               ref={rampInputRef}
               placeholder={t("synergies.rampPlaceholder")}
-              className="w-28 px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-right focus:ring-2 focus:ring-[#002C55] focus:border-[#002C55] outline-none"
+              className="w-28 px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-right focus:ring-2 focus:ring-ecit-navy focus:border-ecit-navy outline-none"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   const val = Number((e.target as HTMLInputElement).value);
@@ -329,7 +329,7 @@ export default function SynergiesEditor({
               <button
                 onClick={handleSave}
                 disabled={saving || !dirty}
-                className="flex items-center gap-1 px-4 py-2 text-xs bg-[#03223F] hover:bg-[#002C55] disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
+                className="flex items-center gap-1 px-4 py-2 text-xs bg-ecit-dark hover:bg-ecit-navy disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
               >
                 <Save size={12} />
                 {saving ? t("synergies.saving") : t("synergies.saveSynergies")}

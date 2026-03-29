@@ -4,12 +4,14 @@ import { useTranslation } from "react-i18next";
 import api from "../services/api";
 import type { Company, AcquisitionScenario } from "../types";
 import { Building2, FileSpreadsheet, GitMerge, ArrowRight, Trash2 } from "lucide-react";
+import { Spinner, ConfirmModal } from "../components/ui";
 
 export default function DashboardPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [scenarios, setScenarios] = useState<AcquisitionScenario[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   const { t } = useTranslation();
 
   const loadData = async () => {
@@ -33,23 +35,25 @@ export default function DashboardPage() {
     loadData();
   }, []);
 
-  const handleDeleteScenario = async (id: number, name: string) => {
-    if (!confirm(t("dashboard.confirmDeleteScenario", { name }))) return;
+  const handleDeleteScenarioClick = (id: number, name: string) => {
+    setDeleteTarget({ id, name });
+  };
+
+  const handleDeleteScenarioConfirm = async () => {
+    if (!deleteTarget) return;
     try {
-      await api.deleteScenario(id);
-      setScenarios((prev) => prev.filter((s) => s.id !== id));
+      await api.deleteScenario(deleteTarget.id);
+      setDeleteTarget(null);
+      setScenarios((prev) => prev.filter((s) => s.id !== deleteTarget.id));
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : t("errors.deleteFailed"));
+      setDeleteTarget(null);
     }
   };
 
   if (loading) {
-    return (
-      <div className="p-8 flex items-center justify-center h-full">
-        <div className="text-gray-400">{t("common.loading")}</div>
-      </div>
-    );
+    return <Spinner fullPage label={t("common.loading")} />;
   }
 
   const acquirers = companies.filter((c) => c.company_type === "acquirer");
@@ -60,7 +64,7 @@ export default function DashboardPage() {
   );
 
   return (
-    <div className="p-8 max-w-6xl">
+    <div className="p-8 max-w-7xl">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">{t("dashboard.title")}</h1>
         <p className="text-gray-500 mt-1">
@@ -83,14 +87,14 @@ export default function DashboardPage() {
             label: t("dashboard.acquirers"),
             value: acquirers.length,
             icon: Building2,
-            color: "text-[#002C55]",
+            color: "text-ecit-navy",
             bg: "bg-blue-50",
           },
           {
             label: t("dashboard.targetCompanies"),
             value: targets.length,
             icon: Building2,
-            color: "text-[#57A5E4]",
+            color: "text-ecit-accent",
             bg: "bg-sky-50",
           },
           {
@@ -161,9 +165,9 @@ export default function DashboardPage() {
               <Link
                 key={item.step}
                 to={item.link}
-                className="flex items-center gap-4 p-4 rounded-lg border border-gray-100 hover:border-[#002C55] hover:bg-blue-50/30 transition-all"
+                className="flex items-center gap-4 p-4 rounded-lg border border-gray-100 hover:border-ecit-navy hover:bg-blue-50/30 transition-all"
               >
-                <div className="w-8 h-8 rounded-full bg-[#03223F] text-white flex items-center justify-center text-sm font-bold">
+                <div className="w-8 h-8 rounded-full bg-ecit-dark text-white flex items-center justify-center text-sm font-bold">
                   {item.step}
                 </div>
                 <div className="flex-1">
@@ -186,7 +190,7 @@ export default function DashboardPage() {
             </h2>
             <Link
               to="/scenarios"
-              className="text-sm text-[#002C55] hover:underline"
+              className="text-sm text-ecit-navy hover:underline"
             >
               {t("dashboard.viewAll")}
             </Link>
@@ -201,7 +205,7 @@ export default function DashboardPage() {
                   to={`/scenarios/${s.id}`}
                   className="flex items-center gap-3 flex-1 min-w-0"
                 >
-                  <GitMerge size={16} className="text-[#002C55] shrink-0" />
+                  <GitMerge size={16} className="text-ecit-navy shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-900 text-sm truncate">
                       {s.name}
@@ -221,7 +225,7 @@ export default function DashboardPage() {
                   </span>
                 </Link>
                 <button
-                  onClick={() => handleDeleteScenario(s.id, s.name)}
+                  onClick={() => handleDeleteScenarioClick(s.id, s.name)}
                   className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
                   title={t("dashboard.deleteScenario")}
                 >
@@ -242,7 +246,7 @@ export default function DashboardPage() {
             </h2>
             <Link
               to="/companies"
-              className="text-sm text-[#002C55] hover:underline"
+              className="text-sm text-ecit-navy hover:underline"
             >
               {t("dashboard.manage")}
             </Link>
@@ -258,8 +262,8 @@ export default function DashboardPage() {
                   size={16}
                   className={
                     c.company_type === "acquirer"
-                      ? "text-[#002C55]"
-                      : "text-[#57A5E4]"
+                      ? "text-ecit-navy"
+                      : "text-ecit-accent"
                   }
                 />
                 <div className="flex-1">
@@ -274,6 +278,15 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title={t("common.confirmDelete")}
+        message={t("dashboard.confirmDeleteScenario", { name: deleteTarget?.name ?? "" })}
+        variant="danger"
+        onConfirm={handleDeleteScenarioConfirm}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

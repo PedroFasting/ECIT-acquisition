@@ -22,6 +22,7 @@ import {
   Activity,
   Building2,
 } from "lucide-react";
+import { Spinner } from "../components/ui";
 
 // ── Key Metric Card ──────────────────────────────────────────────────────
 
@@ -30,7 +31,7 @@ function MetricCard({
   value,
   subtitle,
   icon: Icon,
-  color = "text-[#002C55]",
+  color = "text-ecit-navy",
   bg = "bg-blue-50",
 }: {
   label: string;
@@ -85,9 +86,9 @@ function RevenueMixBar({
   if (total === 0) return null;
 
   const segments = [
-    { label: t("targetOverview.managedServices"), value: ms, color: "bg-[#002C55]" },
-    { label: t("targetOverview.professionalServices"), value: ps, color: "bg-[#57A5E4]" },
-    { label: t("targetOverview.other"), value: other, color: "bg-[#F4EDDC]" },
+    { label: t("targetOverview.managedServices"), value: ms, color: "bg-ecit-navy" },
+    { label: t("targetOverview.professionalServices"), value: ps, color: "bg-ecit-accent" },
+    { label: t("targetOverview.other"), value: other, color: "bg-ecit-cream" },
   ].filter((s) => s.value > 0);
 
   return (
@@ -275,11 +276,7 @@ export default function TargetOverviewPage() {
   // ── Render ─────────────────────────────────────────────────────────────
 
   if (loading) {
-    return (
-      <div className="p-8 flex items-center justify-center h-full">
-        <div className="text-gray-400">{t("targetOverview.loading")}</div>
-      </div>
-    );
+    return <Spinner fullPage label={t("targetOverview.loading")} />;
   }
 
   if (!company) {
@@ -305,7 +302,7 @@ export default function TargetOverviewPage() {
           <div>
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-sky-50">
-                <Building2 size={24} className="text-[#57A5E4]" />
+                <Building2 size={24} className="text-ecit-accent" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">
@@ -337,7 +334,7 @@ export default function TargetOverviewPage() {
               <select
                 value={selectedModelId || ""}
                 onChange={(e) => setSelectedModelId(Number(e.target.value))}
-                className="appearance-none bg-white border border-gray-200 rounded-lg px-4 py-2.5 pr-10 text-sm font-medium text-gray-700 focus:ring-2 focus:ring-[#002C55] outline-none cursor-pointer"
+                className="appearance-none bg-white border border-gray-200 rounded-lg px-4 py-2.5 pr-10 text-sm font-medium text-gray-700 focus:ring-2 focus:ring-ecit-navy outline-none cursor-pointer"
               >
                 {models.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -366,7 +363,7 @@ export default function TargetOverviewPage() {
            <p className="text-lg mb-2">{t("targetOverview.noFinancialData")}</p>
            <p className="text-sm">
              {t("targetOverview.importDataVia")}{" "}
-             <Link to={`/companies/${company.id}`} className="text-[#57A5E4] underline">
+             <Link to={`/companies/${company.id}`} className="text-ecit-accent underline">
                {t("targetOverview.companyPage")}
              </Link>
            </p>
@@ -380,7 +377,7 @@ export default function TargetOverviewPage() {
               value={fmt(latestPeriod?.revenue_total)}
               subtitle={latestPeriod?.period_label}
               icon={DollarSign}
-              color="text-[#002C55]"
+              color="text-ecit-navy"
               bg="bg-blue-50"
             />
             <MetricCard
@@ -416,7 +413,7 @@ export default function TargetOverviewPage() {
                   : undefined
               }
               icon={TrendingUp}
-              color="text-[#57A5E4]"
+              color="text-ecit-accent"
               bg="bg-sky-50"
             />
             <MetricCard
@@ -436,7 +433,7 @@ export default function TargetOverviewPage() {
           {/* ── Revenue Mix ───────────────────────────────────────── */}
           <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
             <div className="flex items-center gap-2 mb-3">
-              <PieChart size={16} className="text-[#002C55]" />
+              <PieChart size={16} className="text-ecit-navy" />
               <h2 className="text-sm font-semibold text-gray-900">
                 {t("targetOverview.revenueMix", { period: latestPeriod?.period_label })}
               </h2>
@@ -619,7 +616,7 @@ export default function TargetOverviewPage() {
             <table className="ecit-table">
               <thead>
                 <tr>
-                  <th className="text-left sticky left-0 bg-[#002C55] min-w-[220px]">
+                  <th className="text-left sticky left-0 bg-ecit-navy min-w-[220px]">
                     {company.name}
                     {modelDetail && ` (${modelDetail.name})`}
                   </th>
@@ -684,7 +681,7 @@ export default function TargetOverviewPage() {
           {hasEquityData && (
             <div className="mb-6">
               <div className="flex items-center gap-2 mb-3">
-                <TrendingUp size={16} className="text-[#002C55]" />
+                <TrendingUp size={16} className="text-ecit-navy" />
                  <h2 className="text-sm font-semibold text-gray-900">
                    {t("targetOverview.equityBridge")}
                  </h2>
@@ -693,7 +690,7 @@ export default function TargetOverviewPage() {
                 <table className="ecit-table">
                   <thead>
                     <tr>
-                       <th className="text-left sticky left-0 bg-[#002C55] min-w-[220px]">
+                       <th className="text-left sticky left-0 bg-ecit-navy min-w-[220px]">
                          {t("targetOverview.valuationAndEquity")}
                        </th>
                       {periods.map((p) => (
@@ -712,7 +709,7 @@ export default function TargetOverviewPage() {
                       return (
                         <tr
                           key={item.key}
-                          className={item.bold ? "!bg-[#F4EDDC]" : ""}
+                          className={item.bold ? "!bg-ecit-cream" : ""}
                         >
                           <td
                             className={`sticky left-0 ${
@@ -762,7 +759,7 @@ export default function TargetOverviewPage() {
                     to={`/scenarios/${s.id}`}
                     className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors border border-gray-100"
                   >
-                    <GitMerge size={14} className="text-[#002C55] shrink-0" />
+                    <GitMerge size={14} className="text-ecit-navy shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">
                         {s.name}

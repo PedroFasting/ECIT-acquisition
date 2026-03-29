@@ -11,6 +11,7 @@ import {
   Trophy,
 } from "lucide-react";
 import { getErrorMessage } from "../utils/errors";
+import { Spinner } from "../components/ui";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -70,7 +71,7 @@ function ComparisonRow({
         <tr>
           <td
             colSpan={3}
-            className="px-4 py-2 text-xs font-bold text-[#002C55] uppercase tracking-wider bg-[#F4EDDC] border-t border-gray-200"
+            className="px-4 py-2 text-xs font-bold text-ecit-navy uppercase tracking-wider bg-ecit-cream border-t border-gray-200"
           >
             {section}
           </td>
@@ -281,11 +282,7 @@ export default function TargetComparePage() {
   // ── Render ─────────────────────────────────────────────────────────────
 
   if (loading) {
-    return (
-      <div className="p-8 flex items-center justify-center h-full">
-        <div className="text-gray-400">{t("targetCompare.loading")}</div>
-      </div>
-    );
+    return <Spinner fullPage label={t("targetCompare.loading")} />;
   }
 
   if (error && (!targetA || !targetB)) {
@@ -350,7 +347,7 @@ export default function TargetComparePage() {
           >
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2 rounded-lg bg-sky-50">
-                <Building2 size={18} className="text-[#57A5E4]" />
+                <Building2 size={18} className="text-ecit-accent" />
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold text-gray-900">
@@ -364,7 +361,7 @@ export default function TargetComparePage() {
               </div>
               <Link
                 to={`/targets/${target?.company.id}`}
-                className="text-xs text-[#57A5E4] hover:underline"
+                className="text-xs text-ecit-accent hover:underline"
               >
                 {t("targetCompare.fullDetails")}
               </Link>
@@ -396,7 +393,7 @@ export default function TargetComparePage() {
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
         <table className="w-full">
           <thead>
-            <tr className="bg-[#002C55] text-white">
+            <tr className="bg-ecit-navy text-white">
                <th className="text-left px-4 py-3 text-xs font-semibold w-1/3">
                  {t("targetCompare.keyMetric")}
                </th>
@@ -512,17 +509,17 @@ export default function TargetComparePage() {
                      {[
                          {
                            pct: mix.ms_pct,
-                           color: "bg-[#002C55]",
+                           color: "bg-ecit-navy",
                            label: t("targetCompare.ms"),
                          },
                          {
                            pct: mix.ps_pct,
-                           color: "bg-[#57A5E4]",
+                           color: "bg-ecit-accent",
                            label: t("targetCompare.ps"),
                          },
                          {
                            pct: mix.other_pct,
-                           color: "bg-[#F4EDDC]",
+                           color: "bg-ecit-cream",
                            label: t("targetCompare.other"),
                          },
                        ]
@@ -585,7 +582,7 @@ export default function TargetComparePage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-[#002C55] text-white">
+                  <tr className="bg-ecit-navy text-white">
                      <th className="text-left px-3 py-2 text-xs font-semibold min-w-[140px]">
                        {t("targetCompare.metric")}
                      </th>
@@ -599,7 +596,7 @@ export default function TargetComparePage() {
                       </th>
                     ))}
                   </tr>
-                  <tr className="bg-[#002C55]/80 text-white/80">
+                  <tr className="bg-ecit-navy/80 text-white/80">
                     <th className="text-left px-3 py-1 text-[10px]"></th>
                     {sortedLabels.map((label) => (
                       <React.Fragment key={label}>

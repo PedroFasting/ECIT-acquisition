@@ -13,6 +13,7 @@ import {
   Check,
 } from "lucide-react";
 import { getErrorMessage } from "../utils/errors";
+import { Spinner } from "../components/ui";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -148,15 +149,11 @@ export default function TargetsListPage() {
   }
 
   if (loading) {
-    return (
-      <div className="p-8 flex items-center justify-center h-full">
-        <div className="text-gray-400">{t("targets.loading")}</div>
-      </div>
-    );
+    return <Spinner fullPage label={t("targets.loading")} />;
   }
 
   return (
-    <div className="p-8 max-w-6xl">
+    <div className="p-8 max-w-7xl">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -173,7 +170,7 @@ export default function TargetsListPage() {
             }}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
               compareMode
-                ? "bg-[#57A5E4] text-white"
+                ? "bg-ecit-accent text-white"
                 : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
             }`}
           >
@@ -183,7 +180,7 @@ export default function TargetsListPage() {
           {compareMode && selectedForCompare.length === 2 && (
             <button
               onClick={handleCompare}
-              className="flex items-center gap-2 px-4 py-2.5 bg-[#03223F] text-white rounded-lg text-sm font-medium hover:bg-[#002C55] transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 bg-ecit-dark text-white rounded-lg text-sm font-medium hover:bg-ecit-navy transition-colors"
             >
               <ChevronRight size={16} />
               {t("targets.compareSelected")}
@@ -212,7 +209,7 @@ export default function TargetsListPage() {
           <p className="text-lg mb-2">{t("targets.noTargetsRegistered")}</p>
           <p className="text-sm">
             {t("targets.addViaCompanies")}{" "}
-            <Link to="/companies" className="text-[#57A5E4] underline">
+            <Link to="/companies" className="text-ecit-accent underline">
               {t("targets.companiesPage")}
             </Link>
           </p>
@@ -227,7 +224,7 @@ export default function TargetsListPage() {
                 key={ts.company.id}
                 className={`bg-white rounded-xl border transition-all ${
                   compareMode && isSelected
-                    ? "border-[#57A5E4] ring-2 ring-[#57A5E4]/20"
+                    ? "border-ecit-accent ring-2 ring-ecit-accent/20"
                     : "border-gray-200 hover:shadow-md"
                 }`}
               >
@@ -239,8 +236,8 @@ export default function TargetsListPage() {
                         onClick={() => toggleCompareSelection(ts.company.id)}
                         className={`mt-1 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors shrink-0 ${
                           isSelected
-                            ? "bg-[#57A5E4] border-[#57A5E4] text-white"
-                            : "border-gray-300 hover:border-[#57A5E4]"
+                            ? "bg-ecit-accent border-ecit-accent text-white"
+                            : "border-gray-300 hover:border-ecit-accent"
                         }`}
                       >
                         {isSelected && <Check size={12} />}
@@ -251,7 +248,7 @@ export default function TargetsListPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-1">
                         <div className="p-2 rounded-lg bg-sky-50">
-                          <Building2 size={18} className="text-[#57A5E4]" />
+                          <Building2 size={18} className="text-ecit-accent" />
                         </div>
                         <div>
                           <h3 className="font-semibold text-gray-900 text-lg">
@@ -291,7 +288,7 @@ export default function TargetsListPage() {
                     {!compareMode && (
                       <Link
                         to={`/targets/${ts.company.id}`}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-[#03223F] text-white rounded-lg text-sm font-medium hover:bg-[#002C55] transition-colors shrink-0"
+                        className="flex items-center gap-1.5 px-4 py-2 bg-ecit-dark text-white rounded-lg text-sm font-medium hover:bg-ecit-navy transition-colors shrink-0"
                       >
                         <Eye size={14} />
                         {t("targets.viewDetails")}
@@ -322,7 +319,7 @@ export default function TargetsListPage() {
                         </p>
                       </div>
                       <div className="bg-gray-50 rounded-lg px-3 py-2">
-                        <p className="text-xs text-gray-500">NIBD</p>
+                        <p className="text-xs text-gray-500">{t("common.nibd")}</p>
                         <p
                           className={`text-sm font-semibold tabular-nums ${
                             ts.latestNibd != null && ts.latestNibd < 0

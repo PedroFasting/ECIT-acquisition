@@ -608,7 +608,7 @@ export default function CapitalStructure({
                   ))}
                   <button
                     onClick={() => setSources([...sources, { name: "", amount: 0, type: "debt" }])}
-                    className="flex items-center gap-1 text-xs text-[#002C55] hover:underline font-medium"
+                    className="flex items-center gap-1 text-xs text-ecit-navy hover:underline font-medium"
                   >
                     <Plus size={12} /> {t("capital.addSource")}
                   </button>
@@ -652,7 +652,7 @@ export default function CapitalStructure({
                   ))}
                   <button
                     onClick={() => setUses([...uses, { name: "", amount: 0 }])}
-                    className="flex items-center gap-1 text-xs text-[#002C55] hover:underline font-medium"
+                    className="flex items-center gap-1 text-xs text-ecit-navy hover:underline font-medium"
                   >
                     <Plus size={12} /> {t("capital.addUse")}
                   </button>
@@ -794,7 +794,7 @@ export default function CapitalStructure({
                             </tr>
                           );
                         })}
-                        <tr className="bg-[#F4EDDC] font-semibold border-t border-gray-300">
+                        <tr className="bg-ecit-cream font-semibold border-t border-gray-300">
                           <td className="px-3 py-1.5" colSpan={2}>Total</td>
                           <td className="px-3 py-1.5 text-right tabular-nums">
                             {formatNum(sourcesTotal, 0)}
@@ -833,7 +833,7 @@ export default function CapitalStructure({
                               key={i}
                               className={
                                 isBold
-                                  ? "bg-[#F4EDDC] font-semibold"
+                                  ? "bg-ecit-cream font-semibold"
                                   : i % 2 === 0
                                   ? "bg-white"
                                   : "bg-gray-50"
@@ -846,7 +846,7 @@ export default function CapitalStructure({
                             </tr>
                           );
                         })}
-                        <tr className="bg-[#F4EDDC] font-semibold border-t border-gray-300">
+                        <tr className="bg-ecit-cream font-semibold border-t border-gray-300">
                           <td className="px-3 py-1.5">Total</td>
                           <td className="px-3 py-1.5 text-right tabular-nums">
                             {formatNum(usesTotal, 0)}
@@ -899,7 +899,7 @@ export default function CapitalStructure({
               <p className="mb-2">{t("capital.noCapitalStructure")}</p>
               <button
                 onClick={startEditing}
-                className="text-[#002C55] hover:underline text-sm font-medium"
+                className="text-ecit-navy hover:underline text-sm font-medium"
               >
                 {t("capital.addSourcesAndUses")}
               </button>

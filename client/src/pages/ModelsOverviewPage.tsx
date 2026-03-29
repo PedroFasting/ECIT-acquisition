@@ -4,6 +4,7 @@ import api from "../services/api";
 import type { Company, FinancialModel } from "../types";
 import { FileSpreadsheet, Building2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { Spinner } from "../components/ui";
 
 export default function ModelsOverviewPage() {
   const { t } = useTranslation();
@@ -37,17 +38,13 @@ export default function ModelsOverviewPage() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="p-8 flex items-center justify-center h-full">
-        <div className="text-gray-400">{t("modelsOverview.loadingModels")}</div>
-      </div>
-    );
+    return <Spinner fullPage label={t("modelsOverview.loadingModels")} />;
   }
 
   const totalModels = Object.values(modelsByCompany).flat().length;
 
   return (
-    <div className="p-8 max-w-6xl">
+    <div className="p-8 max-w-7xl">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">
           {t("modelsOverview.title")}
@@ -60,7 +57,7 @@ export default function ModelsOverviewPage() {
       {companies.length === 0 ? (
         <div className="bg-white rounded-xl border border-dashed border-gray-300 p-12 text-center text-gray-400">
           <p className="mb-2">{t("modelsOverview.noCompanies")}</p>
-          <Link to="/companies" className="text-[#002C55] hover:underline">
+          <Link to="/companies" className="text-ecit-navy hover:underline">
             {t("modelsOverview.createCompanyFirst")}
           </Link>
         </div>
@@ -75,14 +72,14 @@ export default function ModelsOverviewPage() {
                     size={18}
                     className={
                       company.company_type === "acquirer"
-                        ? "text-[#002C55]"
-                        : "text-[#57A5E4]"
+                        ? "text-ecit-navy"
+                        : "text-ecit-accent"
                     }
                   />
                   <h2 className="text-lg font-semibold text-gray-900">
                     <Link
                       to={`/companies/${company.id}`}
-                      className="hover:text-[#002C55]"
+                      className="hover:text-ecit-navy"
                     >
                       {company.name}
                     </Link>
@@ -105,7 +102,7 @@ export default function ModelsOverviewPage() {
                     {t("modelsOverview.noModels")}{" "}
                     <Link
                       to={`/companies/${company.id}`}
-                      className="text-[#002C55] hover:underline"
+                      className="text-ecit-navy hover:underline"
                     >
                       {t("modelsOverview.createOne")}
                     </Link>
@@ -122,7 +119,7 @@ export default function ModelsOverviewPage() {
                           <div className="p-2 rounded-lg bg-gray-50">
                             <FileSpreadsheet
                               size={18}
-                              className="text-[#002C55]"
+                              className="text-ecit-navy"
                             />
                           </div>
                           <div>

@@ -265,8 +265,8 @@ export default function SensitivityHeatmap({
     return closest;
   }, [baseParams]);
 
-  const selectCls = "px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-[#002C55] focus:border-[#002C55] outline-none";
-  const inputCls = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-left focus:ring-2 focus:ring-[#002C55] focus:border-[#002C55] outline-none";
+  const selectCls = "px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-ecit-navy focus:border-ecit-navy outline-none";
+  const inputCls = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-left focus:ring-2 focus:ring-ecit-navy focus:border-ecit-navy outline-none";
   const labelCls = "block text-xs font-medium text-gray-600 mb-1";
 
   const metricLabel = METRIC_OPTIONS.find(m => m.value === metric)?.labelKey
@@ -397,7 +397,7 @@ export default function SensitivityHeatmap({
                 <button
                   onClick={handleCalculate}
                   disabled={calculating || !baseParams.price_paid || rowAxisParam === colAxisParam}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#03223F] text-white rounded-lg text-sm font-medium hover:bg-[#002C55] disabled:opacity-50 w-full justify-center"
+                  className="flex items-center gap-2 px-4 py-2 bg-ecit-dark text-white rounded-lg text-sm font-medium hover:bg-ecit-navy disabled:opacity-50 w-full justify-center"
                 >
                   <Grid3x3 size={14} />
                   {calculating
@@ -427,7 +427,7 @@ export default function SensitivityHeatmap({
           {/* ── Loading state ──────────────────────────────── */}
           {calculating && (
             <div className="text-center py-12 text-gray-500">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#002C55] mx-auto mb-4" />
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-ecit-navy mx-auto mb-4" />
               <p className="text-sm">
                 {t("sensitivity.calculatingCombinations", {
                   rows: rowValues.length,

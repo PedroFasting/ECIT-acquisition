@@ -23,7 +23,7 @@ export default function SectionHeader({
     <div
       className={`px-6 py-4 flex items-center justify-between cursor-pointer select-none ${
         dark
-          ? "bg-[#03223F] text-white rounded-t-xl"
+          ? "bg-ecit-dark text-white rounded-t-xl"
           : "bg-gray-50 border-b border-gray-200 rounded-t-xl"
       }`}
       onClick={() => onToggle(sectionKey)}

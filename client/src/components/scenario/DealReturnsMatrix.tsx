@@ -280,7 +280,7 @@ export default function DealReturnsMatrix({
   }, [params.exit_multiples, onExitMultiplesChange]);
 
   const inputCls =
-    "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-right focus:ring-2 focus:ring-[#002C55] focus:border-[#002C55] outline-none";
+    "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-right focus:ring-2 focus:ring-ecit-navy focus:border-ecit-navy outline-none";
   const labelCls = "block text-xs font-medium text-gray-600 mb-1";
 
   return (
@@ -684,7 +684,7 @@ export default function DealReturnsMatrix({
                 <button
                   onClick={handleCalculate}
                   disabled={calculating || !params.price_paid}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#03223F] text-white rounded-lg text-sm font-medium hover:bg-[#002C55] disabled:opacity-50"
+                  className="flex items-center gap-2 px-4 py-2 bg-ecit-dark text-white rounded-lg text-sm font-medium hover:bg-ecit-navy disabled:opacity-50"
                 >
                   <Calculator size={14} />
                   {calculating
@@ -706,7 +706,7 @@ export default function DealReturnsMatrix({
               </p>
               <button
                 onClick={() => setShowParams(true)}
-                className="text-[#002C55] hover:underline text-sm font-medium"
+                className="text-ecit-navy hover:underline text-sm font-medium"
               >
                 {t("returns.showParametersBtn")}
               </button>
@@ -767,7 +767,7 @@ export default function DealReturnsMatrix({
                             key={caseName}
                             className={
                               caseName === "Kombinert"
-                                ? "!bg-[#F4EDDC]"
+                                ? "!bg-ecit-cream"
                                 : ""
                             }
                           >

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import CompanyAssumptions from "../components/CompanyAssumptions";
 import { getErrorMessage } from "../utils/errors";
+import { Spinner, ConfirmModal } from "../components/ui";
 
 export default function CompanyDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -23,6 +24,7 @@ export default function CompanyDetailPage() {
   const [models, setModels] = useState<FinancialModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   const { t } = useTranslation();
 
   // New model form
@@ -81,13 +83,19 @@ export default function CompanyDetailPage() {
     }
   };
 
-  const handleDeleteModel = async (modelId: number, name: string) => {
-    if (!confirm(t("companyDetail.confirmDeleteModel", { name }))) return;
+  const handleDeleteModelClick = (modelId: number, name: string) => {
+    setDeleteTarget({ id: modelId, name });
+  };
+
+  const handleDeleteModelConfirm = async () => {
+    if (!deleteTarget) return;
     try {
-      await api.deleteModel(modelId);
+      await api.deleteModel(deleteTarget.id);
+      setDeleteTarget(null);
       fetchData();
     } catch (err) {
       setError(getErrorMessage(err));
+      setDeleteTarget(null);
     }
   };
 
@@ -174,11 +182,7 @@ export default function CompanyDetailPage() {
   }, [handleExcelUpload]);
 
   if (loading) {
-    return (
-      <div className="p-8 flex items-center justify-center h-full">
-        <div className="text-gray-400">{t("common.loading")}</div>
-      </div>
-    );
+    return <Spinner fullPage label={t("common.loading")} />;
   }
 
   if (!company) {
@@ -192,7 +196,7 @@ export default function CompanyDetailPage() {
   const modelTypeKeys = ["base", "management", "sellside", "post_dd", "upside", "downside", "custom"] as const;
 
   return (
-    <div className="p-8 max-w-6xl">
+    <div className="p-8 max-w-7xl">
       {/* Header */}
       <div className="mb-8">
         <Link
@@ -229,7 +233,7 @@ export default function CompanyDetailPage() {
           </div>
           <button
             onClick={() => setShowModelForm(!showModelForm)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#03223F] text-white rounded-lg hover:bg-[#002C55] transition-colors text-sm font-medium"
+            className="flex items-center gap-2 px-4 py-2.5 bg-ecit-dark text-white rounded-lg hover:bg-ecit-navy transition-colors text-sm font-medium"
           >
             <Plus size={16} />
             {t("companyDetail.newModel")}
@@ -251,13 +255,13 @@ export default function CompanyDetailPage() {
           onDrop={handleDrop}
           className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-colors ${
             excelDragOver
-              ? "border-[#57A5E4] bg-blue-50/50"
+              ? "border-ecit-accent bg-blue-50/50"
               : "border-gray-300 hover:border-gray-400"
           } ${excelUploading ? "opacity-60 pointer-events-none" : ""}`}
         >
           <div className="flex flex-col items-center gap-2">
             <div className="p-3 rounded-full bg-blue-50">
-              <FileSpreadsheet size={28} className="text-[#002C55]" />
+              <FileSpreadsheet size={28} className="text-ecit-navy" />
             </div>
             <div>
               <p className="text-sm font-medium text-gray-700">
@@ -265,7 +269,7 @@ export default function CompanyDetailPage() {
               </p>
               <p className="text-xs text-gray-400 mt-1">
                 {t("companyDetail.dragAndDrop")}{" "}
-                <label className="text-[#57A5E4] hover:text-[#002C55] cursor-pointer underline">
+                <label className="text-ecit-accent hover:text-ecit-navy cursor-pointer underline">
                   {t("companyDetail.selectFile")}
                   <input
                     type="file"
@@ -287,8 +291,8 @@ export default function CompanyDetailPage() {
 
           {excelUploading && (
             <div className="absolute inset-0 flex items-center justify-center bg-white/60 rounded-xl">
-              <div className="flex items-center gap-2 text-sm text-[#002C55] font-medium">
-                <div className="w-4 h-4 border-2 border-[#002C55] border-t-transparent rounded-full animate-spin" />
+              <div className="flex items-center gap-2 text-sm text-ecit-navy font-medium">
+                <div className="w-4 h-4 border-2 border-ecit-navy border-t-transparent rounded-full animate-spin" />
                 {t("companyDetail.readingExcel")}
               </div>
             </div>
@@ -375,7 +379,7 @@ export default function CompanyDetailPage() {
                 onChange={(e) =>
                   setModelForm({ ...modelForm, name: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#002C55] outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ecit-navy outline-none"
                 placeholder={t("companyDetail.modelNamePlaceholder")}
               />
             </div>
@@ -388,7 +392,7 @@ export default function CompanyDetailPage() {
                 onChange={(e) =>
                   setModelForm({ ...modelForm, model_type: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#002C55] outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ecit-navy outline-none"
               >
                 {modelTypeKeys.map((val) => (
                   <option key={val} value={val}>
@@ -407,14 +411,14 @@ export default function CompanyDetailPage() {
                 onChange={(e) =>
                   setModelForm({ ...modelForm, description: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#002C55] outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ecit-navy outline-none"
               />
             </div>
           </div>
           <div className="flex gap-2 mt-4">
             <button
               onClick={handleCreateModel}
-              className="px-4 py-2 bg-[#03223F] text-white rounded-lg text-sm font-medium hover:bg-[#002C55]"
+              className="px-4 py-2 bg-ecit-dark text-white rounded-lg text-sm font-medium hover:bg-ecit-navy"
             >
               {t("companyDetail.createModel")}
             </button>
@@ -450,7 +454,7 @@ export default function CompanyDetailPage() {
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-3 flex-1">
                   <div className="p-2 rounded-lg bg-gray-50">
-                    <FileSpreadsheet size={20} className="text-[#002C55]" />
+                    <FileSpreadsheet size={20} className="text-ecit-navy" />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
@@ -506,7 +510,7 @@ export default function CompanyDetailPage() {
 
                   {/* Delete */}
                   <button
-                    onClick={() => handleDeleteModel(model.id, model.name)}
+                    onClick={() => handleDeleteModelClick(model.id, model.name)}
                     className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
                     title={t("companyDetail.deleteModel")}
                   >
@@ -533,6 +537,15 @@ export default function CompanyDetailPage() {
           ))}
         </div>
       )}
+
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title={t("common.confirmDelete")}
+        message={t("companyDetail.confirmDeleteModel", { name: deleteTarget?.name ?? "" })}
+        variant="danger"
+        onConfirm={handleDeleteModelConfirm}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

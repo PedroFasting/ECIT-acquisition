@@ -615,7 +615,7 @@ function BridgeTable({
               return (
                 <tr
                   key={ri}
-                  className={`${row.bold ? "!bg-[#F4EDDC]" : ""} ${
+                  className={`${row.bold ? "!bg-ecit-cream" : ""} ${
                     row.divider ? "border-t-2 border-t-gray-200" : ""
                   }`}
                 >
@@ -683,7 +683,7 @@ function NtmPanel({
   const nextYear = yearMatch ? parseInt(yearMatch[1]) + 1 : "?";
 
   const inputCls =
-    "w-24 px-2 py-1.5 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-[#002C55] focus:border-[#002C55] outline-none";
+    "w-24 px-2 py-1.5 border border-gray-300 rounded text-sm text-right focus:ring-2 focus:ring-ecit-navy focus:border-ecit-navy outline-none";
 
   return (
     <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4">
@@ -1141,7 +1141,7 @@ export default function EquityBridgeTable({
           onClick={() => setSelectedMultiple(m)}
           className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
             selectedMultiple === m
-              ? "bg-[#03223F] text-white"
+              ? "bg-ecit-dark text-white"
               : "bg-gray-100 text-gray-700 hover:bg-gray-200"
           }`}
         >

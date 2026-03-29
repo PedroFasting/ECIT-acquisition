@@ -8,6 +8,7 @@ import {
   LogOut,
   Target,
   Globe,
+  FileSpreadsheet,
 } from "lucide-react";
 
 export default function Layout() {
@@ -29,13 +30,14 @@ export default function Layout() {
     { to: "/", icon: LayoutDashboard, label: t("nav.overview") },
     { to: "/companies", icon: Building2, label: t("nav.companies") },
     { to: "/targets", icon: Target, label: t("nav.targets") },
+    { to: "/models", icon: FileSpreadsheet, label: t("nav.models") },
     { to: "/scenarios", icon: GitMerge, label: t("nav.scenarios") },
   ];
 
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
-      <aside className="w-64 bg-[#03223F] text-white flex flex-col">
+      <aside className="w-64 bg-ecit-dark text-white flex flex-col">
         <div className="p-6 border-b border-white/10">
           <h1 className="text-xl font-bold tracking-tight">ECIT Acquisition</h1>
           <p className="text-xs text-white/50 mt-1">{t("nav.subtitle")}</p>

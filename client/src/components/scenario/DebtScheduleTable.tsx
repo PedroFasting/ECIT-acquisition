@@ -152,7 +152,7 @@ export default function DebtScheduleTable({
                       <tr key={`hdr-${idx}`}>
                         <td
                           colSpan={debtSchedule.length + 1}
-                          className="pt-3 pb-1 text-xs font-bold text-[#03223F] uppercase tracking-wider"
+                          className="pt-3 pb-1 text-xs font-bold text-ecit-dark uppercase tracking-wider"
                         >
                           <div className="flex items-center gap-2">
                             <Landmark size={14} />
@@ -229,7 +229,7 @@ export default function DebtScheduleTable({
                 <>
                   {/* Mandatory amort portion */}
                   <div
-                    className="h-full bg-[#03223F] float-left transition-all"
+                    className="h-full bg-ecit-dark float-left transition-all"
                     style={{
                       width: `${Math.min(100, (debtSchedule.reduce((s, r) => s + r.mandatory_amort, 0) / entryDebt) * 100)}%`,
                     }}
@@ -248,7 +248,7 @@ export default function DebtScheduleTable({
             </div>
             <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-400">
               <span className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-sm bg-[#03223F] inline-block" />
+                <span className="w-2.5 h-2.5 rounded-sm bg-ecit-dark inline-block" />
                 {t("debt.mandatory")}
               </span>
               <span className="flex items-center gap-1">

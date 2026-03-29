@@ -36,10 +36,10 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#03223F] to-[#002C55]">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-ecit-dark to-ecit-navy">
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-[#03223F]">
+          <h1 className="text-3xl font-bold text-ecit-dark">
             {t("login.title")}
           </h1>
           <p className="text-gray-500 mt-2">
@@ -57,7 +57,7 @@ export default function LoginPage() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#002C55] focus:border-transparent outline-none"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ecit-navy focus:border-transparent outline-none"
                 required
               />
             </div>
@@ -71,7 +71,7 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#002C55] focus:border-transparent outline-none"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ecit-navy focus:border-transparent outline-none"
               placeholder="admin@ecit.no"
               required
             />
@@ -85,7 +85,7 @@ export default function LoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#002C55] focus:border-transparent outline-none"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ecit-navy focus:border-transparent outline-none"
               required
             />
           </div>
@@ -99,7 +99,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 bg-[#03223F] text-white rounded-lg font-medium hover:bg-[#002C55] transition-colors disabled:opacity-50"
+            className="w-full py-2.5 bg-ecit-dark text-white rounded-lg font-medium hover:bg-ecit-navy transition-colors disabled:opacity-50"
           >
             {loading
               ? t("login.loading")
@@ -116,7 +116,7 @@ export default function LoginPage() {
               setIsRegister(!isRegister);
               setError("");
             }}
-            className="text-[#002C55] font-medium hover:underline"
+            className="text-ecit-navy font-medium hover:underline"
           >
             {isRegister ? t("login.loginLink") : t("login.registerLink")}
           </button>

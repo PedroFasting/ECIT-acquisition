@@ -122,7 +122,7 @@ export default function ProFormaTable({
             {lineItems.map((item, _idx) => (
               <tr
                 key={item.key}
-                className={item.bold ? "!bg-[#F4EDDC]" : ""}
+                className={item.bold ? "!bg-ecit-cream" : ""}
               >
                 <td className={`${item.indent ? "pl-8 text-gray-500 italic" : item.bold ? "font-semibold text-gray-900" : "text-gray-700"}`}>
                   {item.label}

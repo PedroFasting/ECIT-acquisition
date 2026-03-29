@@ -182,7 +182,7 @@ export default function AccretionAnalysis({
                         </td>
                       ))}
                     </tr>
-                    <tr className="!bg-[#F4EDDC]">
+                    <tr className="!bg-ecit-cream">
                       <td className="font-semibold text-gray-900 text-xs">{t("accretion.delta")}</td>
                       {accretionData.map((d) => {
                         // Revenue-weighted combined organic growth vs acquirer standalone
@@ -229,7 +229,7 @@ export default function AccretionAnalysis({
                         <td key={d.label} className="num">{formatPct(d.acquirerMargin)}</td>
                       ))}
                     </tr>
-                    <tr className="!bg-[#F4EDDC]">
+                    <tr className="!bg-ecit-cream">
                       <td className="font-semibold text-gray-900 text-xs">{t("accretion.delta")}</td>
                       {accretionData.map((d) => {
                         // Pro forma weighted margin vs acquirer standalone

@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import api from "../services/api";
 import type { FinancialModel, FinancialPeriod } from "../types";
 import { ArrowLeft, Settings, TrendingUp } from "lucide-react";
+import { Spinner } from "../components/ui";
 
 export default function ModelDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -22,16 +23,12 @@ export default function ModelDetailPage() {
   }, [id]);
 
   if (loading) {
-    return (
-      <div className="p-8 flex items-center justify-center h-full">
-        <div className="text-gray-400">{t("modelDetail.loadingModel")}</div>
-      </div>
-    );
+    return <Spinner fullPage label={t("modelDetail.loadingModel")} />;
   }
 
   if (!model) {
     return (
-      <div className="p-8">
+    <div className="p-8 max-w-7xl">
         <p className="text-red-600">{t("modelDetail.modelNotFound")} {error}</p>
       </div>
     );
@@ -188,7 +185,7 @@ export default function ModelDetailPage() {
           <table className="ecit-table">
             <thead>
               <tr>
-                <th className="text-left sticky left-0 bg-[#002C55] min-w-[220px]">
+                <th className="text-left sticky left-0 bg-ecit-navy min-w-[220px]">
                   {model.company_name} ({model.name})
                 </th>
                 {periods.map((p) => (
@@ -217,7 +214,7 @@ export default function ModelDetailPage() {
                       <tr key={`section-${item.sectionKey}`}>
                         <td
                           colSpan={periods.length + 1}
-                          className="px-4 py-2 text-xs font-bold text-[#002C55] uppercase tracking-wider !bg-[#F4EDDC] border-t border-gray-200"
+                          className="px-4 py-2 text-xs font-bold text-ecit-navy uppercase tracking-wider !bg-ecit-cream border-t border-gray-200"
                         >
                           {t(item.sectionKey)}
                         </td>
@@ -225,7 +222,7 @@ export default function ModelDetailPage() {
                     )}
                     <tr
                       key={item.key}
-                      className={item.bold ? "!bg-[#F4EDDC]" : ""}
+                      className={item.bold ? "!bg-ecit-cream" : ""}
                     >
                       <td
                         className={`sticky left-0 ${
@@ -260,14 +257,14 @@ export default function ModelDetailPage() {
         {hasEquityBridgeData && (
           <div className="mt-8">
             <div className="flex items-center gap-2 mb-4">
-              <TrendingUp size={18} className="text-[#002C55]" />
+              <TrendingUp size={18} className="text-ecit-navy" />
               <h2 className="text-lg font-semibold text-gray-900">{t("modelDetail.equityBridge")}</h2>
             </div>
             <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
               <table className="ecit-table">
                 <thead>
                   <tr>
-                     <th className="text-left sticky left-0 bg-[#002C55] min-w-[220px]">
+                     <th className="text-left sticky left-0 bg-ecit-navy min-w-[220px]">
                        {t("modelDetail.valuationAndEquity")}
                      </th>
                     {periods.map((p) => (
@@ -295,7 +292,7 @@ export default function ModelDetailPage() {
                           <tr key={`eq-section-${item.sectionKey}`}>
                             <td
                               colSpan={periods.length + 1}
-                              className="px-4 py-2 text-xs font-bold text-[#002C55] uppercase tracking-wider !bg-[#F4EDDC] border-t border-gray-200"
+                              className="px-4 py-2 text-xs font-bold text-ecit-navy uppercase tracking-wider !bg-ecit-cream border-t border-gray-200"
                             >
                               {t(item.sectionKey)}
                             </td>
@@ -303,7 +300,7 @@ export default function ModelDetailPage() {
                         )}
                         <tr
                           key={item.key}
-                          className={item.bold ? "!bg-[#F4EDDC]" : ""}
+                          className={item.bold ? "!bg-ecit-cream" : ""}
                         >
                           <td
                             className={`sticky left-0 ${
@@ -336,7 +333,7 @@ export default function ModelDetailPage() {
         {hasModelParameters && (
           <div className="mt-8">
             <div className="flex items-center gap-2 mb-4">
-              <Settings size={18} className="text-[#002C55]" />
+              <Settings size={18} className="text-ecit-navy" />
               <h2 className="text-lg font-semibold text-gray-900">{t("modelDetail.modelParameters")}</h2>
             </div>
             <div className="bg-white rounded-xl border border-gray-200 p-5">

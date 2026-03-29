@@ -28,6 +28,7 @@ import ShareTracker from "../components/scenario/ShareTracker";
 import DebtScheduleTable from "../components/scenario/DebtScheduleTable";
 import SensitivityHeatmap from "../components/scenario/SensitivityHeatmap";
 import { getErrorMessage } from "../utils/errors";
+import { Spinner } from "../components/ui";
 
 export default function ScenarioDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -206,11 +207,7 @@ export default function ScenarioDetailPage() {
   // ─── Loading / Error states ───────────────────────────────
 
   if (loading) {
-    return (
-      <div className="p-8 flex items-center justify-center h-full">
-        <div className="text-gray-400">{t("scenarios.loadingAnalysis")}</div>
-      </div>
-    );
+    return <Spinner fullPage label={t("scenarios.loadingAnalysis")} />;
   }
 
   if (!scenario) {
@@ -256,7 +253,7 @@ export default function ScenarioDetailPage() {
               )}
               {scenario.exit_date && (
                 <span>
-                  Exit:{" "}
+                  {t("common.exitDate")}:{" "}
                   {new Date(scenario.exit_date).toLocaleDateString("nb-NO")}
                 </span>
               )}
@@ -272,7 +269,7 @@ export default function ScenarioDetailPage() {
             <button
               onClick={handleExportPpt}
               disabled={exportingPpt}
-              className="flex items-center gap-2 px-4 py-2.5 bg-[#C9A84C] text-white rounded-lg hover:bg-[#b8973f] transition-colors text-sm font-medium disabled:opacity-50 shadow-sm"
+              className="flex items-center gap-2 px-4 py-2.5 bg-ecit-gold text-white rounded-lg hover:bg-ecit-gold-dark transition-colors text-sm font-medium disabled:opacity-50 shadow-sm"
             >
               <Presentation size={16} className={exportingPpt ? "animate-bounce" : ""} />
               {exportingPpt ? t("common.exporting") : t("scenarios.pptExport")}
@@ -288,7 +285,7 @@ export default function ScenarioDetailPage() {
             <button
               onClick={handleGenerateProForma}
               disabled={generating}
-              className="flex items-center gap-2 px-4 py-2.5 bg-[#03223F] text-white rounded-lg hover:bg-[#002C55] transition-colors text-sm font-medium disabled:opacity-50 shadow-sm"
+              className="flex items-center gap-2 px-4 py-2.5 bg-ecit-dark text-white rounded-lg hover:bg-ecit-navy transition-colors text-sm font-medium disabled:opacity-50 shadow-sm"
             >
               <RefreshCw size={16} className={generating ? "animate-spin" : ""} />
               {generating ? t("common.calculating") : t("scenarioDetail.generateProForma")}

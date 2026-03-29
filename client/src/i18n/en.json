@@ -46,11 +46,15 @@
     "shares": "shares",
     "share": "share",
     "copyToClipboard": "Copy to clipboard",
-    "downloadPng": "Download as PNG"
+    "downloadPng": "Download as PNG",
+    "confirmDelete": "Confirm deletion",
+    "nibd": "NIBD",
+    "exitDate": "Exit"
   },
   "nav": {
     "overview": "Overview",
     "companies": "Companies",
+    "models": "Models",
     "targets": "Targets",
     "scenarios": "Scenarios",
     "logout": "Log out",

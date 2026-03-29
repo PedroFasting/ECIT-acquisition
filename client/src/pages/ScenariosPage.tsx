@@ -31,6 +31,7 @@ import ShareTracker from "../components/scenario/ShareTracker";
 import DebtScheduleTable from "../components/scenario/DebtScheduleTable";
 import SensitivityHeatmap from "../components/scenario/SensitivityHeatmap";
 import { getErrorMessage } from "../utils/errors";
+import { Spinner } from "../components/ui";
 
 export default function ScenariosPage() {
   const { t } = useTranslation();
@@ -339,17 +340,13 @@ export default function ScenariosPage() {
 
   // ─── Loading state ────────────────────────────────────────
   if (loading) {
-    return (
-      <div className="p-8 flex items-center justify-center h-full">
-        <div className="text-gray-400">{t("scenarios.loadingModels")}</div>
-      </div>
-    );
+    return <Spinner fullPage label={t("scenarios.loadingModels")} />;
   }
 
   // ─── No acquirer models ───────────────────────────────────
   if (acquirerModels.length === 0) {
     return (
-      <div className="p-8 max-w-6xl">
+      <div className="p-8 max-w-7xl">
         <h1 className="text-2xl font-bold text-gray-900 mb-4">{t("scenarios.title")}</h1>
         <div className="bg-white rounded-xl border border-dashed border-gray-300 p-12 text-center text-gray-400">
           <GitMerge size={32} className="mx-auto mb-3 opacity-40" />
@@ -385,7 +382,7 @@ export default function ScenariosPage() {
             <button
               onClick={handleExportPpt}
               disabled={exportingPpt}
-              className="flex items-center gap-2 px-4 py-2.5 bg-[#C9A84C] text-white rounded-lg hover:bg-[#b8973f] transition-colors text-sm font-medium disabled:opacity-50 shadow-sm"
+              className="flex items-center gap-2 px-4 py-2.5 bg-ecit-gold text-white rounded-lg hover:bg-ecit-gold-dark transition-colors text-sm font-medium disabled:opacity-50 shadow-sm"
             >
               <Presentation size={16} className={exportingPpt ? "animate-bounce" : ""} />
               {exportingPpt ? t("common.exporting") : t("scenarios.pptExport")}
@@ -428,7 +425,7 @@ export default function ScenariosPage() {
                   onClick={() => setSelectedAcquirerId(m.id)}
                   className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all border-2 ${
                     selectedAcquirerId === m.id
-                      ? "border-[#03223F] bg-[#03223F] text-white shadow-sm"
+                      ? "border-ecit-dark bg-ecit-dark text-white shadow-sm"
                       : "border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300 hover:bg-gray-100"
                   }`}
                 >
@@ -463,7 +460,7 @@ export default function ScenariosPage() {
                     e.target.value ? Number(e.target.value) : null
                   )
                 }
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-sm font-medium bg-white focus:ring-2 focus:ring-[#002C55] focus:border-[#002C55] outline-none appearance-none pr-10 transition-colors"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-sm font-medium bg-white focus:ring-2 focus:ring-ecit-navy focus:border-ecit-navy outline-none appearance-none pr-10 transition-colors"
               >
                 <option value="">{t("scenarios.selectTarget")}</option>
                 {Array.from(targetsByCompany.entries()).map(

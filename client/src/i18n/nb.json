@@ -46,11 +46,15 @@
     "shares": "aksjer",
     "share": "aksje",
     "copyToClipboard": "Kopier til utklippstavle",
-    "downloadPng": "Last ned som PNG"
+    "downloadPng": "Last ned som PNG",
+    "confirmDelete": "Bekreft sletting",
+    "nibd": "NIBD",
+    "exitDate": "Exit"
   },
   "nav": {
     "overview": "Oversikt",
     "companies": "Selskaper",
+    "models": "Modeller",
     "targets": "Targets",
     "scenarios": "Scenarier",
     "logout": "Logg ut",

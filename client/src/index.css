@@ -1,16 +1,20 @@
 @import "tailwindcss";
 
-/* ECIT Acquisition custom theme */
-:root {
+/* ECIT Acquisition — Tailwind v4 custom theme */
+@theme {
   --color-ecit-dark: #03223F;
   --color-ecit-navy: #002C55;
   --color-ecit-accent: #57A5E4;
   --color-ecit-cream: #F4EDDC;
   --color-ecit-light: #FBF7EF;
+  --color-ecit-gold: #C9A84C;
+  --color-ecit-gold-dark: #b8973f;
   --color-ecit-positive: #22c55e;
   --color-ecit-negative: #ef4444;
   --color-ecit-neutral: #6b7280;
+}
 
+:root {
   font-family: system-ui, -apple-system, sans-serif;
   line-height: 1.5;
 }
@@ -28,7 +32,7 @@ body {
 }
 
 .ecit-table thead tr {
-  background-color: #002C55;
+  background-color: var(--color-ecit-navy);
   color: white;
 }
 
@@ -43,7 +47,7 @@ body {
 }
 
 .ecit-table tbody tr:nth-child(even) {
-  background-color: #FBF7EF;
+  background-color: var(--color-ecit-light);
 }
 
 .ecit-table tbody tr:nth-child(odd) {
