@@ -368,6 +368,76 @@ export interface CompareResult {
   share_summary?: ShareSummary;
 }
 
+// ── Dashboard Summary (from GET /api/dashboard/summary) ──
+
+export interface DashboardCounts {
+  acquirers: number;
+  targets: number;
+  models: number;
+  scenarios: number;
+  active_scenarios: number;
+  draft_scenarios: number;
+}
+
+export interface DashboardScenario {
+  id: number;
+  name: string;
+  status: 'draft' | 'active' | 'archived';
+  enterprise_value: number | null;
+  exit_date: string | null;
+  created_at: string;
+  updated_at: string;
+  deal_parameters: DealParameters | null;
+  acquirer_company_name: string | null;
+  acquirer_model_name: string | null;
+  target_company_name: string | null;
+  target_model_name: string | null;
+  pf_revenue: number | null;
+  pf_ebitda: number | null;
+  pf_margin: number | null;
+  target_revenue: number | null;
+  target_ebitda: number | null;
+  target_margin: number | null;
+  acquirer_revenue: number | null;
+  acquirer_ebitda: number | null;
+  // Extracted from deal_parameters for convenience
+  entry_multiple: number | null;
+  exit_multiples: number[];
+  interest_rate: number | null;
+}
+
+export interface DashboardCompany {
+  id: number;
+  name: string;
+  company_type: 'acquirer' | 'target';
+  country: string | null;
+  sector: string | null;
+  created_at: string;
+  updated_at: string;
+  model_count: number;
+  revenue_total: number | null;
+  ebitda_total: number | null;
+  ebitda_margin: number | null;
+  revenue_growth: number | null;
+  model_name: string | null;
+  period_label: string | null;
+}
+
+export interface DashboardActivity {
+  entity_type: 'scenario' | 'company';
+  id: number;
+  name: string;
+  updated_at: string;
+  status: string | null;
+}
+
+export interface DashboardSummary {
+  counts: DashboardCounts;
+  scenarios: DashboardScenario[];
+  companies: DashboardCompany[];
+  activity: DashboardActivity[];
+}
+
 // Company-level assumptions (stored in model_parameters JSONB, synced across all models)
 export interface CompanyAssumptions {
   shares_at_completion?: number | null;

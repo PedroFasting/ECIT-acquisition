@@ -7,6 +7,7 @@ import companyRoutes from "./routes/companies.js";
 import modelRoutes from "./routes/models.js";
 import scenarioRoutes from "./routes/scenarios.js";
 import importRoutes from "./routes/import.js";
+import dashboardRoutes from "./routes/dashboard.js";
 import { openApiSpec } from "./docs/openapi.js";
 
 const app = express();
@@ -48,6 +49,7 @@ app.use("/api/companies", companyRoutes);
 app.use("/api/models", modelRoutes);
 app.use("/api/scenarios", scenarioRoutes);
 app.use("/api/import", importRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 // API documentation
 app.get("/api/docs/openapi.json", (_req, res) => res.json(openApiSpec));

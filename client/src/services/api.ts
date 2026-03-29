@@ -10,6 +10,7 @@ import type {
   SensitivityRequest,
   SensitivityResponse,
   CompanyAssumptions,
+  DashboardSummary,
 } from "../types";
 
 const API_BASE = "/api";
@@ -359,6 +360,11 @@ class ApiService {
     a.click();
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
+  }
+
+  // Dashboard
+  async getDashboardSummary(): Promise<DashboardSummary> {
+    return this.request("/dashboard/summary");
   }
 }
 
